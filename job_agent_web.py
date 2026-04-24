@@ -299,11 +299,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def _get_lang(self, params: Dict) -> str:
         """获取语言偏好：URL参数 > profile存储 > 默认"""
         lang = params.get("lang", "")
-        if lang in ("en", "zh-CN"):
+        if lang in ("en", "zh-CN", "fr"):
             return lang
         try:
             stored = self.agent.engine.profile.profile.get("language", "zh-CN")
-            if stored in ("en", "zh-CN"):
+            if stored in ("en", "zh-CN", "fr"):
                 return stored
         except:
             pass
