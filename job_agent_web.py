@@ -280,6 +280,22 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "feature_track_desc": "De la découverte à l'offre, tout au même endroit",
         "feature_letter": "Lettres de motivation",
         "feature_letter_desc": "Générez des lettres personnalisées en un clic",
+        # Boutons de recherche (utilisés dans la page de recherche)
+        "searching_text": "Recherche en cours…",
+        "status_searching": "Recherche en cours depuis ",
+        "status_done": "✅ Terminé, ",
+        "status_done_end": " offres trouvées",
+        "status_failed": "❌ Échec",
+        "btn_search": "🚀 Lancer la recherche",
+        "btn_search_again": "🚀 Relancer la recherche",
+        "btn_save": "💾 Enregistrer",
+        "btn_letter": "✉️ Lettre de motivation",
+        "btn_view": "🔗 Voir l'offre",
+        "saved_text": "✅ Enregistré",
+        "exists_text": "⚠️ Déjà enregistré",
+        "btn_letter_generate": "✉️ Générer la lettre",
+        "my_profile": "Mon profil",
+        "tracked_jobs": "Offres suivies",
     },
 
 }
@@ -450,20 +466,20 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         
         # Pre-translate all visible text
         _t = lambda k: t(lang, k)
-        _tr = lambda zh, en: zh if lang == "zh-CN" else en
         
-        searching_text = _tr("搜索中…", "Searching...")
-        status_searching = _tr("正在从 ", "Searching from ")
-        status_done = _tr("✅ 完成，找到 ", "✅ Done, found ")
-        status_done_end = _tr(" 个相关职位", " jobs")
-        status_failed = _tr("❌ 失败", "❌ Failed")
-        btn_search = _tr("🚀 开始搜索", "🚀 Start Search")
-        btn_search_again = _tr("🚀 重新搜索", "🚀 Search Again")
-        btn_save = _tr("💾 保存", "💾 Save")
-        btn_letter = _tr("✉️ 求职信", "✉️ Letter")
-        btn_view = _tr("🔗 查看原文", "🌐 View Posting")
-        saved_text = _tr("✅ 已保存", "✅ Saved")
-        exists_text = _tr("⚠️ 已存在", "⚠️ Exists")
+        
+        searching_text = t(lang, "searching_text")
+        status_searching = t(lang, "status_searching")
+        status_done = t(lang, "status_done")
+        status_done_end = t(lang, "status_done_end")
+        status_failed = t(lang, "status_failed")
+        btn_search = t(lang, "btn_search")
+        btn_search_again = t(lang, "btn_search_again")
+        btn_save = t(lang, "btn_save")
+        btn_letter = t(lang, "btn_letter")
+        btn_view = t(lang, "btn_view")
+        saved_text = t(lang, "saved_text")
+        exists_text = t(lang, "exists_text")
         
         h1_title = _t('search_page_title')
         kw_label = _t('keywords_label')
