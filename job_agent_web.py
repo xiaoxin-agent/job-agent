@@ -560,13 +560,71 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _jl_h2 = {json.dumps(job_list_h2)};
         
         var searchData = null;
+
+        function renderResults(d) {{
+            const results = document.getElementById('results');
+            const status = document.getElementById('search-status');
+            var h = '<div class="search-summary"><h2>' + _sr_h2 + '</h2>';
+            h += '<div class="result-stats">';
+            h += '<span>' + _jobs_label + ': ' + d.stats.total_jobs + '</span>';
+            h += '<span>' + _high_match + ': ' + d.stats.high_match + '</span>';
+            h += '<span>' + _avg_match + ': ' + d.stats.avg_match_score + '%</span>';
+            h += '</div></div><h2>' + _jl_h2 + '</h2>';
+            (d.jobs || []).forEach(function(job, i) {{
+                var sc = job.match_score || 0;
+                var cls = sc >= 70 ? 'score-high' : sc >= 40 ? 'score-medium' : 'score-low';
+                var mark = sc >= 70 ? '🎯' : sc >= 40 ? '👍' : '📋';
+                var desc = job.description || '';
+                var shortDesc = desc.substring(0, 120);
+                h += '<div class="job-card" id="card-' + i + '">';
+                h += '<div class="job-header" onclick="toggleDesc(' + i + ')" style="cursor:pointer">';
+                h += '<div class="job-title">' + mark + ' ' + (job.title || '') + '</div>';
+                h += '<div class="job-score ' + cls + '">' + sc + '%</div></div>';
+                h += '<div class="job-meta">';
+                h += '<span>🏢 ' + (job.company || '') + '</span>';
+                h += '<span>📍 ' + (job.location || '') + '</span>';
+                h += '<span>📅 ' + (job.date || '').substring(0, 10) + '</span>';
+                h += '<span>📡 ' + (job.source || '') + '</span></div>';
+                h += '<div class="job-desc" id="desc-' + i + '">' + shortDesc + '</div>';
+                h += '<div class="job-desc-full" id="fulldesc-' + i + '" style="display:none">' + desc.replace(/\\n/g, '<br>') + '</div>';
+                h += '<div class="job-actions">';
+                if (job.url) h += '<a href="' + job.url + '" target="_blank" class="btn btn-small">' + _btn_view + '</a>';
+                h += '<button onclick="saveJob(' + i + ')" class="btn btn-small btn-save" id="save-' + i + '">' + _btn_save + '</button>';
+                h += '<button onclick="genLetter(' + i + ')" class="btn btn-small">' + _btn_letter + '</button>';
+                h += '</div></div>';
+            }});
+            if (d.search_links && d.search_links.length) {{
+                h += '<h2>' + _sr_h2 + '</h2>';
+                d.search_links.forEach(function(lk) {{
+                    h += '<div class="link-item"><div>' + lk.title + '</div>';
+                    h += '<a href="' + lk.url + '" target="_blank" class="link-url">' + lk.url + '</a></div>';
+                }});
+            }}
+            results.innerHTML = h;
+            status.innerHTML = '<p>' + _done_prefix + d.stats.total_jobs + _done_suffix + '</p>';
+        }}
+
+        function loadCachedResults() {{
+            var cached = sessionStorage.getItem('searchResults');
+            if (cached) {{
+                try {{
+                    var d = JSON.parse(cached);
+                    searchData = d;
+                    renderResults(d);
+                    document.getElementById('searchBtn').textContent = _btn_search_again;
+                    return true;
+                }} catch(e) {{}}
+            }}
+            return false;
+        }}
+
         async function runSearch() {{
             const btn = document.getElementById('searchBtn');
             const status = document.getElementById('search-status');
             const results = document.getElementById('results');
             const sources = [];
             document.querySelectorAll('.src-cb:checked').forEach(function(cb) {{ sources.push(cb.value); }});
-            
+
             btn.disabled = true;
             btn.textContent = _searching;
             status.innerHTML = '<div class="loading"><div class="spinner"></div><p>' + _src_prefix + sources.join(', ') + '</p></div>';
@@ -579,44 +637,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 const d = await resp.json();
                 if (d.success) {{
                     searchData = d;
-                    let h = '<div class="search-summary"><h2>' + _sr_h2 + '</h2>';
-                    h += '<div class="result-stats">';
-                    h += '<span>' + _jobs_label + ': ' + d.stats.total_jobs + '</span>';
-                    h += '<span>' + _high_match + ': ' + d.stats.high_match + '</span>';
-                    h += '<span>' + _avg_match + ': ' + d.stats.avg_match_score + '%</span>';
-                    h += '</div></div><h2>' + _jl_h2 + '</h2>';
-                    (d.jobs || []).forEach(function(job, i) {{
-                        var sc = job.match_score || 0;
-                        var cls = sc >= 70 ? 'score-high' : sc >= 40 ? 'score-medium' : 'score-low';
-                        var mark = sc >= 70 ? '\U0001f3af' : sc >= 40 ? '\U0001f44d' : '\U0001f4cb';
-                        var desc = job.description || '';
-                        var shortDesc = desc.substring(0, 120);
-                        h += '<div class="job-card" id="card-' + i + '">';
-                        h += '<div class="job-header" onclick="toggleDesc(' + i + ')" style="cursor:pointer">';
-                        h += '<div class="job-title">' + mark + ' ' + (job.title || '') + '</div>';
-                        h += '<div class="job-score ' + cls + '">' + sc + '%</div></div>';
-                        h += '<div class="job-meta">';
-                        h += '<span>\U0001f3e2 ' + (job.company || '') + '</span>';
-                        h += '<span>\U0001f4cd ' + (job.location || '') + '</span>';
-                        h += '<span>\U0001f4c5 ' + (job.date || '').substring(0, 10) + '</span>';
-                        h += '<span>\U0001f4e1 ' + (job.source || '') + '</span></div>';
-                        h += '<div class="job-desc" id="desc-' + i + '">' + shortDesc + '</div>';
-                        h += '<div class="job-desc-full" id="fulldesc-' + i + '" style="display:none">' + desc.replace(/\\n/g, '<br>') + '</div>';
-                        h += '<div class="job-actions">';
-                        if (job.url) h += '<a href="' + job.url + '" target="_blank" class="btn btn-small">' + _btn_view + '</a>';
-                        h += '<button onclick="saveJob(' + i + ')" class="btn btn-small btn-save" id="save-' + i + '">' + _btn_save + '</button>';
-                        h += '<button onclick="genLetter(' + i + ')" class="btn btn-small">' + _btn_letter + '</button>';
-                        h += '</div></div>';
-                    }});
-                    if (d.search_links && d.search_links.length) {{
-                        h += '<h2>' + _sr_h2 + '</h2>';
-                        d.search_links.forEach(function(lk) {{
-                            h += '<div class="link-item"><div>' + lk.title + '</div>';
-                            h += '<a href="' + lk.url + '" target="_blank" class="link-url">' + lk.url + '</a></div>';
-                        }});
-                    }}
-                    results.innerHTML = h;
-                    status.innerHTML = '<p>' + _done_prefix + d.stats.total_jobs + _done_suffix + '</p>';
+                    sessionStorage.setItem('searchResults', JSON.stringify(d));
+                    renderResults(d);
                 }} else {{
                     status.innerHTML = '<p class="error">' + _failed + (d.error || '') + '</p>';
                 }}
@@ -626,6 +648,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             btn.disabled = false;
             btn.textContent = _btn_search_again;
         }}
+        
+        // On page load, restore cached results if available
+        loadCachedResults();
         function toggleDesc(i) {{
             var short = document.getElementById('desc-' + i);
             var full = document.getElementById('fulldesc-' + i);
