@@ -17,7 +17,7 @@ PORT = 9999
 
 
 # ============================================================
-# 国际化 (i18n) — 当前支持 en / zh-CN
+# 国际化 (i18n) — 当前支持 en / zh-CN / fr
 # ============================================================
 
 LANGUAGES: Dict[str, Dict[str, str]] = {
@@ -193,7 +193,95 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "feature_track_desc": "管理你的申请状态，从发现到Offer全程跟踪",
         "feature_letter": "求职信生成",
         "feature_letter_desc": "一键生成定制求职信，突出你的优势",
-    }
+    },
+    "fr": {
+        # Navigation
+        "nav_home": "🏠 Accueil",
+        "nav_dashboard": "📊 Tableau de bord",
+        "nav_search": "🔍 Recherche",
+        "nav_tracked": "📋 Suivi",
+        "nav_profile": "👤 Profil",
+        "nav_letter": "✉️ Lettre de motivation",
+        # Général
+        "page_title": "Agent de Recherche d'Emploi",
+        "hero_h1": "🤖 Agent de Recherche d'Emploi",
+        "hero_subtitle": "Recherche intelligente · Correspondance de compétences · Suivi des candidatures",
+        "start_search": "🚀 Lancer la recherche",
+        "dashboard": "📊 Tableau de bord",
+        "search_btn": "🔍 Rechercher",
+        "save_btn": "💾 Enregistrer",
+        "saved_btn": "✅ Enregistré",
+        "view_btn": "🔗 Voir",
+        "letter_btn": "✉️ Lettre",
+        "job_title": "Titre du poste",
+        "company": "Entreprise",
+        "location": "Lieu",
+        "source": "Source",
+        "date": "Date",
+        "match_score": "Correspondance",
+        "status": "Statut",
+        "all": "Tout",
+        "saved": "Enregistrés",
+        "applied": "Postulés",
+        "interviewing": "Entretien",
+        "rejected": "Refusés",
+        "offer": "Offre",
+        "no_results": "Aucun résultat pour le moment. Essayez une recherche !",
+        "loading": "Recherche en cours...",
+        "error": "Erreur",
+        # Page de recherche
+        "search_page_title": "🔍 Rechercher des offres",
+        "search_desc": "Rechercher sur plusieurs plateformes et analyser automatiquement les scores de correspondance.",
+        "search_btn_lg": "🚀 Lancer la recherche",
+        "search_again_btn": "🚀 Relancer la recherche",
+        "keywords_label": "Mots-clés",
+        "location_label": "Lieu",
+        "sources_label": "Sources",
+        "search_results": "📊 Résultats de recherche",
+        "jobs_found": "Offres",
+        "high_match": "Haute correspondance",
+        "avg_match": "Corresp. moyenne",
+        "job_list": "💼 Liste des offres",
+        "cover_letter_title": "✉️ Lettre de motivation",
+        # Tableau de bord
+        "dash_title": "📊 Tableau de bord",
+        "total_tracked": "Suivis",
+        "applications": "Candidatures",
+        "interviews": "Entretiens",
+        "offers": "Offres",
+        "application_status": "Progression des candidatures",
+        "skill_profile": "🛠️ Profil de compétences",
+        "edit_profile": "Modifier le profil",
+        # Page de suivi
+        "tracked_title": "📋 Offres suivies",
+        "all_statuses": "Tous les statuts",
+        "no_tracked": "Aucune offre enregistrée.",
+        # Page de profil
+        "profile_title": "👤 Profil",
+        "profile_desc": "Mettez à jour vos compétences et préférences.",
+        "name_label": "Nom",
+        "target_role": "Poste visé",
+        "salary_min": "Salaire min",
+        "salary_max": "Salaire max",
+        "currency": "Devise",
+        "locations_label": "Lieux cibles",
+        "target_companies": "Entreprises cibles",
+        "save_profile": "💾 Enregistrer le profil",
+        # Générateur de lettre
+        "letter_title": "✉️ Générateur de lettre",
+        "letter_desc": "Sélectionnez une offre enregistrée pour générer une lettre personnalisée.",
+        "generate_letter": "Générer",
+        # Fonctionnalités d'accueil
+        "feature_multi": "Multi-sources",
+        "feature_multi_desc": "Offres en temps réel depuis Indeed et d'autres plateformes",
+        "feature_match": "Correspondance intelligente",
+        "feature_match_desc": "Analyse automatique basée sur votre profil de compétences",
+        "feature_track": "Suivi des candidatures",
+        "feature_track_desc": "De la découverte à l'offre, tout au même endroit",
+        "feature_letter": "Lettres de motivation",
+        "feature_letter_desc": "Générez des lettres personnalisées en un clic",
+    },
+
 }
 
 
@@ -706,7 +794,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_update_profile(self, data):
         try:
             # Persist language preference if sent from client
-            if 'language' in data and data['language'] in ('en', 'zh-CN'):
+            if 'language' in data and data['language'] in ('en', 'zh-CN', 'fr'):
                 self.agent.update_profile({'language': data['language']})
             self.agent.update_profile(data)
             self.send_json({"success": True})
@@ -736,12 +824,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         qs = f"?lang={lang}" if lang != "zh-CN" else ""
         for href, text in pages:
             nav_items += f'<a href="{href}{qs}" class="nav-link">{text}</a>'
-        # 语言切换
-        other = "en" if lang == "zh-CN" else "zh-CN"
-        other_label = "🇨🇳 中文" if other == "zh-CN" else "🇬🇧 English"
+        # 语言切换（循环: zh-CN → en → fr → zh-CN）
+        lang_cycle = {"zh-CN": "en", "en": "fr", "fr": "zh-CN"}
+        other = lang_cycle.get(lang, "zh-CN")
+        lang_labels = {"zh-CN": "🇨🇳 中文", "en": "🇬🇧 English", "fr": "🇫🇷 Français"}
+        other_label = lang_labels.get(other, "🇨🇳 中文")
         lang_switch = f'<a href="?lang={other}" class="nav-link lang-switch" style="margin-left:auto;font-size:12px">{other_label}</a>'
         
-        html_lang = "en" if lang == "en" else "zh-CN"
+        html_lang = lang if lang in ("en", "zh-CN", "fr") else "zh-CN"
         site_name = t(lang, "page_title")
         return f"""<!DOCTYPE html>
 <html lang="{html_lang}">
