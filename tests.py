@@ -217,14 +217,14 @@ class TestWebServer(unittest.TestCase):
         resp = urlopen(f"http://localhost:{self.port}/tracked")
         self.assertEqual(resp.status, 200)
         html = resp.read().decode("utf-8")
-        self.assertIn("申请跟踪", html)
+        self.assertIn("跟踪职位", html)
     
     def test_05_profile_page(self):
         """画像页面返回200"""
         resp = urlopen(f"http://localhost:{self.port}/profile")
         self.assertEqual(resp.status, 200)
         html = resp.read().decode("utf-8")
-        self.assertIn("我的画像", html)
+        self.assertIn("用户画像", html)
         self.assertIn("Cloud", html)  # 需要有技能数据
     
     def test_06_letter_page(self):
