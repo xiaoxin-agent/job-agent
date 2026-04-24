@@ -1,0 +1,6 @@
+*.pyc
+__pycache__/
+*.log
+*.pid
+agent_data/*.json
+!agent_data/user_profile.json
