@@ -106,7 +106,20 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "feature_track": "Application Tracking",
         "feature_track_desc": "Track from discovery to offer, all in one place",
         "feature_letter": "Cover Letters",
-        "feature_letter_desc": "Generate tailored cover letters with one click",
+        "feature_letter_desc": "Generate tailored cover letters with one click",        # Search page button texts
+        "searching_text": "Searching...",
+        "status_searching": "Searching from ",
+        "status_done": "✅ Done, found ",
+        "status_done_end": " jobs",
+        "status_failed": "❌ Failed",
+        "btn_search": "🚀 Start Search",
+        "btn_search_again": "🚀 Search Again",
+        "btn_save": "💾 Save",
+        "btn_letter": "✉️ Letter",
+        "btn_view": "🔗 View Posting",
+        "saved_text": "✅ Saved",
+        "exists_text": "⚠️ Exists",
+
     },
     "zh-CN": {
         "nav_home": "🏠 首页",
@@ -192,7 +205,20 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "feature_track": "申请跟踪",
         "feature_track_desc": "管理你的申请状态，从发现到Offer全程跟踪",
         "feature_letter": "求职信生成",
-        "feature_letter_desc": "一键生成定制求职信，突出你的优势",
+        "feature_letter_desc": "一键生成定制求职信，突出你的优势",        # 搜索页按钮文本
+        "searching_text": "搜索中…",
+        "status_searching": "正在从 ",
+        "status_done": "✅ 完成，找到 ",
+        "status_done_end": " 个相关职位",
+        "status_failed": "❌ 失败",
+        "btn_search": "🚀 开始搜索",
+        "btn_search_again": "🚀 重新搜索",
+        "btn_save": "💾 保存",
+        "btn_letter": "✉️ 求职信",
+        "btn_view": "🔗 查看原文",
+        "saved_text": "✅ 已保存",
+        "exists_text": "⚠️ 已存在",
+
     },
     "fr": {
         # Navigation
