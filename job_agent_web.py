@@ -1222,6 +1222,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         """从简历库删除简历"""
         try:
             resume_id = data.get("resume_id", "")
+            if not resume_id:
+                self.send_json({"success": False, "error": "缺少 resume_id"}, 400)
+                return
             ok = self.agent.tracker.delete_resume(resume_id)
             self.send_json({"success": ok})
         except Exception as e:
@@ -1261,19 +1264,24 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var h = '';
             resp.resumes.forEach(function(r) {{
                 h += '<div class="resume-card">';
-                h += '<div><span class="resume-name">📄 ' + r.name + '</span><br><span class="resume-date">' + r.created_at + '</span></div>';
+                h += '<div><span class="resume-name">\U0001F4C4 ' + r.name + '</span><br><span class="resume-date">' + r.created_at + '</span></div>';
                 h += '<div class="resume-actions">';
-                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">👁️ 预览</a>';
-                h += '<button onclick="delResume(\"' + r.id + '\")" class="btn btn-small btn-delete">' + RESUME_DELETE + '</button>';
+                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">\U0001F441\u200D\U0001F5E8\uFE0F \u9884\u89C8</a>';
+                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-delete btn-del-resume">' + RESUME_DELETE + '</button>';
                 h += '</div></div>';
             }});
             list.innerHTML = h;
         }}
-        async function delResume(id) {{
-            if (!confirm('确定删除？')) return;
-            await fetch('/api/delete_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{resume_id:id}})}});
-            loadResumes();
-        }}
+        // Event delegation for delete buttons
+        document.addEventListener('click', function(e) {{
+            var btn = e.target.closest('.btn-del-resume');
+            if (!btn) return;
+            var id = btn.getAttribute('data-resume-id');
+            if (!confirm('\u786E\u5B9A\u5220\u9664\uFF1F')) return;
+            fetch('/api/delete_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{resume_id:id}})}})
+              .then(function(r){{ return r.json(); }})
+              .then(function(d){{ if(d.success) loadResumes(); }});
+        }});
         async function uploadResume() {{
             var input = document.createElement('input');
             input.type = 'file';
@@ -1292,10 +1300,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     if (d.success) {{
                         loadResumes();
                     }} else {{
-                        alert('上传失败: ' + (d.error || ''));
+                        alert('\u4E0A\u4F20\u5931\u8D25: ' + (d.error || ''));
                     }}
                 }} catch(e) {{
-                    alert('上传出错: ' + e);
+                    alert('\u4E0A\u4F20\u51FA\u9519: ' + e);
                 }}
                 document.body.removeChild(input);
             }};
@@ -1308,9 +1316,6 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
     def _resume_page_script(self):
         return ''
-
-    # ===================== 工具 =====================
-
     def _page(self, title, body, lang="zh-CN"):
         nav_items = ""
         pages = [

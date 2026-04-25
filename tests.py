@@ -529,6 +529,37 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
             self.fail(msg)
         self.assertGreater(len(results), 0)
 
+    def test_19_resume_page_delete_button_html(self):
+        """验证简历库页面删除按钮的 HTML 正确"""
+        import requests
+        resp = urlopen(f"http://localhost:{self.port}/resumes")
+        html = resp.read().decode("utf-8")
+
+        # 不要用 onclick 拼接参数（之前的 bug 来源）
+        import re
+        # 检查 JS 模板中 data-resume-id 的模式
+        # 注意：实际列表由 JS 动态渲染，HTML 源码中只有模板字符串
+        self.assertIn('data-resume-id="', html,
+            "JS 模板字符串应生成 data-resume-id 属性")
+        self.assertIn("btn-del-resume", html,
+            "JS 模板字符串应有 btn-del-resume 类")
+
+        # 验证点击事件委托和确认框
+        self.assertIn("document.addEventListener", html,
+            "页面应使用事件委托处理点击")
+        self.assertIn("btn-del-resume", html,
+            "事件委托应查找 btn-del-resume 类")
+        self.assertIn("delete_resume", html,
+            "事件委托应调用 delete_resume API")
+
+    def test_20_resume_page_upload_button_html(self):
+        """验证上传按钮 HTML 正确"""
+        resp = urlopen(f"http://localhost:{self.port}/resumes")
+        html = resp.read().decode("utf-8")
+        self.assertIn('onclick="uploadResume()"', html)
+        self.assertIn("add_resume_multipart", html)
+
+
 def cleanup():
     """清理测试数据"""
     import shutil
