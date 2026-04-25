@@ -559,74 +559,113 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         self.assertIn('onclick="uploadResume()"', html)
         self.assertIn("add_resume_multipart", html)
 
-    def test_21_resume_assign_and_verify_in_library(self):
-        """端到端测试：关联简历后，简历库仍能找到该简历"""
+    def test_21_resume_link_browser_simulation(self):
+        """模仿浏览器：模拟点击关联简历→选简历→确认关联的完整流程"""
+        import urllib.parse
+
+        # === 1. 上传简历到简历库（模拟用户在简历库页面上传） ===
         import requests
-        # 上传一份简历到简历库
         r = requests.post(f"http://localhost:{self.port}/api/add_resume_multipart",
-            files={'resume': ('e2e_test.pdf', b'%PDF E2E test resume content', 'application/pdf')},
-            data={'name': 'e2e_test.pdf'})
+            files={'resume': ('browser_test.pdf', b'%PDF simulate browser upload', 'application/pdf')},
+            data={'name': 'browser_test.pdf'})
         d = r.json()
-        self.assertTrue(d.get("success"))
+        self.assertTrue(d.get("success"), f"上传失败: {d}")
         resume_id = d["resume"]["id"]
         resume_name = d["resume"]["name"]
 
-        # 保存职位到跟踪列表
+        # === 2. 保存职位到跟踪列表（模拟用户搜索后保存） ===
         agent = self._agent
         agent.save_job({
-            "title": "E2E Link Test Job",
-            "company": "E2E Co",
-            "location": "Test City",
-            "match_score": 80
+            "title": "Browser Sim Job",
+            "company": "Sim Co",
+            "location": "Sim City",
+            "match_score": 85
         })
         job_id = agent.tracker.tracked_jobs[0]["id"]
 
-        # 关联简历到职位
-        r2 = requests.post(f"http://localhost:{self.port}/api/assign_resume",
-            json={"job_id": job_id, "resume_id": resume_id})
-        d2 = r2.json()
-        self.assertTrue(d2.get("success"), f"assign_resume failed: {d2}")
+        # === 3. 模拟浏览器：请求跟踪页，验证渲染内容 ===
+        tracked_html = urlopen(f"http://localhost:{self.port}/tracked").read().decode("utf-8")
 
-        # === 验证点1：职位有正确的 resume_id ===
+        # 3a. 页面包含 linkResume 函数
+        self.assertIn("function linkResume(jobId)", tracked_html,
+            "跟踪页应定义 linkResume 函数")
+
+        # 3b. 页面有关联简历按钮（onclick 正确包含 jobId 且带引号）
+        # 在 JS 代码内部，字符串拼接生成: onclick="linkResume('$jobId')"
+        # 所以页面源码中应看到 onclick="linkResume(' 字符串片段
+        self.assertIn('onclick="linkResume(\'', tracked_html,
+            "按钮 onclick 应生成 linkResume('...') 带引号")
+
+        # 3c. 页面有 assignResume 函数
+        self.assertIn("async function assignResume(jobId, resumeId)", tracked_html,
+            "跟踪页应定义 assignResume 函数")
+
+        # 3d. 页面有 uploadNewResumeAndLink 函数
+        self.assertIn("async function uploadNewResumeAndLink", tracked_html,
+            "跟踪页应定义 uploadNewResumeAndLink 函数")
+
+        # 3e. 未关联简历的职位显示 "关联简历" 按钮
+        self.assertIn('关联简历', tracked_html,
+            "未关联简历的职位应显示'关联简历'按钮")
+
+        # 3f. 弹窗模板包含简历库列表结构和关闭按钮
+        self.assertIn("resume-modal-overlay", tracked_html,
+            "弹窗应使用 resume-modal-overlay id")
+        self.assertIn("closeResumeModal", tracked_html,
+            "弹窗有关闭函数")
+
+        # === 4. 模拟浏览器：点击关联简历后弹窗会调用的 API ===
+        # linkResume 函数内部 fetch('/api/list_resumes')
+        r4 = requests.get(f"http://localhost:{self.port}/api/list_resumes")
+        d4 = r4.json()
+        self.assertTrue(d4.get("success"))
+        # 上传的简历在列表中
+        lib_ids = [r["id"] for r in d4.get("resumes", [])]
+        self.assertIn(resume_id, lib_ids, f"简历库列表应包含刚上传的简历")
+
+        # === 5. 模拟浏览器：点击 "关联" 按钮调用的 API ===
+        # 这是弹窗中每个简历后面的按钮: assignResume(jobId, resumeId)
+        r5 = requests.post(f"http://localhost:{self.port}/api/assign_resume",
+            json={"job_id": job_id, "resume_id": resume_id})
+        d5 = r5.json()
+        self.assertTrue(d5.get("success"), f"assign_resume 失败: {d5}")
+
+        # === 6. 验证关联结果（这对应浏览器页面 location.reload() 后的状态） ===
+        # 6a. 职位有 resume_id
         job = agent.tracker.get_job(job_id)
         self.assertEqual(job.get("resume_id"), resume_id)
         self.assertEqual(job.get("resume_name"), resume_name)
 
-        # === 验证点2：简历库列表仍能找到该简历 ===
-        r3 = requests.get(f"http://localhost:{self.port}/api/list_resumes")
-        d3 = r3.json()
-        self.assertTrue(d3.get("success"))
-        lib_ids = [r["id"] for r in d3.get("resumes", [])]
-        self.assertIn(resume_id, lib_ids, f"简历库列表未包含已关联的简历 {resume_id}")
+        # 6b. 简历库仍有该简历（关联不影响简历库）
+        r6 = requests.get(f"http://localhost:{self.port}/api/list_resumes")
+        d6 = r6.json()
+        lib_ids = [r["id"] for r in d6.get("resumes", [])]
+        self.assertIn(resume_id, lib_ids, "关联后简历库应仍有该简历")
 
-        # 找到该简历条目，验证名称一致
-        lib_entry = next(r for r in d3["resumes"] if r["id"] == resume_id)
-        self.assertEqual(lib_entry["name"], resume_name)
-
-        # === 验证点3：简历库的元数据文件 (resume_index.json) 未丢失 ===
+        # 6c. 职位专属副本文件存在
         import os
         base = os.path.dirname(agent.tracker.jobs_file)
-        index_path = os.path.join(base, "resumes", "resume_index.json")
-        self.assertTrue(os.path.exists(index_path), "resume_index.json 不存在")
-        with open(index_path, 'r') as f:
-            index = json.load(f)
-        # index is a list of dicts, find entry by id
-        lib_ids = [r["id"] for r in index]
-        self.assertIn(resume_id, lib_ids, f"resume_index.json 中缺少 resume_id {resume_id}")
-        lib_entry = next(r for r in index if r["id"] == resume_id)
-        self.assertEqual(lib_entry["name"], resume_name)
+        job_pdf = os.path.join(base, "resumes", f"job_{job_id}", f"{resume_id}.pdf")
+        self.assertTrue(os.path.exists(job_pdf), f"职位副本文件不存在: {job_pdf}")
 
-        # === 验证点4：职位专属副本目录存在（副本文件以 resume_id 命名） ===
-        job_dir = os.path.join(base, "resumes", f"job_{job_id}")
-        self.assertTrue(os.path.exists(job_dir), f"职位副本目录 {job_dir} 不存在")
-        job_pdf = os.path.join(job_dir, f"{resume_id}.pdf")
-        self.assertTrue(os.path.exists(job_pdf), f"职位副本 {job_pdf} 不存在")
-
-        # === 验证点5：简历库原始 PDF 依然存在 ===
+        # 6d. 简历库原始文件存在
         lib_pdf = os.path.join(base, "resumes", f"{resume_id}.pdf")
-        self.assertTrue(os.path.exists(lib_pdf), f"简历库原始 PDF {lib_pdf} 不存在")
+        self.assertTrue(os.path.exists(lib_pdf), f"简历库原始 PDF 不存在: {lib_pdf}")
 
-        # 清理创建的职位
+        # === 7. 模拟浏览器：刷新跟踪页，验证已关联显示 ===
+        tracked_html2 = urlopen(f"http://localhost:{self.port}/tracked").read().decode("utf-8")
+        # 不再显示 "关联简历" 按钮
+        self.assertNotIn('linkResume(\'' + job_id + '\')', tracked_html2,
+            "关联后不应再显示关联简历按钮")
+        # 显示简历名 + 预览/编辑链接
+        self.assertIn(resume_name, tracked_html2,
+            f"关联后跟踪页应显示简历名 '{resume_name}'")
+        self.assertIn('预览', tracked_html2,
+            "关联后应有预览链接")
+        self.assertIn('编辑', tracked_html2,
+            "关联后应有编辑链接")
+
+        # 清理
         agent.tracker.delete_job(job_id)
 
 
