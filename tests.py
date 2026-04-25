@@ -247,7 +247,37 @@ class TestWebServer(unittest.TestCase):
         self.assertIn("jobs", data)
         self.assertIn("stats", data)
         self.assertIn("search_links", data)
-    
+
+    def test_07b_api_search_space_separated(self):
+        """空格分隔的关键词应正确解析并返回结果"""
+        req = Request(
+            f"http://localhost:{self.port}/api/run_search",
+            data=json.dumps({"keywords": "software cloud"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        resp = urlopen(req)
+        self.assertEqual(resp.status, 200)
+        data = json.loads(resp.read().decode("utf-8"))
+        self.assertTrue(data.get("success"))
+        self.assertGreater(len(data.get("jobs", [])), 0,
+            msg="空格分隔 'software cloud' 应返回至少1个职位")
+
+    def test_07c_api_search_comma_separated(self):
+        """逗号分隔的关键词也应正确解析"""
+        req = Request(
+            f"http://localhost:{self.port}/api/run_search",
+            data=json.dumps({"keywords": "software,cloud"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        resp = urlopen(req)
+        self.assertEqual(resp.status, 200)
+        data = json.loads(resp.read().decode("utf-8"))
+        self.assertTrue(data.get("success"))
+        self.assertGreater(len(data.get("jobs", [])), 0,
+            msg="逗号分隔 'software,cloud' 应返回至少1个职位")
+
     def test_08_api_save_job(self):
         """保存职位API"""
         req = Request(
