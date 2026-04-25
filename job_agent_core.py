@@ -1008,52 +1008,102 @@ class JobTracker:
         os.makedirs(resume_dir, exist_ok=True)
         return os.path.join(resume_dir, f"{job_id}.pdf")
 
-    def save_resume(self, job_id: str, data: bytes) -> bool:
-        """保存简历文件"""
-        path = self._resume_path(job_id)
+    # ---- 简历库管理 ----
+
+    def _resume_dir(self) -> str:
+        base = os.path.dirname(self.jobs_file)
+        d = os.path.join(base, "resumes")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    def _resume_idx_path(self) -> str:
+        return os.path.join(self._resume_dir(), "resume_index.json")
+
+    def _load_resume_index(self) -> list:
+        path = self._resume_idx_path()
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return json.load(f)
+        return []
+
+    def _save_resume_index(self, idx: list):
+        with open(self._resume_idx_path(), "w") as f:
+            json.dump(idx, f, ensure_ascii=False, indent=2)
+
+    def list_resumes(self) -> list:
+        """列出简历库所有简历"""
+        return self._load_resume_index()
+
+    def add_resume(self, name: str, data: bytes) -> dict:
+        """上传简历到简历库，返回简历信息"""
+        import uuid
+        idx = self._load_resume_index()
+        rid = uuid.uuid4().hex[:12]
+        now = datetime.datetime.now().isoformat()
+        entry = {"id": rid, "name": name, "filename": f"{rid}.pdf", "created_at": now}
+        path = os.path.join(self._resume_dir(), entry["filename"])
         with open(path, "wb") as f:
             f.write(data)
-        # 更新 job 记录标记
-        for job in self.tracked_jobs:
-            if job["id"] == job_id:
-                job["has_resume"] = True
-                break
-        self.save()
-        return True
+        idx.append(entry)
+        self._save_resume_index(idx)
+        return entry
 
-    def get_resume(self, job_id: str) -> Optional[bytes]:
-        """读取简历文件"""
-        path = self._resume_path(job_id)
-        if os.path.exists(path):
-            with open(path, "rb") as f:
-                return f.read()
+    def get_resume(self, resume_id: str) -> Optional[bytes]:
+        """读取简历库中的简历文件"""
+        idx = self._load_resume_index()
+        for r in idx:
+            if r["id"] == resume_id:
+                path = os.path.join(self._resume_dir(), r["filename"])
+                if os.path.exists(path):
+                    with open(path, "rb") as f:
+                        return f.read()
         return None
 
-    def has_resume(self, job_id: str) -> bool:
-        """是否有简历"""
-        for job in self.tracked_jobs:
-            if job["id"] == job_id:
-                return job.get("has_resume", False)
+    def get_resume_info(self, resume_id: str) -> Optional[dict]:
+        """获取简历信息"""
+        idx = self._load_resume_index()
+        for r in idx:
+            if r["id"] == resume_id:
+                return r
+        return None
+
+    def delete_resume(self, resume_id: str) -> bool:
+        """从简历库删除简历"""
+        idx = self._load_resume_index()
+        for i, r in enumerate(idx):
+            if r["id"] == resume_id:
+                path = os.path.join(self._resume_dir(), r["filename"])
+                if os.path.exists(path):
+                    os.remove(path)
+                del idx[i]
+                self._save_resume_index(idx)
+                # 清理职位中对这个简历的引用
+                for job in self.tracked_jobs:
+                    if job.get("resume_id") == resume_id:
+                        job.pop("resume_id", None)
+                        job.pop("resume_name", None)
+                self.save()
+                return True
         return False
 
-    def delete_resume(self, job_id: str):
-        """删除简历文件"""
-        path = self._resume_path(job_id)
-        if os.path.exists(path):
-            os.remove(path)
-        for job in self.tracked_jobs:
-            if job["id"] == job_id:
-                job["has_resume"] = False
-                job.pop("resume_file", None)
-                break
-        self.save()
-
     def delete_job(self, job_id: str) -> bool:
-        """删除跟踪的职位（连带简历文件）"""
-        self.delete_resume(job_id)
+        """删除跟踪的职位（不删简历库，只清引用）"""
         for i, job in enumerate(self.tracked_jobs):
             if job["id"] == job_id:
                 del self.tracked_jobs[i]
+                self.save()
+                return True
+        return False
+
+    def assign_resume(self, job_id: str, resume_id: str) -> bool:
+        """给职位关联简历"""
+        info = self.get_resume_info(resume_id)
+        if not info:
+            return False
+        for job in self.tracked_jobs:
+            if job["id"] == job_id:
+                job["resume_id"] = resume_id
+                job["resume_name"] = info["name"]
                 self.save()
                 return True
         return False

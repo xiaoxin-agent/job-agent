@@ -28,7 +28,13 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_search": "🔍 Search",
         "nav_tracked": "📋 Tracked",
         "nav_profile": "👤 Profile",
+        "nav_resume": "📄 Resumes",
         "nav_letter": "✉️ Cover Letter",
+        "resume_title": "Resume Library",
+        "resume_upload": "Upload Resume",
+        "resume_delete": "Delete",
+        "resume_empty": "No resumes yet",
+        "resume_upload_hint": "Upload a new resume (PDF recommended)",
         # 通用
         "page_title": "Job Search Agent",
         "hero_h1": "🤖 Job Search Agent",
@@ -133,7 +139,13 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_search": "🔍 搜索",
         "nav_tracked": "📋 跟踪",
         "nav_profile": "👤 画像",
+        "nav_resume": "📄 简历库",
         "nav_letter": "✉️ 求职信",
+        "resume_title": "简历库",
+        "resume_upload": "上传简历",
+        "resume_delete": "删除",
+        "resume_empty": "暂无简历",
+        "resume_upload_hint": "上传新简历（推荐 PDF 格式）",
         # 通用
         "page_title": "职业搜索助手",
         "hero_h1": "🤖 求职Agent",
@@ -239,7 +251,13 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_search": "🔍 Recherche",
         "nav_tracked": "📋 Suivi",
         "nav_profile": "👤 Profil",
+        "nav_resume": "📄 CV",
         "nav_letter": "✉️ Lettre de motivation",
+        "resume_title": "Bibliothèque de CV",
+        "resume_upload": "Télécharger un CV",
+        "resume_delete": "Supprimer",
+        "resume_empty": "Aucun CV pour le moment",
+        "resume_upload_hint": "Télécharger un nouveau CV (PDF recommandé)",
         # Général
         "page_title": "Agent de Recherche d'Emploi",
         "hero_h1": "🤖 Agent de Recherche d'Emploi",
@@ -381,11 +399,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/tracked": self.handle_tracked_page,
             "/profile": self.handle_profile_page,
             "/letter": self.handle_letter_page,
+            "/resumes": self.handle_resume_page,
         }
 
-        # GET 下载简历
+        # GET 下载简历 / 获取简历列表
         if path == "/api/get_resume":
             self.api_get_resume_GET(params)
+            return
+        if path == "/api/list_resumes":
+            self.api_list_resumes_GET()
             return
 
         handler = routes.get(path)
@@ -418,6 +440,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/generate_letter": self.api_generate_letter,
             "/api/upload_resume": self.api_upload_resume,
             "/api/get_resume": self.api_get_resume,
+            "/api/list_resumes": self.api_list_resumes,
+            "/api/add_resume": self.api_add_resume,
+            "/api/delete_resume": self.api_delete_resume,
+            "/api/assign_resume": self.api_assign_resume,
         }
 
         handler = api_routes.get(path)
@@ -781,7 +807,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume">📄 简历已上传 <a href="/api/get_resume?job_id='+j['id']+'" class="link-url" target="_blank">查看</a></div>') if j.get('has_resume') else ''}
+                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="/api/get_resume?resume_id='+j['resume_id']+'" class="link-url" target="_blank">查看</a></div>') if j.get('resume_id') else ''}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
@@ -812,31 +838,87 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             location.reload();
         }}
         async function applyWithResume(id) {{
+            var resumes = await (await fetch('/api/list_resumes')).json();
+            var list = (resumes.success ? resumes.resumes : []);
+            var html = '<div id="resume-modal-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center">';
+            html += '<div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto">';
+            html += '<h3 style="margin-bottom:12px">选择简历</h3>';
+            if (list.length > 0) {{
+                html += '<div style="margin-bottom:12px">';
+                list.forEach(function(r) {{
+                    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">';
+                    html += '<span>📄 ' + r.name + '</span>';
+                    html += '<div>';
+                    html += '<button onclick="useResume(\'' + id + '\',\'' + r.id + '\')" class="btn btn-small" style="margin-right:4px">使用</button>';
+                    html += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">预览</a>';
+                    html += '</div></div>';
+                }});
+                html += '</div>';
+                html += '<hr style="margin:12px 0">';
+            }}
+            html += '<div><button onclick="uploadNewResume(\'' + id + '\')" class="btn" style="width:100%">📤 上传新简历</button></div>';
+            html += '<div style="margin-top:12px;text-align:right"><button onclick="closeResumeModal()" class="btn btn-small">取消</button></div>';
+            html += '</div></div>';
+            document.body.insertAdjacentHTML('beforeend', html);
+        }}
+        function closeResumeModal() {{
+            var el = document.getElementById('resume-modal-overlay');
+            if (el) el.remove();
+        }}
+        async function useResume(jobId, resumeId) {{
+            closeResumeModal();
+            var btn = document.getElementById('apply-btn-' + jobId);
+            btn.disabled = true;
+            btn.textContent = '⏳ 关联中…';
+            try {{
+                var resp = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
+                var d = await resp.json();
+                if (d.success) {{
+                    var notes = prompt('备注（可选）:','')||'';
+                    await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}});
+                    location.reload();
+                }} else {{
+                    alert('关联失败: ' + (d.error || ''));
+                    btn.disabled = false;
+                    btn.textContent = '📤 申请';
+                }}
+            }} catch(e) {{
+                alert('错误: ' + e);
+                btn.disabled = false;
+                btn.textContent = '📤 申请';
+            }}
+        }}
+        async function uploadNewResume(jobId) {{
+            closeResumeModal();
             var input = document.createElement('input');
             input.type = 'file';
-            input.accept = '.pdf,.doc,.docx,.png,.jpg';
+            input.accept = '.pdf,.doc,.docx';
             input.onchange = async function(e) {{
                 var file = e.target.files[0];
                 if (!file) return;
-                var btn = document.getElementById('apply-btn-' + id);
+                var btn = document.getElementById('apply-btn-' + jobId);
                 btn.disabled = true;
                 btn.textContent = '⏳ 上传中…';
-                var formData = new FormData();
-                formData.append('job_id', id);
-                formData.append('resume', file);
                 try {{
-                    var resp = await fetch('/api/upload_resume', {{method:'POST', body:formData}});
-                    var d = await resp.json();
-                    if (d.success) {{
-                        // 简历上传成功，更新状态为 applied
+                    // 1. 先上传到简历库
+                    var reader = new FileReader();
+                    reader.onload = async function(ev) {{
+                        var b64 = ev.target.result.split(',')[1];
+                        var name = file.name || '未命名简历';
+                        var resp1 = await fetch('/api/add_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{name:name, file:b64}})}});
+                        var d1 = await resp1.json();
+                        if (!d1.success) {{ alert('上传失败: ' + (d1.error || '')); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
+                        // 2. 关联到职位
+                        var resumeId = d1.resume.id;
+                        var resp2 = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
+                        var d2 = await resp2.json();
+                        if (!d2.success) {{ alert('关联失败'); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
+                        // 3. 更新状态
                         var notes = prompt('备注（可选）:','')||'';
-                        await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id, status:'applied', notes:notes}})}});
+                        await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}});
                         location.reload();
-                    }} else {{
-                        alert('上传失败: ' + (d.error || '未知错误'));
-                        btn.disabled = false;
-                        btn.textContent = '📤 申请';
-                    }}
+                    }};
+                    reader.readAsDataURL(file);
                 }} catch(e) {{
                     alert('上传出错: ' + e);
                     btn.disabled = false;
@@ -1037,14 +1119,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_get_resume_GET(self, params):
         """GET 方式返回简历文件供下载"""
         try:
-            job_id = params.get("job_id", "")
-            content = self.agent.tracker.get_resume(job_id)
+            resume_id = params.get("resume_id", params.get("job_id", ""))
+            content = self.agent.tracker.get_resume(resume_id)
             if content is None:
                 self.send_json({"success": False, "error": "未找到简历"}, 404)
                 return
             self.send_response(200)
             self.send_header("Content-Type", "application/pdf")
-            self.send_header("Content-Disposition", f'attachment; filename="resume_{job_id}.pdf"')
+            self.send_header("Content-Disposition", f'attachment; filename="resume_{resume_id}.pdf"')
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
@@ -1054,19 +1136,142 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_get_resume(self, data):
         """返回简历文件供下载 (POST)"""
         try:
-            job_id = data.get("job_id", "")
-            content = self.agent.tracker.get_resume(job_id)
+            resume_id = data.get("resume_id", data.get("job_id", ""))
+            content = self.agent.tracker.get_resume(resume_id)
             if content is None:
                 self.send_json({"success": False, "error": "未找到简历"}, 404)
                 return
             self.send_response(200)
             self.send_header("Content-Type", "application/pdf")
-            self.send_header("Content-Disposition", f'attachment; filename="resume_{job_id}.pdf"')
+            self.send_header("Content-Disposition", f'attachment; filename="resume_{resume_id}.pdf"')
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_list_resumes_GET(self, params):
+        """GET 返回简历列表"""
+        try:
+            resumes = self.agent.tracker.list_resumes()
+            self.send_json({"success": True, "resumes": resumes})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_list_resumes(self, data):
+        """POST 返回简历列表"""
+        self.api_list_resumes_GET(data)
+
+    def api_add_resume(self, data):
+        """上传简历到简历库 (POST JSON)"""
+        try:
+            # 支持两种方式：base64 文本或 multipart 上传
+            name = data.get("name", "未命名简历")
+            file_b64 = data.get("file", None)
+            if file_b64:
+                import base64
+                file_data = base64.b64decode(file_b64)
+                entry = self.agent.tracker.add_resume(name, file_data)
+                self.send_json({"success": True, "resume": entry})
+            else:
+                self.send_json({"success": False, "error": "缺少 file 字段(base64)"}, 400)
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_delete_resume(self, data):
+        """从简历库删除简历"""
+        try:
+            resume_id = data.get("resume_id", "")
+            ok = self.agent.tracker.delete_resume(resume_id)
+            self.send_json({"success": ok})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_assign_resume(self, data):
+        """给职位关联简历"""
+        try:
+            job_id = data.get("job_id", "")
+            resume_id = data.get("resume_id", "")
+            ok = self.agent.tracker.assign_resume(job_id, resume_id)
+            self.send_json({"success": ok})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    # ===================== 页面 =====================
+
+    def handle_resume_page(self, params):
+        lang = self._get_lang(params)
+        title = t(lang, 'resume_title')
+        upload_text = t(lang, 'resume_upload')
+        upload_hint = t(lang, 'resume_upload_hint')
+        empty_text = t(lang, 'resume_empty')
+        delete_text = t(lang, 'resume_delete')
+        script = self._resume_page_script()
+        body = f"""
+        <h1>{title}</h1>
+        <div id="resume-list"></div>
+        <div style="margin-top:16px">
+            <button onclick="uploadResume()" class="btn btn-primary">{upload_text}</button>
+            <span style="margin-left:8px;color:#888;font-size:12px">{upload_hint}</span>
+        </div>
+        <script>
+{script}
+        </script>
+        """
+        html = self._page(title, body, lang=lang)
+        self._send_html(html)
+
+    def _resume_page_script(self):
+        """简历库页面 JS (不在 f-string 里避免花括号冲突)"""
+        return r"""
+        async function loadResumes() {
+            var resp = await (await fetch('/api/list_resumes')).json();
+            var list = document.getElementById('resume-list');
+            if (!resp.success || resp.resumes.length === 0) {
+                list.innerHTML = '<p style="margin-top:16px;color:#888">' + EMPTY_TEXT + '</p>';
+                return;
+            }
+            var h = '';
+            resp.resumes.forEach(function(r) {
+                h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid #e0e0e0;border-radius:8px;margin-top:8px">';
+                h += '<div><span style="font-weight:bold">' + 'FOLDER_EMOJI' + ' ' + r.name + '</span><br><span style="font-size:12px;color:#888">' + r.created_at + '</span></div>';
+                h += '<div>';
+                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">' + 'EYE_EMOJI' + ' ' + 'PREVIEW_TEXT</a>';
+                h += '<button onclick="delResume(\'' + r.id + '\')" class="btn btn-small btn-delete" style="margin-left:6px">' + DELETE_TEXT + '</button>';
+                h += '</div></div>';
+            });
+            list.innerHTML = h;
+        }
+        async function delResume(id) {
+            if (!confirm('确定删除？')) return;
+            await fetch('/api/delete_resume', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({resume_id:id})});
+            loadResumes();
+        }
+        async function uploadResume() {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.doc,.docx';
+            input.onchange = async function(e) {
+                var file = e.target.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = async function(ev) {
+                    var b64 = ev.target.result.split(',')[1];
+                    var name = file.name || '未命名简历';
+                    var resp = await fetch('/api/add_resume', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, file:b64})});
+                    var d = await resp.json();
+                    if (d.success) {
+                        loadResumes();
+                    } else {
+                        alert('上传失败: ' + (d.error || ''));
+                    }
+                };
+                reader.readAsDataURL(file);
+            };
+            input.click();
+        }
+        loadResumes();
+        """.replace('EMPTY_TEXT', '暂无简历').replace('DELETE_TEXT', '删除').replace('PREVIEW_TEXT', '预览').replace('FOLDER_EMOJI', '\U0001F4C4').replace('EYE_EMOJI', '\U0001F441\U0000200D\U0001F5E8\uFE0F')
 
     # ===================== 工具 =====================
 
@@ -1079,6 +1284,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ("/tracked", t(lang, "nav_tracked")),
             ("/profile", t(lang, "nav_profile")),
             ("/letter", t(lang, "nav_letter")),
+            ("/resumes", t(lang, "nav_resume")),
         ]
         # Persist lang in nav links so switching pages doesn't lose language
         qs = f"?lang={lang}" if lang != "zh-CN" else ""
