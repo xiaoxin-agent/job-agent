@@ -204,10 +204,11 @@ class JobSearchEngine:
         
         return jobs
     
-    def search_indeed(self, location: str, max_results: int = 5) -> List[Dict]:
+    def search_indeed(self, location: str, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
         """从Indeed搜索职位（curl_cffi模拟浏览器Chrome指纹）"""
         jobs = []
-        keywords = self.profile.get_skill_keywords()[:3]
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
         
         try:
             from curl_cffi import requests
@@ -295,7 +296,7 @@ class JobSearchEngine:
         
         return jobs
     
-    def search_remoteok(self, max_results: int = 5) -> List[Dict]:
+    def search_remoteok(self, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
         """搜索RemoteOK"""
         jobs = []
         
@@ -308,7 +309,8 @@ class JobSearchEngine:
             if response.status_code == 200:
                 data = response.json()
                 if isinstance(data, list) and len(data) > 1:
-                    skills = self.profile.get_skill_keywords()
+                    # Use user keywords if provided, else fall back to profile skills
+                    skills = keywords if keywords else self.profile.get_skill_keywords()
                     for item in data[1:20]:
                         title = item.get("position", "")
                         desc = item.get("description", "")
@@ -415,8 +417,8 @@ class JobSearchEngine:
         
         source_map = {
             "GitHub Jobs": lambda: self.search_github_jobs(keywords, location, max_per_source),
-            "RemoteOK": lambda: self.search_remoteok(max_per_source),
-            "Indeed": lambda: self.search_indeed(location, max_per_source),
+            "RemoteOK": lambda: self.search_remoteok(max_per_source, keywords),
+            "Indeed": lambda: self.search_indeed(location, max_per_source, keywords),
         }
         
         all_jobs = []
