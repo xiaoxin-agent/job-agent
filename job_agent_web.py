@@ -1451,8 +1451,8 @@ async function loadPreview() {{
   originalHtml = html_content;
   document.getElementById('editor').value = html_content
     .replace(/<p>/g, '')
-    .replace(/<\/p>/g, '\n\n')
-    .replace(/<br>/g, '\n')
+    .replace(/<\/p>/g, '\\n\\n')
+    .replace(/<br>/g, '\\n')
     .replace(/<strong>(.*?)<\/strong>/g, '$1');
 }}
 
@@ -1478,11 +1478,11 @@ function toggleEdit() {{
 async function saveEdit() {{
   var status = document.getElementById('statusMsg');
   var htmlContent = document.getElementById('editor').value;
-  var paragraphs = htmlContent.split(/\n\s*\n/).filter(function(p) {{ return p.trim(); }});
+  var paragraphs = htmlContent.split(new RegExp('\\n\\s*\\n')).filter(function(p) {{ return p.trim(); }});
   var formatted = paragraphs.map(function(p) {{
-    var lines = p.trim().split('\n').filter(function(l) {{ return l.trim(); }});
+    var lines = p.trim().split('\\n').filter(function(l) {{ return l.trim(); }});
     return '<p>' + lines.join('<br>') + '</p>';
-  }}).join('\n');
+  }}).join('\\n');
   document.getElementById('preview').innerHTML = formatted;
   originalHtml = formatted;
   document.getElementById('editor').style.display = 'none';
