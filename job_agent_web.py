@@ -815,7 +815,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="/api/get_resume?resume_id='+j['resume_id']+'" class="link-url" target="_blank">查看</a></div>') if j.get('resume_id') else ''}
+                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">查看</a></div>') if j.get('resume_id') else ''}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
@@ -858,8 +858,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     html += '<span>📄 ' + r.name + '</span>';
                     html += '<div>';
                     html += '<button onclick="useResume(&quot;' + id + '&quot;,&quot;' + r.id + '&quot;)" class="btn btn-small" style="margin-right:4px">使用</button>';
-                    html += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">👁‍🗨️ 预览</a>';
-                html += '<a href="/resume_view?resume_id=' + r.id + '" target="_blank" class="btn btn-small">📝 编辑</a>';
+                    
                     html += '</div></div>';
                 }});
                 html += '</div>';
