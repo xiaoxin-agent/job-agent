@@ -578,7 +578,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var shortDesc = desc.substring(0, 120);
                 h += '<div class="job-card" id="card-' + i + '">';
                 h += '<div class="job-header" onclick="toggleDesc(' + i + ')" style="cursor:pointer">';
-                h += '<div class="job-title">' + mark + ' ' + (job.title || '') + '</div>';
+                h += '<div class="job-title">' + mark + ' ' + (job.title || '') + ' <span class="job-type-tag">' + (job.job_type || '') + '</span></div>';
                 h += '<div class="job-score ' + cls + '">' + sc + '%</div></div>';
                 h += '<div class="job-meta">';
                 h += '<span>🏢 ' + (job.company || '') + '</span>';
@@ -959,6 +959,7 @@ h1 {{ margin-bottom:20px; }}
 .score-high {{ background:#e6f4ea; color:#34a853; }}
 .score-medium {{ background:#fef7e0; color:#f9ab00; }}
 .score-low {{ background:#fce8e6; color:#ea4335; }}
+.job-type-tag {{ display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
 .job-meta {{ display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:#666; margin-bottom:6px; }}
 .job-desc {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; }}
 .job-desc-full {{ font-size:13px; color:#333; margin-bottom:8px; line-height:1.5; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:8px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}

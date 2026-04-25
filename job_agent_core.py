@@ -148,6 +148,26 @@ class JobSearchEngine:
     def __init__(self, profile: UserProfile):
         self.profile = profile
     
+
+    def _infer_job_type(self, tags: list, title: str, desc: str) -> str:
+        """从 tags / title / desc 推断职位类型"""
+        text = (title + " " + desc).lower()
+        tag_text = " ".join(t.lower() for t in (tags or []) if isinstance(t, str))
+        full_text = text + " " + tag_text
+        if any(kw in full_text for kw in ["contract", "contractor"]):
+            return "Contract"
+        if any(kw in full_text for kw in ["part.time", "parttime"]):
+            return "Part-Time"
+        if any(kw in full_text for kw in ["full.time", "fulltime", "permanent"]):
+            return "Full-Time"
+        if any(kw in full_text for kw in ["intern", "internship"]):
+            return "Internship"
+        if any(kw in full_text for kw in ["freelance", "freelancer"]):
+            return "Freelance"
+        if "co-op" in full_text or "coop" in full_text:
+            return "Co-op"
+        return ""
+    
     def search_github_jobs(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
         """搜索GitHub Jobs"""
         jobs = []
@@ -290,6 +310,8 @@ class JobSearchEngine:
                         content = (title + " " + desc).lower()
                         
                         if any(s.lower() in content for s in skills):
+                            tags = item.get("tags", [])
+                            job_type = self._infer_job_type(tags, title, desc)
                             jobs.append(self._format_job({
                                 "title": title,
                                 "company": item.get("company", ""),
@@ -297,7 +319,8 @@ class JobSearchEngine:
                                 "description": self._clean_html(desc)[:300],
                                 "url": f"https://remoteok.io/remote-jobs/{item.get('slug', '')}",
                                 "date": item.get("date", ""),
-                                "source": "RemoteOK"
+                                "source": "RemoteOK",
+                                "job_type": job_type
                             }))
                             if len(jobs) >= max_results:
                                 break
@@ -507,6 +530,20 @@ class JobSearchEngine:
     
     def _format_job(self, raw: Dict) -> Dict:
         """格式化职位数据"""
+        job_type = raw.get("job_type", "")
+        if not job_type:
+            # fallback: infer from description
+            desc = (raw.get("title", "") + " " + raw.get("description", "")).lower()
+            if any(kw in desc for kw in ["contract", "contractor"]):
+                job_type = "Contract"
+            elif any(kw in desc for kw in ["part.time", "parttime"]):
+                job_type = "Part-Time"
+            elif any(kw in desc for kw in ["full.time", "fulltime", "permanent"]):
+                job_type = "Full-Time"
+            elif any(kw in desc for kw in ["intern", "internship"]):
+                job_type = "Internship"
+            elif any(kw in desc for kw in ["freelance", "freelancer"]):
+                job_type = "Freelance"
         return {
             "title": raw.get("title", "Unknown"),
             "company": raw.get("company", "Unknown"),
@@ -515,6 +552,7 @@ class JobSearchEngine:
             "url": raw.get("url", ""),
             "date": raw.get("date", ""),
             "source": raw.get("source", ""),
+            "job_type": job_type,
             "analyzed": False,
             "match_score": 0,
             "match_details": {},
