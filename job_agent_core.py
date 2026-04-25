@@ -636,10 +636,36 @@ class JobSearchEngine:
             "saved_at": datetime.datetime.now().isoformat()
         }
     
+    @staticmethod
+    def _fix_mojibake(text: str) -> str:
+        """修复双重编码的 UTF-8 文本（emoji/特殊字符）
+        
+        RemoteOK 等源有时返回被 Latin-1 双重编码的 UTF-8 字符串，
+        如 📈 \u2192 \xf0\x9f\x93\x88 \u2192 Ã°\x9f\x93\x88
+        """
+        if not text:
+            return text
+        try:
+            encoded = text.encode('latin-1')
+            fixed = encoded.decode('utf-8')
+            # 修复后的文本不应包含 C1 控制字符或一个字节拆成多个字符的产物
+            # 检查：修复后的文本是否包含更多有效的高位字符（U+0080+），
+            # 且原始文本有明显的 UTF-8 双编码特征
+            has_bad = any(0x80 <= ord(c) <= 0x9F for c in text)
+            has_accent = any(0xC0 <= ord(c) <= 0xFF for c in text)
+            if has_bad or has_accent:
+                # 额外检查：修复后不再有 C1 控制字符
+                if not any(0x80 <= ord(c) <= 0x9F for c in fixed):
+                    return fixed
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+        return text
+
     def _clean_html(self, text: str) -> str:
         """清理HTML标签，保留段落结构"""
         if not text:
             return ""
+        text = self._fix_mojibake(text)
         # 把<br>、</p>、</li>、</div>等换成换行
         text = re.sub(r'<br\s*/?>', '\n', text)
         text = re.sub(r'</p>', '\n\n', text, flags=re.IGNORECASE)
