@@ -526,7 +526,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="form-row">
                     <label>{loc_label}</label>
-                    <input id="loc" value="Canada" placeholder="Toronto, Vancouver...">
+                    <input id="loc" value="" placeholder="Toronto, ON / Vancouver, BC / Montreal / Remote Canada...">
                 </div>
                 <div class="form-row sources-row">
                     <label>{src_label}</label>
@@ -834,7 +834,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_run_search(self, data):
         try:
             sources = data.get("sources", None)
-            result = self.agent.run_search(sources=sources)
+            kw = data.get("keywords", None)
+            kw_list = [k.strip() for k in kw.split(",")] if kw else None
+            loc = data.get("location", None)
+            result = self.agent.run_search(sources=sources, keywords=kw_list, location=loc)
             self.send_json({
                 "success": True,
                 "jobs": result.get("jobs", []),

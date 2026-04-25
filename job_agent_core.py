@@ -378,8 +378,13 @@ class JobSearchEngine:
         
         return links
     
-    def search_all(self, max_per_source: int = 3, sources: List[str] = None) -> Dict:
-        """多源搜索，可指定来源"""
+    def search_all(self, max_per_source: int = 3, sources: List[str] = None, keywords: List[str] = None, location: str = None) -> Dict:
+        """多源搜索，可指定来源和关键词/地点"""
+        if keywords is None:
+            keywords = self.profile.get_skill_keywords()[:3]
+        if location is None:
+            location = self.profile.profile.get("preferred_locations", ["Canada"])[0]
+        
         source_map = {
             "GitHub Jobs": lambda: self.search_github_jobs(keywords, location, max_per_source),
             "RemoteOK": lambda: self.search_remoteok(max_per_source),
@@ -388,9 +393,6 @@ class JobSearchEngine:
         
         all_jobs = []
         search_links = []
-        
-        keywords = self.profile.get_skill_keywords()[:3]
-        location = self.profile.profile.get("preferred_locations", ["Canada"])[0]
         
         # 默认搜索所有来源
         if not sources:
@@ -862,10 +864,10 @@ class JobAgent:
         # 确保数据目录存在
         os.makedirs(self.data_dir, exist_ok=True)
     
-    def run_search(self, sources: List[str] = None) -> Dict:
-        """执行完整搜索和分析，可指定来源"""
+    def run_search(self, sources: List[str] = None, keywords: List[str] = None, location: str = None) -> Dict:
+        """执行完整搜索和分析，可指定来源/关键词/地点"""
         print(f"Agent: 开始搜索 (来源: {sources or '全部'})...")
-        results = self.engine.search_all(sources=sources)
+        results = self.engine.search_all(sources=sources, keywords=keywords, location=location)
         
         print(f"Agent: 找到 {results['stats']['total_jobs']} 个职位")
         analyzed = self.analyzer.analyze_all(results)
