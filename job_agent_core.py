@@ -916,6 +916,15 @@ class JobTracker:
             if job["id"] == job_id:
                 return job
         return None
+    
+    def delete_job(self, job_id: str) -> bool:
+        """删除跟踪的职位"""
+        for i, job in enumerate(self.tracked_jobs):
+            if job["id"] == job_id:
+                del self.tracked_jobs[i]
+                self.save()
+                return True
+        return False
 
 # ============================================================
 # Agent 主类
@@ -979,6 +988,10 @@ class JobAgent:
     def update_job_status(self, job_id: str, status: str, notes: str = ""):
         """更新职位状态"""
         return self.tracker.update_status(job_id, status, notes)
+    
+    def delete_job(self, job_id: str) -> bool:
+        """删除跟踪的职位"""
+        return self.tracker.delete_job(job_id)
     
     def _save_search_history(self, result: Dict):
         """保存搜索历史"""

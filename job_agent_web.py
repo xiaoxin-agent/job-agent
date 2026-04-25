@@ -385,6 +385,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/run_search": self.api_run_search,
             "/api/save_job": self.api_save_job,
             "/api/update_status": self.api_update_status,
+            "/api/delete_job": self.api_delete_job,
             "/api/update_profile": self.api_update_profile,
             "/api/generate_letter": self.api_generate_letter,
         }
@@ -735,6 +736,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">🤝 面试</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">❌ 拒绝</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">🎉 Offer</button>
+                    <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">🗑️ 删除</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
             </div>"""
@@ -744,6 +746,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div class="section"><div class="tab-bar">{tabs}</div></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
+        async function delJob(id) {{
+            if (!confirm('确定删除？')) return;
+            await fetch('/api/delete_job', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id}})}});
+            location.reload();
+        }}
         function toggleTrackedDesc(id) {{
             var short = document.getElementById('tdesc-' + id);
             var full = document.getElementById('tfull-' + id);
@@ -879,6 +886,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": ok})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
+    
+    def api_delete_job(self, data):
+        try:
+            ok = self.agent.delete_job(data.get("job_id",""))
+            self.send_json({"success": ok})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_update_profile(self, data):
         try:
@@ -958,6 +972,7 @@ h1 {{ margin-bottom:20px; }}
 .btn-interview {{ background:#fbbc04; color:#333; border:none; }}
 .btn-reject {{ background:#ea4335; color:#fff; border:none; }}
 .btn-offer {{ background:#9c27b0; color:#fff; border:none; }}
+.btn-delete {{ background:#d32f2f; color:#fff; border:none; }}
 .stats-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:16px 0; }}
 .stat-card {{ background:#fff; padding:16px; border-radius:8px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.06); }}
 .stat-number {{ font-size:28px; font-weight:700; color:#1a73e8; }}
