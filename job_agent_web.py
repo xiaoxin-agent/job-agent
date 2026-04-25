@@ -819,7 +819,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'">👁️‍🗨 快速查看</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">🖊 编辑</a></div>') if j.get('resume_id') else ''}
+                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">🖊 编辑</a></div>') if j.get('resume_id') else ''}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
