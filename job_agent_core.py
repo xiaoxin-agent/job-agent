@@ -192,7 +192,7 @@ class JobSearchEngine:
                             "title": job.get("title", ""),
                             "company": job.get("company", ""),
                             "location": job.get("location", ""),
-                            "description": self._clean_html(job.get("description", ""))[:1500],
+                            "description": self._clean_html(job.get("description", ""))[:3000],
                             "url": job.get("url", ""),
                             "date": job.get("created_at", ""),
                             "source": "GitHub Jobs"
@@ -321,7 +321,7 @@ class JobSearchEngine:
                                 "title": title,
                                 "company": item.get("company", ""),
                                 "location": "Remote",
-                                "description": self._clean_html(desc)[:1500],
+                                "description": self._clean_html(desc)[:3000],
                                 "url": f"https://remoteok.io/remote-jobs/{item.get('slug', '')}",
                                 "date": item.get("date", ""),
                                 "source": "RemoteOK",
@@ -596,12 +596,29 @@ class JobSearchEngine:
         }
     
     def _clean_html(self, text: str) -> str:
-        """清理HTML标签"""
+        """清理HTML标签，保留段落结构"""
         if not text:
             return ""
+        # 把<br>、</p>、</li>、</div>等换成换行
+        text = re.sub(r'<br\s*/?>', '\n', text)
+        text = re.sub(r'</p>', '\n\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'</li>', '\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'</div>', '\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'</h[1-6]>', '\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'<li[^>]*>', '  • ', text)
+        # 清理剩余HTML标签
         text = re.sub(r'<[^>]+>', ' ', text)
-        text = text.replace('&nbsp;', ' ').replace('&amp;', '&')
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+        # 合并多余空白
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r'[ \t]+', ' ', text)
+        # 清理每行首尾空格
+        lines = []
+        for line in text.split('\n'):
+            line = line.strip()
+            lines.append(line)
+        text = '\n'.join(lines)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
         return text
 
 # ============================================================
