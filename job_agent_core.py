@@ -852,6 +852,8 @@ class JobTracker:
             "company": job.get("company", ""),
             "location": job.get("location", ""),
             "url": job.get("url", ""),
+            "description": job.get("description", ""),
+            "job_type": job.get("job_type", ""),
             "match_score": job.get("match_score", 0),
             "source": job.get("source", ""),
             "status": "saved",  # saved / applied / interviewing / rejected / offer

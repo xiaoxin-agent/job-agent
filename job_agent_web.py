@@ -719,7 +719,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             jobs_html += f"""
             <div class="job-card">
                 <div class="job-header">
-                    <div class="job-title">{j['title']}</div>
+                    <div class="job-title">{j['title']}{' <span class="job-type-tag">'+j['job_type']+'</span>' if j.get('job_type') else ''}</div>
                     <span class="status-tag status-{j['status']}">{label}</span>
                 </div>
                 <div class="job-meta">
@@ -727,6 +727,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
                 </div>
+                <div class="job-desc-snippet">{(j.get('description','') or '')[:150]}</div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">🔗 查看</a>
                     <button onclick="upd('{j['id']}','applied')" class="btn btn-small">📤 申请</button>
@@ -978,6 +979,7 @@ h1 {{ margin-bottom:20px; }}
 .tab {{ padding:6px 12px; border-radius:16px; font-size:12px; text-decoration:none; color:#666; background:#e8e8e8; }}
 .tab.active {{ background:#1a73e8; color:#fff; }}
 .status-tag {{ padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }}
+.job-desc-snippet {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; padding:4px 0; border-bottom:1px solid #eee; }}
 .status-saved {{ background:#f0f0f0; color:#666; }}
 .status-applied {{ background:#e8f0fe; color:#1a73e8; }}
 .status-interviewing {{ background:#fef7e0; color:#f9ab00; }}
