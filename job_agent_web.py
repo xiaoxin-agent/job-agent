@@ -452,6 +452,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/delete_resume": self.api_delete_resume,
             "/api/assign_resume": self.api_assign_resume,
             "/api/save_job_resume": self.api_save_job_resume,
+            "/api/get_resume_markdown": self.api_get_resume_markdown,
+            "/api/download_resume_pdf": self.api_download_resume_pdf,
+            "/api/convert_markdown": self.api_convert_markdown,
+            "/api/save_job_resume_md": self.api_save_job_resume_md,
         }
 
         handler = api_routes.get(path)
@@ -1146,26 +1150,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_preview_resume_GET(self, params):
-        """GET 方式返回简历的 HTML 预览（支持 resume_id 或 job_id）"""
+        """GET 方式返回简历的 HTML 预览（优先使用 Markdown 编辑版）"""
         try:
             resume_id = params.get("resume_id", "")
             job_id = params.get("job_id", "")
             if job_id:
-                # 优先使用职位编辑后的 HTML
-                html = self.agent.tracker.get_job_resume_html(job_id)
-                if html:
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                    self.end_headers()
-                    self.wfile.write(html.encode("utf-8"))
-                    return
-                # 没有编辑版，从 PDF 转换
-                data = self.agent.tracker.get_job_resume(job_id)
-                if data:
-                    html = self.agent.tracker.convert_resume_to_html_given_data(data, resume_id or job_id)
+                # 优先使用 markdown 编辑版
+                md = self.agent.tracker.get_job_resume_markdown(job_id)
+                if md:
+                    html = self.agent.tracker.markdown_to_html(md)
                 else:
-                    html = "<p style='color:#888'>未找到该职位的简历</p>"
+                    data = self.agent.tracker.get_job_resume(job_id)
+                    if data:
+                        html = self.agent.tracker.convert_resume_to_html_given_data(data, resume_id or job_id)
+                    else:
+                        html = "<p style='color:#888'>未找到该职位的简历</p>"
             elif resume_id:
                 html = self.agent.tracker.convert_resume_to_html(resume_id)
             else:
@@ -1298,6 +1297,71 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
+    def api_get_resume_markdown(self, data):
+        """返回职位简历的 Markdown 源码"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            md = self.agent.tracker.get_job_resume_markdown(job_id)
+            self.send_json({"success": True, "markdown": md or ""})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_download_resume_pdf(self, data):
+        """下载职位简历的 PDF 版本（从 Markdown 生成）"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            # 查找职位信息
+            job = None
+            for j in self.agent.tracker.tracked_jobs:
+                if j["id"] == job_id:
+                    job = j
+                    break
+            md = self.agent.tracker.get_job_resume_markdown(job_id)
+            if not md:
+                self.send_json({"success": False, "error": "未找到简历内容"}, 404)
+                return
+            title = (job.get("resume_name", "") if job else "") or "简历"
+            pdf_bytes = self.agent.tracker.resume_to_pdf_bytes(md, title)
+            if not pdf_bytes:
+                self.send_json({"success": False, "error": "PDF 生成失败"}, 500)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Disposition", f'attachment; filename="resume_{job_id}.pdf"')
+            self.send_header("Content-Length", str(len(pdf_bytes)))
+            self.end_headers()
+            self.wfile.write(pdf_bytes)
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_convert_markdown(self, data):
+        """将 Markdown 转换为 HTML（用于实时预览）"""
+        try:
+            markdown = data.get("markdown", "")
+            html = self.agent.tracker.markdown_to_html(markdown)
+            self.send_json({"success": True, "html": html})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_save_job_resume_md(self, data):
+        """保存职位简历的 Markdown 版本"""
+        try:
+            job_id = data.get("job_id", "")
+            markdown = data.get("markdown", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            ok = self.agent.tracker.save_job_resume_markdown(job_id, markdown)
+            self.send_json({"success": ok})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
     # ===================== 页面 =====================
 
     def handle_resume_page(self, params):
@@ -1375,13 +1439,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def _resume_page_script(self):
         return ''
 
+    
     def handle_resume_view_page(self, params):
-        """简历查看/编辑页（职位绑定版本，不修改原始简历库）"""
+        """简历查看/编辑页"""
         job_id = params.get("job_id", "")
         if not job_id:
             self._send_html('<html><body><p style="padding:40px;color:#888">缺少 job_id</p></body></html>')
             return
-        # 查找职位
         job = None
         for j in self.agent.tracker.tracked_jobs:
             if j["id"] == job_id:
@@ -1392,7 +1456,16 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             return
         resume_name = job.get("resume_name", "简历")
         resume_id = job["resume_id"]
-        html = f"""<!DOCTYPE html>
+        html = self._build_resume_editor_page(job_id, resume_name)
+        self._send_html(html)
+
+    def _build_resume_editor_page(self, job_id: str, resume_name: str) -> str:
+        """
+        Markdown 简历编辑器页面
+        分栏布局：左侧 Markdown 编辑器 + 右侧实时 HTML 预览
+        """
+        import json
+        return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -1400,131 +1473,176 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 <title>编辑简历 - {resume_name}</title>
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
-body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; padding:20px; }}
-.container {{ max-width:800px; margin:0 auto; }}
-.header {{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }}
-.header h1 {{ font-size:20px; }}
-.header .subtitle {{ font-size:13px; color:#888; font-weight:normal; }}
-.btn {{ display:inline-block; padding:8px 16px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:6px; cursor:pointer; text-decoration:none; font-size:14px; }}
+body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; padding:0; display:flex; flex-direction:column; height:100vh; }}
+.header {{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:#fff; border-bottom:1px solid #e0e0e0; flex-shrink:0; }}
+.header h1 {{ font-size:18px; }}
+.header .subtitle {{ font-size:12px; color:#888; font-weight:normal; margin-left:8px; }}
+.btn {{ display:inline-block; padding:7px 14px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:6px; cursor:pointer; text-decoration:none; font-size:13px; }}
 .btn:hover {{ background:#e8e8e8; }}
-.btn-primary {{ background:#1a73e8; color:#fff; border:none; }}
-.btn-primary:hover {{ background:#1557b0; }}
 .btn-save {{ background:#34a853; color:#fff; border:none; }}
 .btn-save:hover {{ background:#2d9249; }}
-.preview-box {{ background:#fff; border-radius:8px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.08); min-height:300px; line-height:1.7; font-size:14px; }}
-.preview-box p {{ margin:0 0 10px 0; }}
-.preview-box strong {{ color:#111; }}
-#editor {{ display:none; width:100%; min-height:400px; padding:16px; border:1px solid #ddd; border-radius:8px; font-size:14px; line-height:1.7; font-family:monospace; }}
-.toolbar {{ display:flex; gap:8px; margin-bottom:12px; }}
-.status {{ margin:8px 0; padding:6px 12px; border-radius:4px; display:none; font-size:13px; }}
-.status.success {{ display:block; background:#e6f4ea; color:#2e7d32; }}
-.status.error {{ display:block; background:#fce8e6; color:#d32f2f; }}
+.btn-download {{ background:#5f6368; color:#fff; border:none; }}
+.btn-download:hover {{ background:#4a4d52; }}
+.btn-back {{ background:none; color:#555; border:none; font-size:14px; }}
+.btn-back:hover {{ color:#000; }}
+.main {{ display:flex; flex:1; overflow:hidden; }}
+.editor-pane {{ flex:1; display:flex; flex-direction:column; border-right:1px solid #e0e0e0; background:#fff; }}
+.editor-pane textarea {{ flex:1; width:100%; border:none; outline:none; padding:16px; font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace; font-size:13px; line-height:1.6; resize:none; }}
+.editor-toolbar {{ display:flex; align-items:center; gap:6px; padding:8px 12px; background:#f8f9fa; border-bottom:1px solid #e0e0e0; font-size:12px; color:#666; flex-shrink:0; }}
+.editor-toolbar .btn-icon {{ padding:4px 10px; font-size:14px; cursor:pointer; border-radius:4px; background:none; border:1px solid transparent; font-weight:600; }}
+.editor-toolbar .btn-icon:hover {{ background:#e0e0e0; border-color:#ccc; }}
+.preview-pane {{ flex:1; overflow-y:auto; padding:24px; background:#fff; line-height:1.7; font-size:14px; }}
+.preview-pane h1 {{ font-size:22px; margin:16px 0 8px; }}
+.preview-pane h2 {{ font-size:18px; margin:14px 0 6px; border-bottom:1px solid #eee; padding-bottom:4px; }}
+.preview-pane h3 {{ font-size:16px; margin:12px 0 4px; }}
+.preview-pane p {{ margin:6px 0; }}
+.preview-pane ul, .preview-pane ol {{ margin:6px 0; padding-left:24px; }}
+.preview-pane li {{ margin:3px 0; }}
+.preview-pane a {{ color:#1a73e8; }}
+.preview-pane strong {{ color:#111; }}
+.status {{ position:fixed; bottom:20px; right:20px; padding:8px 16px; border-radius:6px; font-size:13px; z-index:100; opacity:0; transition:opacity 0.3s; }}
+.status.show {{ opacity:1; }}
+.status.success {{ background:#e6f4ea; color:#2e7d32; }}
+.status.error {{ background:#fce8e6; color:#d32f2f; }}
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="header">
-    <h1>📄 {resume_name} <span class="subtitle">（职位专属副本，修改不影响简历库）</span></h1>
-    <div>
-      <a href="/tracked" class="btn" style="margin-right:4px">← 返回</a>
-      <button onclick="toggleEdit()" id="toggleBtn" class="btn">✏️ 编辑</button>
-      <button onclick="downloadPdf()" class="btn">⬇️ 下载 PDF</button>
+<div class="header">
+  <div><h1>📄 {resume_name} <span class="subtitle">（职位专属副本，修改不影响简历库）</span></h1></div>
+  <div>
+    <a href="/tracked" class="btn btn-back">← 返回</a>
+    <button onclick="exportPdf()" class="btn btn-download" id="exportBtn">📄 导出 PDF</button>
+    <button onclick="saveResume()" class="btn btn-save">💾 保存</button>
+  </div>
+</div>
+<div id="statusMsg" class="status">✅ 已保存</div>
+<div class="main">
+  <div class="editor-pane">
+    <div class="editor-toolbar">
+      <span>Markdown 编辑器</span>
+      <span style="flex:1"></span>
+      <button class="btn-icon" onclick="insertMd('**','**')" title="粗体">B</button>
+      <button class="btn-icon" onclick="insertMd('## ','\n## ')" title="标题">H</button>
+      <button class="btn-icon" onclick="insertMd('\\n- ','\n  ')" title="列表">•</button>
+      <button class="btn-icon" onclick="insertMd('[','](url)')" title="链接">🔗</button>
     </div>
+    <textarea id="editor" spellcheck="false" placeholder="Markdown 格式的简历内容..."></textarea>
   </div>
-  <div id="statusMsg" class="status"></div>
-  <div class="toolbar" id="editToolbar" style="display:none">
-    <button onclick="saveEdit()" class="btn btn-save">💾 保存编辑</button>
-    <button onclick="toggleEdit()" class="btn">↩️ 取消</button>
-  </div>
-  <div id="preview" class="preview-box">加载中...</div>
-  <textarea id="editor"></textarea>
+  <div class="preview-pane" id="preview">加载中...</div>
 </div>
 <script>
 var jobId = {json.dumps(job_id)};
-var resumeId = {json.dumps(resume_id)};
-var originalHtml = '';
+var originalMd = "";
+var timer = null;
 
-async function loadPreview() {{
-  var resp = await fetch('/api/preview_resume?job_id=' + jobId);
-  var html_content = await resp.text();
-  document.getElementById('preview').innerHTML = html_content;
-  originalHtml = html_content;
-  document.getElementById('editor').value = html_content
-    .replace(/<p>/g, '')
-    .replace(/<\/p>/g, '\\n\\n')
-    .replace(/<br>/g, '\\n')
-    .replace(/<strong>(.*?)<\/strong>/g, '$1');
+function insertMd(before, after) {{
+  var ta = document.getElementById('editor');
+  var start = ta.selectionStart;
+  var end = ta.selectionEnd;
+  var selected = ta.value.substring(start, end);
+  ta.value = ta.value.substring(0, start) + before + selected + after + ta.value.substring(end);
+  ta.selectionStart = start + before.length;
+  ta.selectionEnd = start + before.length + selected.length;
+  ta.focus();
+  renderPreview(ta.value);
 }}
 
-function toggleEdit() {{
-  var preview = document.getElementById('preview');
-  var editor = document.getElementById('editor');
-  var toolbar = document.getElementById('editToolbar');
-  var btn = document.getElementById('toggleBtn');
-  if (editor.style.display === 'block') {{
-    editor.style.display = 'none';
-    preview.style.display = 'block';
-    toolbar.style.display = 'none';
-    btn.textContent = '✏️ 编辑';
-    preview.innerHTML = originalHtml;
-  }} else {{
-    preview.style.display = 'none';
-    editor.style.display = 'block';
-    toolbar.style.display = 'flex';
-    btn.textContent = '👁️ 预览';
+async function loadResume() {{
+  try {{
+    var resp = await fetch('/api/get_resume_markdown', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
+    var d = await resp.json();
+    if (d.success) {{
+      originalMd = d.markdown || "";
+      document.getElementById('editor').value = originalMd;
+      renderPreview(originalMd);
+    }} else {{
+      document.getElementById('preview').innerHTML = '<p style="color:red">加载失败: ' + (d.error || '') + '</p>';
+    }}
+  }} catch(e) {{
+    document.getElementById('preview').innerHTML = '<p style="color:red">加载出错: ' + e + '</p>';
   }}
 }}
 
-async function saveEdit() {{
-  var status = document.getElementById('statusMsg');
-  var htmlContent = document.getElementById('editor').value;
-  var paragraphs = htmlContent.split(new RegExp('\\n\\s*\\n')).filter(function(p) {{ return p.trim(); }});
-  var formatted = paragraphs.map(function(p) {{
-    var lines = p.trim().split('\\n').filter(function(l) {{ return l.trim(); }});
-    return '<p>' + lines.join('<br>') + '</p>';
-  }}).join('\\n');
-  document.getElementById('preview').innerHTML = formatted;
-  originalHtml = formatted;
-  document.getElementById('editor').style.display = 'none';
-  document.getElementById('preview').style.display = 'block';
-  document.getElementById('editToolbar').style.display = 'none';
-  document.getElementById('toggleBtn').textContent = '✏️ 编辑';
+async function renderPreview(text) {{
   try {{
-    var resp = await fetch('/api/save_job_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, html: formatted}})}});
+    var resp = await fetch('/api/convert_markdown', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{markdown: text}})}});
     var d = await resp.json();
-    var saved = d.success;
-    status.className = 'status ' + (saved ? 'success' : 'error');
-    status.textContent = saved ? '✅ 已保存（仅限此职位）' : '❌ 保存失败: ' + (d.error || '');
+    if (d.success) {{
+      document.getElementById('preview').innerHTML = d.html;
+    }} else {{
+      document.getElementById('preview').innerHTML = '<p style="color:red">预览失败</p><pre>' + text + '</pre>';
+    }}
   }} catch(e) {{
-    status.className = 'status error';
+    // fallback: show raw text
+    document.getElementById('preview').innerHTML = '<pre>' + text + '</pre>';
+  }}
+}}
+
+async function saveResume() {{
+  var md = document.getElementById('editor').value;
+  try {{
+    var resp = await fetch('/api/save_job_resume_md', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, markdown: md}})}});
+    var d = await resp.json();
+    var status = document.getElementById('statusMsg');
+    status.className = 'status ' + (d.success ? 'show success' : 'show error');
+    status.textContent = d.success ? '✅ 已保存' : '❌ 保存失败: ' + (d.error || '');
+    setTimeout(function() {{ status.className = 'status'; }}, 3000);
+    if (d.success) originalMd = md;
+  }} catch(e) {{
+    var status = document.getElementById('statusMsg');
+    status.className = 'status show error';
     status.textContent = '❌ 保存出错: ' + e;
   }}
-  status.style.display = 'block';
-  setTimeout(function() {{ status.style.display = 'none'; }}, 3000);
 }}
 
-function downloadPdf() {{
-  // 如果有编辑版本，下载 HTML；否则下载原始 PDF
-  var downloadUrl = '/api/get_resume?job_id=' + jobId;
-  var previewEl = document.getElementById('preview');
-  if (previewEl && previewEl.innerHTML !== '' && previewEl.innerHTML !== '加载中...' && previewEl.innerHTML !== originalHtml) {{
-    // 有编辑改动，下载为 HTML
-    var blob = new Blob([previewEl.innerHTML.replace(/<\\/p>/g, '\\n\\n').replace(/<br>/g, '\\n').replace(/<strong>(.*?)<\\/strong>/g, '$1')], {{type: 'text/plain;charset=utf-8'}});
+async function exportPdf() {{
+  var btn = document.getElementById('exportBtn');
+  btn.disabled = true;
+  btn.textContent = '生成中...';
+  try {{
+    var resp = await fetch('/api/download_resume_pdf', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
+    if (!resp.ok) {{
+      var d = await resp.json();
+      alert('导出失败: ' + (d.error || ''));
+      return;
+    }}
+    var blob = await resp.blob();
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'resume_edited.txt';
+    a.download = 'resume_' + jobId + '.pdf';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
-  }} else {{
-    window.open(downloadUrl, '_blank');
+  }} catch(e) {{
+    alert('导出出错: ' + e);
+  }} finally {{
+    btn.disabled = false;
+    btn.textContent = '📄 导出 PDF';
   }}
 }}
 
-loadPreview();
+// Ctrl+S to save
+document.addEventListener('keydown', function(e) {{
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {{
+    e.preventDefault();
+    saveResume();
+  }}
+}});
+
+// Auto-preview with debounce
+document.getElementById('editor').addEventListener('input', function() {{
+  clearTimeout(timer);
+  timer = setTimeout(function() {{
+    renderPreview(document.getElementById('editor').value);
+  }}, 500);
+}});
+
+loadResume();
 </script>
 </body>
 </html>"""
-        self._send_html(html)
+
     def _page(self, title, body, lang="zh-CN"):
         nav_items = ""
         pages = [

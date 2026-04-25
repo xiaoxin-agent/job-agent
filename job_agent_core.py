@@ -1164,6 +1164,168 @@ class JobTracker:
                         return f.read()
         return None
 
+    def _pdf_to_markdown(self, data: bytes) -> str:
+        """将 PDF 二进制数据转换为 Markdown 格式"""
+        if not data:
+            return ""
+        try:
+            from io import BytesIO
+            from pdfminer.high_level import extract_text
+            text = extract_text(BytesIO(data))
+        except Exception as e:
+            return f"[PDF 解析失败: {e}]"
+
+        import re
+        lines = text.split("\n")
+        md_lines = []
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if not line:
+                # 空行 — 段落分隔
+                if md_lines and md_lines[-1] != "":
+                    md_lines.append("")
+                i += 1
+                continue
+
+            # 检测标题：短行且不以句号标点结尾
+            is_heading = (
+                len(line) < 60
+                and not line.endswith(('.', '。', '!', '！', '?', '？', ':', '：', ',', '，'))
+                and not re.match(r'^[\d\s\-•*]+$', line)  # 纯列表标记
+                and len(line) > 1
+            )
+
+            # URL 行
+            if re.match(r'^https?://', line):
+                md_lines.append(f"<{line}>")
+                i += 1
+                continue
+
+            # 检查是否是列表项（以 • 或 - 或数字开头）
+            list_match = re.match(r'^(•|\*|-|\d+\.)\s*(.*)', line)
+            if list_match:
+                prefix = list_match.group(1)
+                content = list_match.group(2)
+                # 简单转换为 markdown 列表
+                if prefix.isdigit():  # 有序列表
+                    md_lines.append(f"1. {content}")
+                else:
+                    md_lines.append(f"- {content}")
+                i += 1
+                continue
+
+            if is_heading:
+                md_lines.append(f"## {line}")
+            else:
+                md_lines.append(line)
+            i += 1
+
+        # 合并多行为段落
+        result = []
+        para = []
+        for line in md_lines:
+            if line == "":
+                if para:
+                    result.append(" ".join(para))
+                    para = []
+                result.append("")
+            elif line.startswith("## ") or line.startswith("- ") or line.startswith("1. "):
+                if para:
+                    result.append(" ".join(para))
+                    para = []
+                result.append(line)
+            else:
+                para.append(line)
+        if para:
+            result.append(" ".join(para))
+
+        markdown = "\n".join(result)
+        return markdown
+
+    def get_job_resume_markdown(self, job_id: str) -> Optional[str]:
+        """读取职位的简历 Markdown（编辑后的版本）"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id and job.get("resume_id"):
+                job_dir = os.path.join(self._resume_dir(), f"job_{job_id}")
+                path = os.path.join(job_dir, "resume.md")
+                if os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        return f.read()
+                # 没有编辑版，从 PDF 转换
+                data = self.get_job_resume(job_id)
+                if data:
+                    return self._pdf_to_markdown(data)
+        return None
+
+    def save_job_resume_markdown(self, job_id: str, markdown: str) -> bool:
+        """保存职位的简历 Markdown 版本（不修改原始 PDF）"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id and job.get("resume_id"):
+                job_dir = os.path.join(self._resume_dir(), f"job_{job_id}")
+                os.makedirs(job_dir, exist_ok=True)
+                path = os.path.join(job_dir, "resume.md")
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(markdown)
+                job["has_edited_resume"] = True
+                self.save()
+                return True
+        return False
+
+    def markdown_to_html(self, markdown: str) -> str:
+        """将 Markdown 渲染为 HTML"""
+        if not markdown:
+            return "<p style='color:#888'>暂无内容</p>"
+        try:
+            import markdown as md
+            import re
+            # 预处理：URL 自动转链接
+            markdown = re.sub(
+                r'(?<!\()(https?://[^\s<)>"]+)',
+                r'<\1>',
+                markdown
+            )
+            html = md.markdown(
+                markdown,
+                extensions=['extra', 'smarty']
+            )
+            return html
+        except Exception as e:
+            return f"<p style='color:#d32f2f'>渲染失败: {e}</p><pre>{markdown}</pre>"
+
+    def resume_to_pdf_bytes(self, markdown: str, title: str = "简历") -> Optional[bytes]:
+        """将 Markdown 转换为 PDF 字节"""
+        try:
+            html_content = self.markdown_to_html(markdown)
+            full_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.7; font-size: 12pt; color: #222; }}
+h1 {{ font-size: 20pt; margin-top: 24px; }}
+h2 {{ font-size: 16pt; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }}
+h3 {{ font-size: 14pt; margin-top: 16px; }}
+p {{ margin: 8px 0; }}
+ul, ol {{ margin: 8px 0; padding-left: 24px; }}
+li {{ margin: 4px 0; }}
+a {{ color: #1a73e8; }}
+strong {{ font-weight: 600; }}
+code {{ background: #f5f5f5; padding: 1px 4px; border-radius: 3px; font-size: 11pt; }}
+pre {{ background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }}
+</style>
+</head>
+<body>
+{html_content}
+</body>
+</html>"""
+            from weasyprint import HTML as WeasyHTML
+            pdf_bytes = WeasyHTML(string=full_html).write_pdf()
+            return pdf_bytes
+        except Exception as e:
+            print(f"PDF 生成失败: {e}")
+            return None
+
     def _pdf_bytes_to_html(self, data: bytes) -> str:
         """将 PDF 二进制数据转换为 HTML"""
         if not data:
