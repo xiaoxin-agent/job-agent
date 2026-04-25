@@ -712,6 +712,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             active = "active" if status_filter == key else ""
             tabs += f'<a href="/tracked?status={key}" class="tab {active}">{label} ({cnt})</a>'
 
+        btn_view = t(lang, "btn_view")
         jobs_html = ""
         if not jobs:
             jobs_html = f'<p class="empty">{t(lang, "no_tracked")}</p>'
@@ -728,10 +729,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
                 </div>
-                <div class="job-desc-snippet" id="tdesc-{j['id']}" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
-                <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
+                <div class="job-desc-toggle" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">
+                    <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
+                    <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
+                </div>
                 <div class="job-actions">
-                    <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">🔗 查看</a>
+                    <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
                     <button onclick="upd('{j['id']}','applied')" class="btn btn-small">📤 申请</button>
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">🤝 面试</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">❌ 拒绝</button>
