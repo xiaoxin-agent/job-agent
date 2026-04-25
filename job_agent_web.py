@@ -407,7 +407,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.api_get_resume_GET(params)
             return
         if path == "/api/list_resumes":
-            self.api_list_resumes_GET()
+            self.api_list_resumes_GET(params)
             return
 
         handler = routes.get(path)
@@ -892,30 +892,32 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }}
         }}
         async function uploadNewResume(jobId) {{
-            closeResumeModal();
             var input = document.createElement('input');
             input.type = 'file';
             input.accept = '.pdf,.doc,.docx';
+            input.style.display = 'none';
+            document.body.appendChild(input);
             input.onchange = async function(e) {{
+                closeResumeModal();
                 var file = e.target.files[0];
-                if (!file) return;
+                if (!file) {{ document.body.removeChild(input); return; }}
                 var btn = document.getElementById('apply-btn-' + jobId);
                 btn.disabled = true;
                 btn.textContent = '⏳ 上传中…';
-                // 用 multipart 上传到简历库
                 var formData = new FormData();
                 formData.append('name', file.name);
                 formData.append('resume', file);
                 try {{
                     var resp1 = await fetch('/api/add_resume_multipart', {{method:'POST', body:formData}});
                     var d1 = await resp1.json();
-                    if (!d1.success) {{ alert('上传失败: ' + (d1.error || '')); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
+                    if (!d1.success) {{ alert('上传失败: ' + (d1.error || '')); btn.disabled = false; btn.textContent = '📤 申请'; document.body.removeChild(input); return; }}
                     var resumeId = d1.resume.id;
                     var resp2 = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
                     var d2 = await resp2.json();
-                    if (!d2.success) {{ alert('关联失败'); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
+                    if (!d2.success) {{ alert('关联失败'); btn.disabled = false; btn.textContent = '📤 申请'; document.body.removeChild(input); return; }}
                     var notes = prompt('备注（可选）:','')||'';
                     await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}});
+                    document.body.removeChild(input);
                     location.reload();
                 }} catch(e) {{
                     alert('上传出错: ' + e);

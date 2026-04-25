@@ -377,6 +377,110 @@ class TestWebServer(unittest.TestCase):
             # HTTPError 也说明服务器正确响应了
             self.assertEqual(e.code, 404)
 
+    def test_13_resume_page(self):
+        """简历库页面返回200"""
+        resp = urlopen(f"http://localhost:{self.port}/resumes")
+        self.assertEqual(resp.status, 200)
+        html = resp.read().decode("utf-8")
+        self.assertIn("简历库", html)
+
+    def test_14_resume_add_and_list(self):
+        """模拟浏览器添加简历：multipart上传到简历库，然后列表返回新简历"""
+        import requests
+        url = f"http://localhost:{self.port}/api/add_resume_multipart"
+        files = {'resume': ('my_resume.pdf', b'%PDF-1.4 fake resume content', 'application/pdf')}
+        data = {'name': '我的简历.pdf'}
+        r = requests.post(url, files=files, data=data)
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertTrue(d.get("success"), f"上传失败: {d.get('error')}")
+        self.assertIn("resume", d)
+        resume_id = d["resume"]["id"]
+        self.assertIsNotNone(resume_id)
+        self.assertEqual(d["resume"]["name"], "我的简历.pdf")
+        
+        # 验证列表API能查到
+        r2 = requests.get(f"http://localhost:{self.port}/api/list_resumes")
+        d2 = r2.json()
+        self.assertTrue(d2.get("success"))
+        ids = [r["id"] for r in d2.get("resumes", [])]
+        self.assertIn(resume_id, ids, f"新添加的简历 {resume_id} 应在列表中")
+        
+        # 验证GET下载
+        r3 = requests.get(f"http://localhost:{self.port}/api/get_resume?resume_id={resume_id}")
+        self.assertEqual(r3.status_code, 200)
+        self.assertGreater(len(r3.content), 10)
+        self.assertIn(b"fake resume", r3.content)
+        
+        return resume_id
+    
+    def test_15_resume_assign_and_delete(self):
+        """模拟浏览器：申请职位时关联简历，然后删除简历"""
+        import requests
+        # 先上传一个简历
+        r = requests.post(f"http://localhost:{self.port}/api/add_resume_multipart",
+            files={'resume': ('cv.pdf', b'%PDF CV content', 'application/pdf')},
+            data={'name': 'cv.pdf'})
+        resume_id = r.json()["resume"]["id"]
+        
+        # 保存一个职位
+        agent = self._agent
+        agent.save_job({
+            "title": "Resume Test Job",
+            "company": "Test Co",
+            "location": "Toronto",
+            "match_score": 75
+        })
+        job_id = agent.tracker.tracked_jobs[0]["id"]
+        
+        # 关联简历到职位
+        r2 = requests.post(f"http://localhost:{self.port}/api/assign_resume",
+            json={"job_id": job_id, "resume_id": resume_id})
+        d2 = r2.json()
+        self.assertTrue(d2.get("success"))
+        
+        # 验证职位有了resume_id
+        job = agent.tracker.get_job(job_id)
+        self.assertEqual(job.get("resume_id"), resume_id)
+        self.assertEqual(job.get("resume_name"), "cv.pdf")
+        
+        # 删除简历
+        r3 = requests.post(f"http://localhost:{self.port}/api/delete_resume",
+            json={"resume_id": resume_id})
+        d3 = r3.json()
+        self.assertTrue(d3.get("success"))
+        
+        # 验证简历不在列表
+        r4 = requests.get(f"http://localhost:{self.port}/api/list_resumes")
+        ids = [r["id"] for r in r4.json().get("resumes", [])]
+        self.assertNotIn(resume_id, ids)
+        
+        # 验证职位引用也被清除
+        job = agent.tracker.get_job(job_id)
+        self.assertIsNone(job.get("resume_id"))
+        self.assertIsNone(job.get("resume_name"))
+    
+    def test_16_resume_tracked_page_has_js(self):
+        """跟踪页面包含 resume 相关 JS 函数"""
+        resp = urlopen(f"http://localhost:{self.port}/tracked")
+        html = resp.read().decode("utf-8")
+        self.assertIn("applyWithResume", html)
+        self.assertIn("uploadNewResume", html)
+        self.assertIn("useResume", html)
+        self.assertIn("add_resume_multipart", html)
+        self.assertIn("assign_resume", html)
+    
+    def test_17_resume_page_has_js(self):
+        """简历库页面包含必要 JS"""
+        resp = urlopen(f"http://localhost:{self.port}/resumes")
+        html = resp.read().decode("utf-8")
+        self.assertIn("loadResumes", html)
+        self.assertIn("uploadResume", html)
+        self.assertIn("delResume", html)
+        self.assertIn("add_resume", html)
+        self.assertIn("delete_resume", html)
+        self.assertIn("get_resume?resume_id", html)
+
 
 def cleanup():
     """清理测试数据"""
