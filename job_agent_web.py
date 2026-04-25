@@ -891,7 +891,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         try:
             sources = data.get("sources", None)
             kw = data.get("keywords", None)
-            kw_list = [k.strip() for k in kw.split(",")] if kw else None
+            kw_list = [k.strip() for k in kw.replace(",", " ").split()] if kw else None
             loc = data.get("location", None)
             result = self.agent.run_search(sources=sources, keywords=kw_list, location=loc)
             self.send_json({
