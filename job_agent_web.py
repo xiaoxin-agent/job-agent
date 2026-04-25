@@ -56,6 +56,12 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "no_results": "No results yet. Try a search!",
         "loading": "Searching...",
         "error": "Error",
+        # 跟踪页操作按钮
+        "btn_apply": "📤 Apply",
+        "btn_interview": "🤝 Interview",
+        "btn_reject": "❌ Reject",
+        "btn_offer": "🎉 Offer",
+        "btn_delete": "🗑️ Delete",
         # 搜索页
         "search_page_title": "🔍 Search Jobs",
         "search_desc": "Search multiple platforms and auto-analyze match scores.",
@@ -155,6 +161,12 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "no_results": "还没有搜索结果，试试搜索吧！",
         "loading": "搜索中…",
         "error": "错误",
+        # 跟踪页操作按钮
+        "btn_apply": "📤 申请",
+        "btn_interview": "🤝 面试",
+        "btn_reject": "❌ 拒绝",
+        "btn_offer": "🎉 Offer",
+        "btn_delete": "🗑️ 删除",
         # 搜索页
         "search_page_title": "🔍 搜索职位",
         "search_desc": "点击下方按钮，从多个平台获取实时职位并自动分析匹配度。",
@@ -255,6 +267,12 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "no_results": "Aucun résultat pour le moment. Essayez une recherche !",
         "loading": "Recherche en cours...",
         "error": "Erreur",
+        # Boutons d'action page suivi
+        "btn_apply": "📤 Postuler",
+        "btn_interview": "🤝 Entretien",
+        "btn_reject": "❌ Refuser",
+        "btn_offer": "🎉 Offre",
+        "btn_delete": "🗑️ Supprimer",
         # Page de recherche
         "search_page_title": "🔍 Rechercher des offres",
         "search_desc": "Rechercher sur plusieurs plateformes et analyser automatiquement les scores de correspondance.",
@@ -705,6 +723,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             jobs = [j for j in jobs if j["status"] == status_filter]
 
         labels = {"saved": t(lang, 'saved'),"applied": t(lang, 'applied'),"interviewing": t(lang, 'interviewing'),"rejected": t(lang, 'rejected'),"offer": t(lang, 'offer')}
+        btn_apply = t(lang, "btn_apply")
+        btn_interview = t(lang, "btn_interview")
+        btn_reject = t(lang, "btn_reject")
+        btn_offer = t(lang, "btn_offer")
+        btn_delete = t(lang, "btn_delete")
 
         tabs = ""
         for key, label in [("all",t(lang, 'all')),("saved",t(lang, 'saved')),("applied",t(lang, 'applied')),("interviewing",t(lang, 'interviewing')),("rejected",t(lang, 'rejected')),("offer",t(lang, 'offer'))]:
@@ -735,11 +758,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
-                    <button onclick="upd('{j['id']}','applied')" class="btn btn-small">📤 申请</button>
-                    <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">🤝 面试</button>
-                    <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">❌ 拒绝</button>
-                    <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">🎉 Offer</button>
-                    <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">🗑️ 删除</button>
+                    <button onclick="upd('{j['id']}','applied')" class="btn btn-small">{btn_apply}</button>
+                    <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
+                    <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
+                    <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
+                    <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
             </div>"""
