@@ -383,6 +383,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/letter": self.handle_letter_page,
         }
 
+        # GET 下载简历
+        if path == "/api/get_resume":
+            self.api_get_resume_GET(params)
+            return
+
         handler = routes.get(path)
         if handler:
             handler(params)
@@ -1029,8 +1034,25 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
+    def api_get_resume_GET(self, params):
+        """GET 方式返回简历文件供下载"""
+        try:
+            job_id = params.get("job_id", "")
+            content = self.agent.tracker.get_resume(job_id)
+            if content is None:
+                self.send_json({"success": False, "error": "未找到简历"}, 404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Disposition", f'attachment; filename="resume_{job_id}.pdf"')
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
     def api_get_resume(self, data):
-        """返回简历文件供下载"""
+        """返回简历文件供下载 (POST)"""
         try:
             job_id = data.get("job_id", "")
             content = self.agent.tracker.get_resume(job_id)
