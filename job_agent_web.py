@@ -986,17 +986,45 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_upload_resume(self, body: bytes, content_type: str):
         """处理简历文件上传 (multipart/form-data)"""
         try:
-            import cgi
-            from io import BytesIO
-            env = {"REQUEST_METHOD": "POST", "CONTENT_TYPE": content_type}
-            fs = cgi.FieldStorage(fp=BytesIO(body), environ=env, keep_blank_values=True)
-            job_id = fs.getvalue("job_id", "")
-            file_item = fs.getfirst("resume")
-            if not job_id or not file_item or not file_item.file:
+            import uuid
+            boundary = None
+            for part in content_type.split(";"):
+                part = part.strip()
+                if part.startswith("boundary="):
+                    boundary = part[9:]
+            if not boundary:
+                self.send_json({"success": False, "error": "缺少 boundary"}, 400)
+                return
+
+            job_id = ""
+            file_data = None
+            # 手动解析 multipart
+            delimiter = b"--" + boundary.encode()
+            parts = body.split(delimiter)
+            for part in parts:
+                if b"Content-Disposition" not in part:
+                    continue
+                # 分离 header 和 body
+                header_end = part.find(b"\r\n\r\n")
+                if header_end == -1:
+                    continue
+                headers_raw = part[:header_end].decode("utf-8", errors="replace")
+                content = part[header_end+4:]  # 跳过 \r\n\r\n
+                # 去掉尾部 \r\n--
+                if content.endswith(b"\r\n"):
+                    content = content[:-2]
+                elif content.endswith(b"--\r\n"):
+                    content = content[:-4]
+
+                if 'name="job_id"' in headers_raw:
+                    job_id = content.decode("utf-8", errors="replace").strip()
+                elif 'name="resume"' in headers_raw:
+                    file_data = content
+
+            if not job_id or not file_data:
                 self.send_json({"success": False, "error": "缺少 job_id 或 resume 文件"}, 400)
                 return
-            data = file_item.file.read()
-            self.agent.tracker.save_resume(job_id, data)
+            self.agent.tracker.save_resume(job_id, file_data)
             self.send_json({"success": True})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
