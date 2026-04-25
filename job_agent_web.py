@@ -578,7 +578,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var shortDesc = desc.substring(0, 120);
                 h += '<div class="job-card" id="card-' + i + '">';
                 h += '<div class="job-header" onclick="toggleDesc(' + i + ')" style="cursor:pointer">';
-                h += '<div class="job-title">' + mark + ' ' + (job.title || '') + ' <span class="job-type-tag">' + (job.job_type || '') + '</span></div>';
+                h += '<div class="job-title">' + mark + ' ' + (job.title || '') + ' ';
+                    var types = (job.job_type || '').split(' ').filter(Boolean);
+                    types.forEach(function(t) {{
+                        h += '<span class="job-type-tag">' + t + '</span> ';
+                    }});
+                    h += '</div>';
                 h += '<div class="job-score ' + cls + '">' + sc + '%</div></div>';
                 h += '<div class="job-meta">';
                 h += '<span>🏢 ' + (job.company || '') + '</span>';

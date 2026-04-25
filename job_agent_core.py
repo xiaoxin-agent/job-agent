@@ -266,11 +266,13 @@ class JobSearchEngine:
                 for i in range(n):
                     job_url = f"https://ca.indeed.com/viewjob?jk={jks[i]}"
                     desc = f"From Indeed - {' '.join(keywords[:2])} in {location}"
+                    job_type_for_indeed = ""
                     # 尝试抓详情页（逐个抓，超时30秒总体）
                     try:
-                        detail = self.fetch_indeed_job_details(job_url)
-                        if detail:
-                            desc = detail
+                        detail_info = self.fetch_indeed_job_details(job_url)
+                        if detail_info and detail_info.get("desc"):
+                            desc = detail_info["desc"]
+                            job_type_for_indeed = detail_info.get("job_type", "")
                     except:
                         pass
                     jobs.append(self._format_job({
@@ -280,7 +282,8 @@ class JobSearchEngine:
                         "description": desc,
                         "url": job_url,
                         "date": "",
-                        "source": "Indeed"
+                        "source": "Indeed",
+                        "job_type": job_type_for_indeed
                     }))
                 
                 if jobs:
@@ -503,17 +506,46 @@ class JobSearchEngine:
         
         return text[:3000]
     
-    def fetch_indeed_job_details(self, url: str) -> str:
-        """抓取Indeed职位详情页面获取美化的描述"""
+    def fetch_indeed_job_details(self, url: str) -> Dict:
+        """抓取Indeed职位详情页面，返回 {desc, job_type}"""
+        result = {"desc": "", "job_type": ""}
         try:
             from curl_cffi import requests
             resp = requests.get(url, impersonate='chrome120', timeout=15)
             if resp.status_code != 200:
-                return ""
+                return result
             html = resp.text
             
-            # 找jobDescriptionText区块
+            # 提取 job_type 从详情页结构化数据
             import re
+            # Match Full-time-tile / Part-time-tile / Contract-tile etc
+            jt_match = re.search(r'data-testid="([A-Za-z-]+tile)"', html)
+            if jt_match:
+                raw = jt_match.group(1).replace('-tile', '').lower()
+                if 'full' in raw:
+                    result["job_type"] = "Full-Time"
+                elif 'part' in raw:
+                    result["job_type"] = "Part-Time"
+                elif 'contract' in raw:
+                    result["job_type"] = "Contract"
+                elif 'temp' in raw:
+                    result["job_type"] = "Temporary"
+                elif 'intern' in raw:
+                    result["job_type"] = "Internship"
+            
+            # Also extract Remote from og:title or page title
+            title_match = re.search(r'<title>([^<]+)</title>', html)
+            title_text = title_match.group(1) if title_match else ""
+            
+            # Also extract from og:title
+            og_match = re.search(r'<meta[^>]+property="og:title"[^>]+content="([^"]+)"', html)
+            og_title = og_match.group(1) if og_match else ""
+            
+            combined = (title_text + " " + og_title).lower()
+            if 'remote' in combined:
+                result['job_type'] = 'Remote ' + result['job_type'] if result['job_type'] else 'Remote'
+            
+            # 提取描述
             for pat in [
                 r'id="jobDescriptionText"[^>]*>(.*?)</div>\s*</div>',
                 r'id="jobDescriptionText"[^>]*>(.*?)(?:<div[^>]+id=)',
@@ -521,14 +553,14 @@ class JobSearchEngine:
             ]:
                 m = re.search(pat, html, re.DOTALL)
                 if m and len(m.group(1)) > 100:
-                    result = self._beautify_description(m.group(1))
-                    if len(result) > 100:
+                    result["desc"] = self._beautify_description(m.group(1))
+                    if len(result["desc"]) > 100:
                         return result
             # 备选：全文
-            result = self._beautify_description(html)
-            return result[:3000]
+            result["desc"] = self._beautify_description(html)[:3000]
+            return result
         except:
-            return ""
+            return result
     
     def _format_job(self, raw: Dict) -> Dict:
         """格式化职位数据"""
