@@ -1082,6 +1082,13 @@ class JobTracker:
                     if job.get("resume_id") == resume_id:
                         job.pop("resume_id", None)
                         job.pop("resume_name", None)
+                        job.pop("job_resume_file", None)
+                        job.pop("has_edited_resume", None)
+                        # 删除职位副本目录
+                        job_dir = os.path.join(self._resume_dir(), f"job_{job['id']}")
+                        if os.path.exists(job_dir):
+                            import shutil
+                            shutil.rmtree(job_dir, ignore_errors=True)
                 self.save()
                 return True
         return False
@@ -1096,7 +1103,7 @@ class JobTracker:
         return False
 
     def assign_resume(self, job_id: str, resume_id: str) -> bool:
-        """给职位关联简历"""
+        """给职位关联简历（从简历库复制副本到职位专属目录）"""
         info = self.get_resume_info(resume_id)
         if not info:
             return False
@@ -1104,9 +1111,105 @@ class JobTracker:
             if job["id"] == job_id:
                 job["resume_id"] = resume_id
                 job["resume_name"] = info["name"]
+                # 从简历库复制 PDF 到职位专属副本
+                src = self.get_resume(resume_id)
+                if src:
+                    job_dir = os.path.join(self._resume_dir(), f"job_{job_id}")
+                    os.makedirs(job_dir, exist_ok=True)
+                    dest_filename = f"{resume_id}.pdf"
+                    dest_path = os.path.join(job_dir, dest_filename)
+                    with open(dest_path, "wb") as f:
+                        f.write(src)
+                    job["job_resume_file"] = job_dir
                 self.save()
                 return True
         return False
+
+    def get_job_resume(self, job_id: str) -> Optional[bytes]:
+        """读取职位专属简历副本"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id and job.get("resume_id"):
+                job_dir = os.path.join(self._resume_dir(), f"job_{job_id}")
+                filename = f"{job['resume_id']}.pdf"
+                path = os.path.join(job_dir, filename)
+                if os.path.exists(path):
+                    with open(path, "rb") as f:
+                        return f.read()
+                # 回退到简历库
+                return self.get_resume(job["resume_id"])
+        return None
+
+    def save_job_resume_text(self, job_id: str, html: str) -> bool:
+        """保存职位的简历 HTML 版本（不修改原始 PDF）"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id and job.get("resume_id"):
+                job_dir = os.path.join(self._resume_dir(), f"job_{job_id}")
+                os.makedirs(job_dir, exist_ok=True)
+                path = os.path.join(job_dir, "resume.html")
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(html)
+                job["has_edited_resume"] = True
+                self.save()
+                return True
+        return False
+
+    def get_job_resume_html(self, job_id: str) -> Optional[str]:
+        """读取职位的简历 HTML（编辑后的版本）"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id and job.get("resume_id"):
+                job_dir = os.path.join(self._resume_dir(), f"job_{job_id}")
+                path = os.path.join(job_dir, "resume.html")
+                if os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        return f.read()
+        return None
+
+    def _pdf_bytes_to_html(self, data: bytes) -> str:
+        """将 PDF 二进制数据转换为 HTML"""
+        if not data:
+            return "<p style='color:#888'>简历文件未找到</p>"
+        try:
+            from io import BytesIO
+            from pdfminer.high_level import extract_text
+            text = extract_text(BytesIO(data))
+        except Exception as e:
+            return f"<p style='color:#d32f2f'>PDF 解析失败: {e}</p>"
+        # 简单格式化：空行分段，URL 加链接
+        import re
+        paragraphs = []
+        for block in text.split("\n\n"):
+            block = block.strip()
+            if not block:
+                continue
+            lines = []
+            for line in block.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                # URL -> 链接
+                line = re.sub(
+                    r'(https?://[^\s]+)',
+                    r'<a href="\1" target="_blank">\1</a>',
+                    line
+                )
+                if len(line) < 50 and not line.endswith(('.', '。', '!', '！', '?', '？')):
+                    lines.append(f"<strong>{line}</strong>")
+                else:
+                    lines.append(line)
+            paragraphs.append("<p>" + "<br>".join(lines) + "</p>")
+        html = "\n".join(paragraphs)
+        if not html:
+            html = f"<pre>{re.escape(text)}</pre>"
+        return html
+
+    def convert_resume_to_html_given_data(self, data: bytes, label: str = "") -> str:
+        """将 PDF 二进制数据转换为 HTML（不查简历库）"""
+        return self._pdf_bytes_to_html(data)
+
+    def convert_resume_to_html(self, resume_id: str) -> str:
+        """将简历 PDF 转换为 HTML 格式，返回 HTML 字符串"""
+        data = self.get_resume(resume_id)
+        return self._pdf_bytes_to_html(data)
 
 # ============================================================
 # Agent 主类

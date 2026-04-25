@@ -400,6 +400,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/profile": self.handle_profile_page,
             "/letter": self.handle_letter_page,
             "/resumes": self.handle_resume_page,
+            "/resume_view": self.handle_resume_view_page,
         }
 
         # GET 下载简历 / 获取简历列表
@@ -408,6 +409,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/list_resumes":
             self.api_list_resumes_GET(params)
+            return
+        if path == "/api/preview_resume":
+            self.api_preview_resume_GET(params)
             return
 
         handler = routes.get(path)
@@ -447,6 +451,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/add_resume": self.api_add_resume,
             "/api/delete_resume": self.api_delete_resume,
             "/api/assign_resume": self.api_assign_resume,
+            "/api/save_job_resume": self.api_save_job_resume,
         }
 
         handler = api_routes.get(path)
@@ -853,7 +858,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     html += '<span>📄 ' + r.name + '</span>';
                     html += '<div>';
                     html += '<button onclick="useResume(&quot;' + id + '&quot;,&quot;' + r.id + '&quot;)" class="btn btn-small" style="margin-right:4px">使用</button>';
-                    html += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">预览</a>';
+                    html += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">👁‍🗨️ 预览</a>';
+                html += '<a href="/resume_view?resume_id=' + r.id + '" target="_blank" class="btn btn-small">📝 编辑</a>';
                     html += '</div></div>';
                 }});
                 html += '</div>';
@@ -1118,10 +1124,16 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_get_resume_GET(self, params):
-        """GET 方式返回简历文件供下载"""
+        """GET 方式返回简历文件供下载（支持 resume_id 或 job_id）"""
         try:
-            resume_id = params.get("resume_id", params.get("job_id", ""))
-            content = self.agent.tracker.get_resume(resume_id)
+            job_id = params.get("job_id", "")
+            resume_id = params.get("resume_id", "")
+            if job_id:
+                content = self.agent.tracker.get_job_resume(job_id)
+                if content is None:
+                    content = self.agent.tracker.get_resume(resume_id) if resume_id else None
+            else:
+                content = self.agent.tracker.get_resume(resume_id)
             if content is None:
                 self.send_json({"success": False, "error": "未找到简历"}, 404)
                 return
@@ -1131,6 +1143,40 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_preview_resume_GET(self, params):
+        """GET 方式返回简历的 HTML 预览（支持 resume_id 或 job_id）"""
+        try:
+            resume_id = params.get("resume_id", "")
+            job_id = params.get("job_id", "")
+            if job_id:
+                # 优先使用职位编辑后的 HTML
+                html = self.agent.tracker.get_job_resume_html(job_id)
+                if html:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+                # 没有编辑版，从 PDF 转换
+                data = self.agent.tracker.get_job_resume(job_id)
+                if data:
+                    html = self.agent.tracker.convert_resume_to_html_given_data(data, resume_id or job_id)
+                else:
+                    html = "<p style='color:#888'>未找到该职位的简历</p>"
+            elif resume_id:
+                html = self.agent.tracker.convert_resume_to_html(resume_id)
+            else:
+                self.send_json({"success": False, "error": "缺少 resume_id 或 job_id"}, 400)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
@@ -1240,6 +1286,19 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
+    def api_save_job_resume(self, data):
+        """保存职位简历的 HTML 编辑版本（不修改简历库）"""
+        try:
+            job_id = data.get("job_id", "")
+            html = data.get("html", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            ok = self.agent.tracker.save_job_resume_text(job_id, html)
+            self.send_json({"success": ok})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
     # ===================== 页面 =====================
 
     def handle_resume_page(self, params):
@@ -1316,6 +1375,144 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
     def _resume_page_script(self):
         return ''
+
+    def handle_resume_view_page(self, params):
+        """简历查看/编辑页（职位绑定版本，不修改原始简历库）"""
+        job_id = params.get("job_id", "")
+        if not job_id:
+            self._send_html('<html><body><p style="padding:40px;color:#888">缺少 job_id</p></body></html>')
+            return
+        # 查找职位
+        job = None
+        for j in self.agent.tracker.tracked_jobs:
+            if j["id"] == job_id:
+                job = j
+                break
+        if not job or not job.get("resume_id"):
+            self._send_html(f'<html><body><p style="padding:40px;color:#888">未找到职位或未关联简历</p></body></html>')
+            return
+        resume_name = job.get("resume_name", "简历")
+        resume_id = job["resume_id"]
+        html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编辑简历 - {resume_name}</title>
+<style>
+* {{ margin:0; padding:0; box-sizing:border-box; }}
+body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; padding:20px; }}
+.container {{ max-width:800px; margin:0 auto; }}
+.header {{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }}
+.header h1 {{ font-size:20px; }}
+.header .subtitle {{ font-size:13px; color:#888; font-weight:normal; }}
+.btn {{ display:inline-block; padding:8px 16px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:6px; cursor:pointer; text-decoration:none; font-size:14px; }}
+.btn:hover {{ background:#e8e8e8; }}
+.btn-primary {{ background:#1a73e8; color:#fff; border:none; }}
+.btn-primary:hover {{ background:#1557b0; }}
+.btn-save {{ background:#34a853; color:#fff; border:none; }}
+.btn-save:hover {{ background:#2d9249; }}
+.preview-box {{ background:#fff; border-radius:8px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.08); min-height:300px; line-height:1.7; font-size:14px; }}
+.preview-box p {{ margin:0 0 10px 0; }}
+.preview-box strong {{ color:#111; }}
+#editor {{ display:none; width:100%; min-height:400px; padding:16px; border:1px solid #ddd; border-radius:8px; font-size:14px; line-height:1.7; font-family:monospace; }}
+.toolbar {{ display:flex; gap:8px; margin-bottom:12px; }}
+.status {{ margin:8px 0; padding:6px 12px; border-radius:4px; display:none; font-size:13px; }}
+.status.success {{ display:block; background:#e6f4ea; color:#2e7d32; }}
+.status.error {{ display:block; background:#fce8e6; color:#d32f2f; }}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📄 {resume_name} <span class="subtitle">（职位专属副本，修改不影响简历库）</span></h1>
+    <div>
+      <a href="/tracked" class="btn" style="margin-right:4px">← 返回</a>
+      <button onclick="toggleEdit()" id="toggleBtn" class="btn">✏️ 编辑</button>
+      <button onclick="downloadPdf()" class="btn">⬇️ 下载 PDF</button>
+    </div>
+  </div>
+  <div id="statusMsg" class="status"></div>
+  <div class="toolbar" id="editToolbar" style="display:none">
+    <button onclick="saveEdit()" class="btn btn-save">💾 保存编辑</button>
+    <button onclick="toggleEdit()" class="btn">↩️ 取消</button>
+  </div>
+  <div id="preview" class="preview-box">加载中...</div>
+  <textarea id="editor"></textarea>
+</div>
+<script>
+var jobId = {json.dumps(job_id)};
+var resumeId = {json.dumps(resume_id)};
+var originalHtml = '';
+
+async function loadPreview() {{
+  var resp = await fetch('/api/preview_resume?job_id=' + jobId);
+  var html_content = await resp.text();
+  document.getElementById('preview').innerHTML = html_content;
+  originalHtml = html_content;
+  document.getElementById('editor').value = html_content
+    .replace(/<p>/g, '')
+    .replace(/<\/p>/g, '\n\n')
+    .replace(/<br>/g, '\n')
+    .replace(/<strong>(.*?)<\/strong>/g, '$1');
+}}
+
+function toggleEdit() {{
+  var preview = document.getElementById('preview');
+  var editor = document.getElementById('editor');
+  var toolbar = document.getElementById('editToolbar');
+  var btn = document.getElementById('toggleBtn');
+  if (editor.style.display === 'block') {{
+    editor.style.display = 'none';
+    preview.style.display = 'block';
+    toolbar.style.display = 'none';
+    btn.textContent = '✏️ 编辑';
+    preview.innerHTML = originalHtml;
+  }} else {{
+    preview.style.display = 'none';
+    editor.style.display = 'block';
+    toolbar.style.display = 'flex';
+    btn.textContent = '👁️ 预览';
+  }}
+}}
+
+async function saveEdit() {{
+  var status = document.getElementById('statusMsg');
+  var htmlContent = document.getElementById('editor').value;
+  var paragraphs = htmlContent.split(/\n\s*\n/).filter(function(p) {{ return p.trim(); }});
+  var formatted = paragraphs.map(function(p) {{
+    var lines = p.trim().split('\n').filter(function(l) {{ return l.trim(); }});
+    return '<p>' + lines.join('<br>') + '</p>';
+  }}).join('\n');
+  document.getElementById('preview').innerHTML = formatted;
+  originalHtml = formatted;
+  document.getElementById('editor').style.display = 'none';
+  document.getElementById('preview').style.display = 'block';
+  document.getElementById('editToolbar').style.display = 'none';
+  document.getElementById('toggleBtn').textContent = '✏️ 编辑';
+  try {{
+    var resp = await fetch('/api/save_job_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, html: formatted}})}});
+    var d = await resp.json();
+    var saved = d.success;
+    status.className = 'status ' + (saved ? 'success' : 'error');
+    status.textContent = saved ? '✅ 已保存（仅限此职位）' : '❌ 保存失败: ' + (d.error || '');
+  }} catch(e) {{
+    status.className = 'status error';
+    status.textContent = '❌ 保存出错: ' + e;
+  }}
+  status.style.display = 'block';
+  setTimeout(function() {{ status.style.display = 'none'; }}, 3000);
+}}
+
+function downloadPdf() {{
+  window.open('/api/get_resume?job_id=' + jobId, '_blank');
+}}
+
+loadPreview();
+</script>
+</body>
+</html>"""
+        self._send_html(html)
     def _page(self, title, body, lang="zh-CN"):
         nav_items = ""
         pages = [
@@ -1341,116 +1538,224 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         html_lang = lang if lang in ("en", "zh-CN", "fr") else "zh-CN"
         site_name = t(lang, "page_title")
         return f"""<!DOCTYPE html>
-<html lang="{html_lang}">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{title} - {site_name}</title>
-<style>
-* {{ margin:0; padding:0; box-sizing:border-box; }}
-body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; }}
-nav {{ background:#fff; display:flex; padding:0 16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); gap:8px; overflow-x:auto; position:sticky; top:0; z-index:100; }}
-nav a {{ padding:14px 12px; text-decoration:none; color:#666; font-weight:500; border-bottom:3px solid transparent; white-space:nowrap; }}
-nav a:hover {{ color:#333; }}
-nav a.active {{ color:#1a73e8; border-bottom-color:#1a73e8; }}
-.container {{ max-width:960px; margin:0 auto; padding:20px; }}
-h1 {{ margin-bottom:20px; }}
-.hero {{ text-align:center; padding:50px 20px 30px; }}
-.hero h1 {{ font-size:42px; }}
-.subtitle {{ color:#666; font-size:16px; margin:8px 0 24px; }}
-.hero-actions {{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }}
-.features {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin:30px 0; }}
-.feature-card {{ background:#fff; padding:24px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.06); text-align:center; }}
-.feature-icon {{ font-size:32px; margin-bottom:8px; }}
-.feature-card h3 {{ margin-bottom:6px; font-size:16px; }}
-.feature-card p {{ color:#666; font-size:13px; line-height:1.5; }}
-.btn {{ display:inline-block; padding:8px 16px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:6px; cursor:pointer; text-decoration:none; font-size:14px; }}
-.btn:hover {{ background:#e8e8e8; }}
-.btn-primary {{ background:#1a73e8; color:#fff; border:none; }}
-.btn-primary:hover {{ background:#1557b0; }}
-.btn-secondary {{ background:#5f6368; color:#fff; border:none; }}
-.btn-lg {{ padding:14px 28px; font-size:16px; }}
-.btn-small {{ padding:4px 10px; font-size:12px; }}
-.btn-save {{ background:#34a853; color:#fff; border:none; }}
-.btn-save:hover {{ background:#2d9249; }}
-.btn-interview {{ background:#fbbc04; color:#333; border:none; }}
-.btn-reject {{ background:#ea4335; color:#fff; border:none; }}
-.btn-offer {{ background:#9c27b0; color:#fff; border:none; }}
-.btn-delete {{ background:#d32f2f; color:#fff; border:none; }}
-.stats-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:16px 0; }}
-.stat-card {{ background:#fff; padding:16px; border-radius:8px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.06); }}
-.stat-number {{ font-size:28px; font-weight:700; color:#1a73e8; }}
-.stat-label {{ color:#666; font-size:12px; margin-top:4px; }}
-.status-bar {{ display:flex; height:32px; border-radius:6px; overflow:hidden; margin:12px 0; font-size:12px; color:#fff; font-weight:500; }}
-.status-segment {{ display:flex; align-items:center; justify-content:center; padding:0 6px; }}
-.skills-list {{ margin:12px 0; }}
-.skill-item {{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #eee; }}
-.skill-name {{ width:90px; font-weight:500; }}
-.skill-level {{ flex:1; }}
-.skill-years {{ color:#888; font-size:12px; }}
-.dot {{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:3px; background:#ddd; }}
-.dot.filled {{ background:#1a73e8; }}
-.job-card {{ background:#fff; border-radius:8px; padding:14px; margin:10px 0; box-shadow:0 1px 3px rgba(0,0,0,0.06); }}
-.job-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }}
-.job-title {{ font-weight:600; font-size:14px; }}
-.job-score {{ padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; }}
-.score-high {{ background:#e6f4ea; color:#34a853; }}
-.score-medium {{ background:#fef7e0; color:#f9ab00; }}
-.score-low {{ background:#fce8e6; color:#ea4335; }}
-.job-type-tag {{ display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
-.job-meta {{ display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:#666; margin-bottom:6px; }}
-.job-desc {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; }}
-.job-desc-full {{ font-size:13px; color:#333; margin-bottom:8px; line-height:1.5; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:8px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
-.job-actions {{ display:flex; gap:6px; flex-wrap:wrap; }}
-.job-notes {{ margin-top:6px; color:#888; font-size:12px; }}
-.search-summary {{ margin:16px 0; }}
-.result-stats {{ display:flex; gap:16px; margin:8px 0; }}
-.link-item {{ background:#fff; border-radius:6px; padding:10px; margin:6px 0; font-size:13px; }}
-.link-url {{ color:#1a73e8; word-break:break-all; display:block; margin-top:3px; }}
-.tab-bar {{ display:flex; flex-wrap:wrap; gap:4px; }}
-.tab {{ padding:6px 12px; border-radius:16px; font-size:12px; text-decoration:none; color:#666; background:#e8e8e8; }}
-.tab.active {{ background:#1a73e8; color:#fff; }}
-.status-tag {{ padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }}
-.job-desc-snippet {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; padding:4px 0; border-bottom:1px solid #eee; }}
-.status-saved {{ background:#f0f0f0; color:#666; }}
-.status-applied {{ background:#e8f0fe; color:#1a73e8; }}
-.status-interviewing {{ background:#fef7e0; color:#f9ab00; }}
-.status-rejected {{ background:#fce8e6; color:#ea4335; }}
-.status-offer {{ background:#e6f4ea; color:#34a853; }}
-.section {{ margin:24px 0; }}
-.section h2 {{ margin-bottom:12px; font-size:18px; }}
-.profile-form {{ max-width:480px; }}
-.form-row {{ display:flex; align-items:center; gap:10px; margin:10px 0; }}
-.form-row label {{ width:90px; font-size:13px; color:#555; flex-shrink:0; }}
-.form-row input {{ flex:1; padding:7px 10px; border:1px solid #ddd; border-radius:5px; font-size:13px; }}
-.salary-range {{ display:flex; align-items:center; gap:6px; }}
-.salary-range input {{ width:100px; }}
-.skills-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
-.skills-table th, .skills-table td {{ padding:8px; border-bottom:1px solid #eee; text-align:left; }}
-.skills-table th {{ color:#555; }}
-.search-form {{ background:#fff; padding:16px; border-radius:8px; margin-bottom:12px; }}
-.sources-row {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }}
-.source-check {{ font-size:13px; display:flex; align-items:center; gap:4px; cursor:pointer; }}
-.empty {{ color:#888; padding:30px; text-align:center; }}
-.error {{ color:#ea4335; }}
-.loading {{ text-align:center; padding:20px; }}
-.spinner {{ border:3px solid #f3f3f3; border-top:3px solid #1a73e8; border-radius:50%; width:30px; height:30px; animation:spin .8s linear infinite; margin:0 auto 8px; }}
-@keyframes spin {{ 0%{{transform:rotate(0deg)}} 100%{{transform:rotate(360deg)}} }}
-pre {{ background:#f5f5f5; padding:16px; border-radius:6px; white-space:pre-wrap; font-size:13px; line-height:1.5; }}
-</style>
-</head>
-<body>
-<nav>{nav_items}{lang_switch}</nav>
-<div class="container">{body}</div>
-<script>
-// Persist language preference
-(function() {{
+        <html lang="{html_lang}">
+
+        <head>
+
+        <meta charset="UTF-8">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>{title} - {site_name}</title>
+
+        <style>
+
+        * {{ margin:0; padding:0; box-sizing:border-box; }}
+
+        body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; }}
+
+        nav {{ background:#fff; display:flex; padding:0 16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); gap:8px; overflow-x:auto; position:sticky; top:0; z-index:100; }}
+
+        nav a {{ padding:14px 12px; text-decoration:none; color:#666; font-weight:500; border-bottom:3px solid transparent; white-space:nowrap; }}
+
+        nav a:hover {{ color:#333; }}
+
+        nav a.active {{ color:#1a73e8; border-bottom-color:#1a73e8; }}
+
+        .container {{ max-width:960px; margin:0 auto; padding:20px; }}
+
+        h1 {{ margin-bottom:20px; }}
+
+        .hero {{ text-align:center; padding:50px 20px 30px; }}
+
+        .hero h1 {{ font-size:42px; }}
+
+        .subtitle {{ color:#666; font-size:16px; margin:8px 0 24px; }}
+
+        .hero-actions {{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }}
+
+        .features {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin:30px 0; }}
+
+        .feature-card {{ background:#fff; padding:24px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.06); text-align:center; }}
+
+        .feature-icon {{ font-size:32px; margin-bottom:8px; }}
+
+        .feature-card h3 {{ margin-bottom:6px; font-size:16px; }}
+
+        .feature-card p {{ color:#666; font-size:13px; line-height:1.5; }}
+
+        .btn {{ display:inline-block; padding:8px 16px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:6px; cursor:pointer; text-decoration:none; font-size:14px; }}
+
+        .btn:hover {{ background:#e8e8e8; }}
+
+        .btn-primary {{ background:#1a73e8; color:#fff; border:none; }}
+
+        .btn-primary:hover {{ background:#1557b0; }}
+
+        .btn-secondary {{ background:#5f6368; color:#fff; border:none; }}
+
+        .btn-lg {{ padding:14px 28px; font-size:16px; }}
+
+        .btn-small {{ padding:4px 10px; font-size:12px; }}
+
+        .btn-save {{ background:#34a853; color:#fff; border:none; }}
+
+        .btn-save:hover {{ background:#2d9249; }}
+
+        .btn-interview {{ background:#fbbc04; color:#333; border:none; }}
+
+        .btn-reject {{ background:#ea4335; color:#fff; border:none; }}
+
+        .btn-offer {{ background:#9c27b0; color:#fff; border:none; }}
+
+        .btn-delete {{ background:#d32f2f; color:#fff; border:none; }}
+
+        .stats-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:16px 0; }}
+
+        .stat-card {{ background:#fff; padding:16px; border-radius:8px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.06); }}
+
+        .stat-number {{ font-size:28px; font-weight:700; color:#1a73e8; }}
+
+        .stat-label {{ color:#666; font-size:12px; margin-top:4px; }}
+
+        .status-bar {{ display:flex; height:32px; border-radius:6px; overflow:hidden; margin:12px 0; font-size:12px; color:#fff; font-weight:500; }}
+
+        .status-segment {{ display:flex; align-items:center; justify-content:center; padding:0 6px; }}
+
+        .skills-list {{ margin:12px 0; }}
+
+        .skill-item {{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #eee; }}
+
+        .skill-name {{ width:90px; font-weight:500; }}
+
+        .skill-level {{ flex:1; }}
+
+        .skill-years {{ color:#888; font-size:12px; }}
+
+        .dot {{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:3px; background:#ddd; }}
+
+        .dot.filled {{ background:#1a73e8; }}
+
+        .job-card {{ background:#fff; border-radius:8px; padding:14px; margin:10px 0; box-shadow:0 1px 3px rgba(0,0,0,0.06); }}
+
+        .job-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }}
+
+        .job-title {{ font-weight:600; font-size:14px; }}
+
+        .job-score {{ padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; }}
+
+        .score-high {{ background:#e6f4ea; color:#34a853; }}
+
+        .score-medium {{ background:#fef7e0; color:#f9ab00; }}
+
+        .score-low {{ background:#fce8e6; color:#ea4335; }}
+
+        .job-type-tag {{ display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
+
+        .job-meta {{ display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:#666; margin-bottom:6px; }}
+
+        .job-desc {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; }}
+
+        .job-desc-full {{ font-size:13px; color:#333; margin-bottom:8px; line-height:1.5; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:8px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
+
+        .job-actions {{ display:flex; gap:6px; flex-wrap:wrap; }}
+
+        .job-notes {{ margin-top:6px; color:#888; font-size:12px; }}
+
+        .search-summary {{ margin:16px 0; }}
+
+        .result-stats {{ display:flex; gap:16px; margin:8px 0; }}
+
+        .link-item {{ background:#fff; border-radius:6px; padding:10px; margin:6px 0; font-size:13px; }}
+
+        .link-url {{ color:#1a73e8; word-break:break-all; display:block; margin-top:3px; }}
+
+        .tab-bar {{ display:flex; flex-wrap:wrap; gap:4px; }}
+
+        .tab {{ padding:6px 12px; border-radius:16px; font-size:12px; text-decoration:none; color:#666; background:#e8e8e8; }}
+
+        .tab.active {{ background:#1a73e8; color:#fff; }}
+
+        .status-tag {{ padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }}
+
+        .job-desc-snippet {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; padding:4px 0; border-bottom:1px solid #eee; }}
+
+        .status-saved {{ background:#f0f0f0; color:#666; }}
+
+        .status-applied {{ background:#e8f0fe; color:#1a73e8; }}
+
+        .status-interviewing {{ background:#fef7e0; color:#f9ab00; }}
+
+        .status-rejected {{ background:#fce8e6; color:#ea4335; }}
+
+        .status-offer {{ background:#e6f4ea; color:#34a853; }}
+
+        .section {{ margin:24px 0; }}
+
+        .section h2 {{ margin-bottom:12px; font-size:18px; }}
+
+        .profile-form {{ max-width:480px; }}
+
+        .form-row {{ display:flex; align-items:center; gap:10px; margin:10px 0; }}
+
+        .form-row label {{ width:90px; font-size:13px; color:#555; flex-shrink:0; }}
+
+        .form-row input {{ flex:1; padding:7px 10px; border:1px solid #ddd; border-radius:5px; font-size:13px; }}
+
+        .salary-range {{ display:flex; align-items:center; gap:6px; }}
+
+        .salary-range input {{ width:100px; }}
+
+        .skills-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+
+        .skills-table th, .skills-table td {{ padding:8px; border-bottom:1px solid #eee; text-align:left; }}
+
+        .skills-table th {{ color:#555; }}
+
+        .search-form {{ background:#fff; padding:16px; border-radius:8px; margin-bottom:12px; }}
+
+        .sources-row {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }}
+
+        .source-check {{ font-size:13px; display:flex; align-items:center; gap:4px; cursor:pointer; }}
+
+        .empty {{ color:#888; padding:30px; text-align:center; }}
+
+        .error {{ color:#ea4335; }}
+
+        .loading {{ text-align:center; padding:20px; }}
+
+        .spinner {{ border:3px solid #f3f3f3; border-top:3px solid #1a73e8; border-radius:50%; width:30px; height:30px; animation:spin .8s linear infinite; margin:0 auto 8px; }}
+
+        @keyframes spin {{ 0%{{transform:rotate(0deg)}} 100%{{transform:rotate(360deg)}} }}
+
+        pre {{ background:#f5f5f5; padding:16px; border-radius:6px; white-space:pre-wrap; font-size:13px; line-height:1.5; }}
+
+        </style>
+
+        </head>
+
+        <body>
+
+        <nav>{nav_items}{lang_switch}</nav>
+
+        <div class="container">{body}</div>
+
+        <script>
+
+        // Persist language preference
+
+        (function() {{
+
     var lang = '{lang}';
     fetch('/api/update_profile', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{language: lang}})}});
-}})();
-</script>
-</body>
-</html>"""
+        }})();
+
+        </script>
+
+        </body>
+
+        </html>"""
+
 
     def _send_html(self, html):
         self.send_response(200)
