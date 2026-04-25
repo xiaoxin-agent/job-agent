@@ -1264,20 +1264,25 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def _resume_page_script(self):
         """简历库页面 JS (不在 f-string 里避免花括号冲突)"""
         return r"""
+        var RESUME_EMPTY = 'EMPTY_TEXT';
+        var RESUME_DELETE = 'DELETE_TEXT';
+        var RESUME_PREVIEW = 'PREVIEW_TEXT';
+        var RESUME_FOLDER_EMOJI = 'FOLDER_EMOJI';
+        var RESUME_EYE_EMOJI = 'EYE_EMOJI';
         async function loadResumes() {
             var resp = await (await fetch('/api/list_resumes')).json();
             var list = document.getElementById('resume-list');
             if (!resp.success || resp.resumes.length === 0) {
-                list.innerHTML = '<p style="margin-top:16px;color:#888">' + EMPTY_TEXT + '</p>';
+                list.innerHTML = '<p style="margin-top:16px;color:#888">' + RESUME_EMPTY + '</p>';
                 return;
             }
             var h = '';
             resp.resumes.forEach(function(r) {
                 h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid #e0e0e0;border-radius:8px;margin-top:8px">';
-                h += '<div><span style="font-weight:bold">' + 'FOLDER_EMOJI' + ' ' + r.name + '</span><br><span style="font-size:12px;color:#888">' + r.created_at + '</span></div>';
+                h += '<div><span style="font-weight:bold">' + RESUME_FOLDER_EMOJI + ' ' + r.name + '</span><br><span style="font-size:12px;color:#888">' + r.created_at + '</span></div>';
                 h += '<div>';
-                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">' + 'EYE_EMOJI' + ' ' + 'PREVIEW_TEXT</a>';
-                h += '<button onclick="delResume(\'' + r.id + '\')" class="btn btn-small btn-delete" style="margin-left:6px">' + DELETE_TEXT + '</button>';
+                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">' + RESUME_EYE_EMOJI + ' ' + RESUME_PREVIEW + '</a>';
+                h += '<button onclick="delResume(\'' + r.id + '\')" class="btn btn-small btn-delete" style="margin-left:6px">' + RESUME_DELETE + '</button>';
                 h += '</div></div>';
             });
             list.innerHTML = h;
@@ -1291,22 +1296,26 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var input = document.createElement('input');
             input.type = 'file';
             input.accept = '.pdf,.doc,.docx';
+            input.style.display = 'none';
+            document.body.appendChild(input);
             input.onchange = async function(e) {
                 var file = e.target.files[0];
-                if (!file) return;
-                var reader = new FileReader();
-                reader.onload = async function(ev) {
-                    var b64 = ev.target.result.split(',')[1];
-                    var name = file.name || '未命名简历';
-                    var resp = await fetch('/api/add_resume', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, file:b64})});
+                if (!file) { document.body.removeChild(input); return; }
+                var formData = new FormData();
+                formData.append('name', file.name);
+                formData.append('resume', file);
+                try {
+                    var resp = await fetch('/api/add_resume_multipart', {method:'POST', body:formData});
                     var d = await resp.json();
                     if (d.success) {
                         loadResumes();
                     } else {
                         alert('上传失败: ' + (d.error || ''));
                     }
-                };
-                reader.readAsDataURL(file);
+                } catch(e) {
+                    alert('上传出错: ' + e);
+                }
+                document.body.removeChild(input);
             };
             input.click();
         }
