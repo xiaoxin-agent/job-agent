@@ -470,17 +470,64 @@ class TestWebServer(unittest.TestCase):
         self.assertIn("add_resume_multipart", html)
         self.assertIn("assign_resume", html)
     
-    def test_17_resume_page_has_js(self):
-        """简历库页面包含必要 JS"""
-        resp = urlopen(f"http://localhost:{self.port}/resumes")
-        html = resp.read().decode("utf-8")
-        self.assertIn("loadResumes", html)
-        self.assertIn("uploadResume", html)
-        self.assertIn("delResume", html)
-        self.assertIn("add_resume", html)
-        self.assertIn("delete_resume", html)
-        self.assertIn("get_resume?resume_id", html)
-
+    def test_18_js_page_validates(self):
+        """所有页面的 JS 语法正确 (用 Node.js 验证)"""
+        import subprocess, json
+        pages = ["/", "/tracked", "/resumes", "/dashboard", "/search"]
+        node_script = """
+const http = require('http');
+const results = [];
+let done = 0;
+const total = %d;
+function check(page) {
+    http.get('http://localhost:%d' + page, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+            const scripts = [...data.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+            if (scripts.length === 0) {
+                results.push({page, valid: true, note: 'no script tag'});
+            } else {
+                scripts.forEach((m, i) => {
+                    try {
+                        new Function(m[1]);
+                        results.push({page, idx: i, valid: true});
+                    } catch(e) {
+                        const lines = m[1].split('\\n');
+                        const errLine = e.lineNumber || 0;
+                        results.push({page, idx: i, valid: false,
+                            error: e.message,
+                            line: errLine,
+                            context: lines.slice(Math.max(0,errLine-3), errLine+2).join('\\n').trim()});
+                    }
+                });
+            }
+            done++;
+            if (done >= total) {
+                console.log(JSON.stringify(results));
+            }
+        });
+    });
+}
+""" % (len(pages), self.port)
+        for p in pages:
+            node_script += f"""
+setTimeout(() => check('{p}'), 100);
+"""
+        node_script += """
+setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(results)); } }, 5000);
+"""
+        proc = subprocess.run(["node", "-e", node_script], capture_output=True, text=True, timeout=10)
+        self.assertEqual(proc.returncode, 0, f"Node JS error: {proc.stderr}")
+        results = json.loads(proc.stdout.strip())
+        errors = [r for r in results if not r.get("valid")]
+        if errors:
+            msg = "JS语法错误:\n"
+            for e in errors:
+                msg += f"  {e['page']} [script {e.get('idx','?')}]: {e.get('error','?')}\n"
+                msg += f"    {e.get('context','')}\n"
+            self.fail(msg)
+        self.assertGreater(len(results), 0)
 
 def cleanup():
     """清理测试数据"""

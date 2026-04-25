@@ -852,14 +852,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">';
                     html += '<span>📄 ' + r.name + '</span>';
                     html += '<div>';
-                    html += '<button onclick="useResume(\'' + id + '\',\'' + r.id + '\')" class="btn btn-small" style="margin-right:4px">使用</button>';
+                    html += '<button onclick="useResume(&quot;' + id + '&quot;,&quot;' + r.id + '&quot;)" class="btn btn-small" style="margin-right:4px">使用</button>';
                     html += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">预览</a>';
                     html += '</div></div>';
                 }});
                 html += '</div>';
                 html += '<hr style="margin:12px 0">';
             }}
-            html += '<div><button onclick="uploadNewResume(\'' + id + '\')" class="btn" style="width:100%">📤 上传新简历</button></div>';
+                        html += '<div><button onclick="uploadNewResume(&quot;' + id + '&quot;)" class="btn" style="width:100%">📤 上传新简历</button></div>';
             html += '<div style="margin-top:12px;text-align:right"><button onclick="closeResumeModal()" class="btn btn-small">取消</button></div>';
             html += '</div></div>';
             document.body.insertAdjacentHTML('beforeend', html);
@@ -1241,86 +1241,73 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
     def handle_resume_page(self, params):
         lang = self._get_lang(params)
-        title = t(lang, 'resume_title')
-        upload_text = t(lang, 'resume_upload')
-        upload_hint = t(lang, 'resume_upload_hint')
-        empty_text = t(lang, 'resume_empty')
-        delete_text = t(lang, 'resume_delete')
-        script = self._resume_page_script()
-        body = f"""
-        <h1>{title}</h1>
+        html = self._page(t(lang, 'resume_title'), f"""
+        <h1>{t(lang, 'resume_title')}</h1>
         <div id="resume-list"></div>
         <div style="margin-top:16px">
-            <button onclick="uploadResume()" class="btn btn-primary">{upload_text}</button>
-            <span style="margin-left:8px;color:#888;font-size:12px">{upload_hint}</span>
+            <button onclick="uploadResume()" class="btn btn-primary">{t(lang, 'resume_upload')}</button>
+            <span style="margin-left:8px;color:#888;font-size:12px">{t(lang, 'resume_upload_hint')}</span>
         </div>
         <script>
-{script}
-        </script>
-        """
-        html = self._page(title, body, lang=lang)
-        self._send_html(html)
-
-    def _resume_page_script(self):
-        """简历库页面 JS (不在 f-string 里避免花括号冲突)"""
-        return r"""
-        var RESUME_EMPTY = 'EMPTY_TEXT';
-        var RESUME_DELETE = 'DELETE_TEXT';
-        var RESUME_PREVIEW = 'PREVIEW_TEXT';
-        var RESUME_FOLDER_EMOJI = 'FOLDER_EMOJI';
-        var RESUME_EYE_EMOJI = 'EYE_EMOJI';
-        async function loadResumes() {
+        var RESUME_EMPTY = '{t(lang, 'resume_empty')}';
+        var RESUME_DELETE = '{t(lang, 'resume_delete')}';
+        async function loadResumes() {{
             var resp = await (await fetch('/api/list_resumes')).json();
             var list = document.getElementById('resume-list');
-            if (!resp.success || resp.resumes.length === 0) {
+            if (!resp.success || resp.resumes.length === 0) {{
                 list.innerHTML = '<p style="margin-top:16px;color:#888">' + RESUME_EMPTY + '</p>';
                 return;
-            }
+            }}
             var h = '';
-            resp.resumes.forEach(function(r) {
-                h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid #e0e0e0;border-radius:8px;margin-top:8px">';
-                h += '<div><span style="font-weight:bold">' + RESUME_FOLDER_EMOJI + ' ' + r.name + '</span><br><span style="font-size:12px;color:#888">' + r.created_at + '</span></div>';
-                h += '<div>';
-                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">' + RESUME_EYE_EMOJI + ' ' + RESUME_PREVIEW + '</a>';
-                h += '<button onclick="delResume(\'' + r.id + '\')" class="btn btn-small btn-delete" style="margin-left:6px">' + RESUME_DELETE + '</button>';
+            resp.resumes.forEach(function(r) {{
+                h += '<div class="resume-card">';
+                h += '<div><span class="resume-name">📄 ' + r.name + '</span><br><span class="resume-date">' + r.created_at + '</span></div>';
+                h += '<div class="resume-actions">';
+                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">👁️ 预览</a>';
+                h += '<button onclick="delResume(\"' + r.id + '\")" class="btn btn-small btn-delete">' + RESUME_DELETE + '</button>';
                 h += '</div></div>';
-            });
+            }});
             list.innerHTML = h;
-        }
-        async function delResume(id) {
+        }}
+        async function delResume(id) {{
             if (!confirm('确定删除？')) return;
-            await fetch('/api/delete_resume', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({resume_id:id})});
+            await fetch('/api/delete_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{resume_id:id}})}});
             loadResumes();
-        }
-        async function uploadResume() {
+        }}
+        async function uploadResume() {{
             var input = document.createElement('input');
             input.type = 'file';
             input.accept = '.pdf,.doc,.docx';
             input.style.display = 'none';
             document.body.appendChild(input);
-            input.onchange = async function(e) {
+            input.onchange = async function(e) {{
                 var file = e.target.files[0];
-                if (!file) { document.body.removeChild(input); return; }
+                if (!file) {{ document.body.removeChild(input); return; }}
                 var formData = new FormData();
                 formData.append('name', file.name);
                 formData.append('resume', file);
-                try {
-                    var resp = await fetch('/api/add_resume_multipart', {method:'POST', body:formData});
+                try {{
+                    var resp = await fetch('/api/add_resume_multipart', {{method:'POST', body:formData}});
                     var d = await resp.json();
-                    if (d.success) {
+                    if (d.success) {{
                         loadResumes();
-                    } else {
+                    }} else {{
                         alert('上传失败: ' + (d.error || ''));
-                    }
-                } catch(e) {
+                    }}
+                }} catch(e) {{
                     alert('上传出错: ' + e);
-                }
+                }}
                 document.body.removeChild(input);
-            };
+            }};
             input.click();
-        }
+        }}
         loadResumes();
-        """.replace('EMPTY_TEXT', '暂无简历').replace('DELETE_TEXT', '删除').replace('PREVIEW_TEXT', '预览').replace('FOLDER_EMOJI', '\U0001F4C4').replace('EYE_EMOJI', '\U0001F441\U0000200D\U0001F5E8\uFE0F')
+        </script>
+        """, lang=lang)
+        self._send_html(html)
+
+    def _resume_page_script(self):
+        return ''
 
     # ===================== 工具 =====================
 
