@@ -727,7 +727,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
                 </div>
-                <div class="job-desc-snippet">{(j.get('description','') or '')[:150]}</div>
+                <div class="job-desc-snippet" id="tdesc-{j['id']}" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">{(j.get('description','') or '')[:150]}</div>
+                <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','')}</div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">🔗 查看</a>
                     <button onclick="upd('{j['id']}','applied')" class="btn btn-small">📤 申请</button>
@@ -743,6 +744,18 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div class="section"><div class="tab-bar">{tabs}</div></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
+        function toggleTrackedDesc(id) {{
+            var short = document.getElementById('tdesc-' + id);
+            var full = document.getElementById('tfull-' + id);
+            if (!full) return;
+            if (full.style.display === 'none') {{
+                full.style.display = 'block';
+                short.style.display = 'none';
+            }} else {{
+                full.style.display = 'none';
+                short.style.display = 'block';
+            }}
+        }}
         async function upd(id, st) {{
             var notes = prompt('备注（可选）:','')||'';
             await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id, status:st, notes:notes}})}});
