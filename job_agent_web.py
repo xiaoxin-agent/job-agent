@@ -394,6 +394,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length) if content_length > 0 else b"{}"
 
+        # 处理文件上传（multipart/form-data）
+        if path == "/api/upload_resume":
+            self.api_upload_resume(body, self.headers.get("Content-Type", ""))
+            return
+
         try:
             data = json.loads(body)
         except:
@@ -406,6 +411,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/delete_job": self.api_delete_job,
             "/api/update_profile": self.api_update_profile,
             "/api/generate_letter": self.api_generate_letter,
+            "/api/upload_resume": self.api_upload_resume,
+            "/api/get_resume": self.api_get_resume,
         }
 
         handler = api_routes.get(path)
@@ -762,13 +769,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
-                    <button onclick="upd('{j['id']}','applied')" class="btn btn-small">{btn_apply}</button>
+                    <button onclick="applyWithResume('{j['id']}')" class="btn btn-small" id="apply-btn-{j['id']}">{btn_apply}</button>
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
+                {('<div class="job-resume">📄 简历已上传 <a href="/api/get_resume?job_id='+j['id']+'" class="link-url" target="_blank">查看</a></div>') if j.get('has_resume') else ''}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
@@ -797,6 +805,40 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var notes = prompt('备注（可选）:','')||'';
             await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id, status:st, notes:notes}})}});
             location.reload();
+        }}
+        async function applyWithResume(id) {{
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.doc,.docx,.png,.jpg';
+            input.onchange = async function(e) {{
+                var file = e.target.files[0];
+                if (!file) return;
+                var btn = document.getElementById('apply-btn-' + id);
+                btn.disabled = true;
+                btn.textContent = '⏳ 上传中…';
+                var formData = new FormData();
+                formData.append('job_id', id);
+                formData.append('resume', file);
+                try {{
+                    var resp = await fetch('/api/upload_resume', {{method:'POST', body:formData}});
+                    var d = await resp.json();
+                    if (d.success) {{
+                        // 简历上传成功，更新状态为 applied
+                        var notes = prompt('备注（可选）:','')||'';
+                        await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id, status:'applied', notes:notes}})}});
+                        location.reload();
+                    }} else {{
+                        alert('上传失败: ' + (d.error || '未知错误'));
+                        btn.disabled = false;
+                        btn.textContent = '📤 申请';
+                    }}
+                }} catch(e) {{
+                    alert('上传出错: ' + e);
+                    btn.disabled = false;
+                    btn.textContent = '📤 申请';
+                }}
+            }};
+            input.click();
         }}
         </script>
         """, lang=lang)
@@ -938,6 +980,41 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         try:
             letter = self.agent.generate_cover_letter(data.get("job", {}))
             self.send_json({"success": True, "letter": letter})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_upload_resume(self, body: bytes, content_type: str):
+        """处理简历文件上传 (multipart/form-data)"""
+        try:
+            import cgi
+            from io import BytesIO
+            env = {"REQUEST_METHOD": "POST", "CONTENT_TYPE": content_type}
+            fs = cgi.FieldStorage(fp=BytesIO(body), environ=env, keep_blank_values=True)
+            job_id = fs.getvalue("job_id", "")
+            file_item = fs.getfirst("resume")
+            if not job_id or not file_item or not file_item.file:
+                self.send_json({"success": False, "error": "缺少 job_id 或 resume 文件"}, 400)
+                return
+            data = file_item.file.read()
+            self.agent.tracker.save_resume(job_id, data)
+            self.send_json({"success": True})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_get_resume(self, data):
+        """返回简历文件供下载"""
+        try:
+            job_id = data.get("job_id", "")
+            content = self.agent.tracker.get_resume(job_id)
+            if content is None:
+                self.send_json({"success": False, "error": "未找到简历"}, 404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Disposition", f'attachment; filename="resume_{job_id}.pdf"')
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 

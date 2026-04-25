@@ -1001,8 +1001,56 @@ class JobTracker:
                 return job
         return None
     
+    def _resume_path(self, job_id: str) -> str:
+        """简历文件路径"""
+        base = os.path.dirname(self.jobs_file)
+        resume_dir = os.path.join(base, "resumes")
+        os.makedirs(resume_dir, exist_ok=True)
+        return os.path.join(resume_dir, f"{job_id}.pdf")
+
+    def save_resume(self, job_id: str, data: bytes) -> bool:
+        """保存简历文件"""
+        path = self._resume_path(job_id)
+        with open(path, "wb") as f:
+            f.write(data)
+        # 更新 job 记录标记
+        for job in self.tracked_jobs:
+            if job["id"] == job_id:
+                job["has_resume"] = True
+                break
+        self.save()
+        return True
+
+    def get_resume(self, job_id: str) -> Optional[bytes]:
+        """读取简历文件"""
+        path = self._resume_path(job_id)
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                return f.read()
+        return None
+
+    def has_resume(self, job_id: str) -> bool:
+        """是否有简历"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id:
+                return job.get("has_resume", False)
+        return False
+
+    def delete_resume(self, job_id: str):
+        """删除简历文件"""
+        path = self._resume_path(job_id)
+        if os.path.exists(path):
+            os.remove(path)
+        for job in self.tracked_jobs:
+            if job["id"] == job_id:
+                job["has_resume"] = False
+                job.pop("resume_file", None)
+                break
+        self.save()
+
     def delete_job(self, job_id: str) -> bool:
-        """删除跟踪的职位"""
+        """删除跟踪的职位（连带简历文件）"""
+        self.delete_resume(job_id)
         for i, job in enumerate(self.tracked_jobs):
             if job["id"] == job_id:
                 del self.tracked_jobs[i]
