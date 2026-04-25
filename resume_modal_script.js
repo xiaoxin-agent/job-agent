@@ -27,12 +27,14 @@
         h += '</div></div>';
         h += '<div id="resume-view-content" style="flex:1;overflow-y:auto;padding:20px;line-height:1.7;font-size:14px">';
         h += '<div style="text-align:center;padding:40px;color:#999">\u52a0\u8f7d\u4e2d...</div></div>';
-        h += '<div id="resume-view-footer" style="border-top:1px solid #e0e0e0;padding:10px 20px;flex-shrink:0;display:none">';
-        h += '<textarea id="resume-md-edit" style="width:100%;height:120px;border:1px solid #ddd;border-radius:6px;padding:8px;font-family:monospace;font-size:13px;resize:vertical" placeholder="Markdown \u7f16\u8f91..."></textarea>';
+        h += '<div id="resume-view-footer" style="border-top:1px solid #e0e0e0;display:none;flex-shrink:0;position:relative">';
+        h += '<div id="md-resize-handle" style="height:6px;background:#e0e0e0;cursor:ns-resize;user-select:none"></div>';
+        h += '<div style="padding:10px 20px">';
+        h += '<textarea id="resume-md-edit" style="width:100%;height:120px;border:1px solid #ddd;border-radius:6px;padding:8px;font-family:monospace;font-size:13px;box-sizing:border-box" placeholder="Markdown \u7f16\u8f91..."></textarea>';
         h += '<div style="margin-top:6px;text-align:right">';
         h += '<button class="btn btn-small" style="margin-right:4px" onclick="closeResumeMdEdit()">\u53d6\u6d88</button>';
         h += '<button class="btn btn-small btn-save" onclick="saveResumeMdFromModal()">\u{1f4be} \u4fdd\u5b58</button>';
-        h += '</div></div>';
+        h += '</div></div></div>';
         h += '</div></div>';
         document.body.insertAdjacentHTML('beforeend', h);
 
@@ -79,3 +81,27 @@ async function saveResumeMdFromModal() {
         alert('\u274c \u4fdd\u5b58\u51fa\u9519: ' + e);
     }
 }
+
+// MD editor resize handle
+document.addEventListener('mousedown', function(e) {
+    var handle = e.target.closest('#md-resize-handle');
+    if (!handle) return;
+    e.preventDefault();
+    var footer = document.getElementById('resume-view-footer');
+    var textarea = document.getElementById('resume-md-edit');
+    var startY = e.clientY;
+    var startH = textarea.clientHeight;
+
+    function onMove(ev) {
+        var h = Math.max(60, startH + (ev.clientY - startY));
+        textarea.style.height = h + 'px';
+        textarea.style.resize = 'none';
+    }
+    function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        textarea.style.resize = 'vertical';
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+});
