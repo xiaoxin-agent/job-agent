@@ -425,6 +425,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         if path == "/api/upload_resume":
             self.api_upload_resume(body, self.headers.get("Content-Type", ""))
             return
+        if path == "/api/add_resume_multipart":
+            self.api_add_resume_multipart(body, self.headers.get("Content-Type", ""))
+            return
 
         try:
             data = json.loads(body)
@@ -899,28 +902,24 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var btn = document.getElementById('apply-btn-' + jobId);
                 btn.disabled = true;
                 btn.textContent = '⏳ 上传中…';
+                // 用 multipart 上传到简历库
+                var formData = new FormData();
+                formData.append('name', file.name);
+                formData.append('resume', file);
                 try {{
-                    // 1. 先上传到简历库
-                    var reader = new FileReader();
-                    reader.onload = async function(ev) {{
-                        var b64 = ev.target.result.split(',')[1];
-                        var name = file.name || '未命名简历';
-                        var resp1 = await fetch('/api/add_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{name:name, file:b64}})}});
-                        var d1 = await resp1.json();
-                        if (!d1.success) {{ alert('上传失败: ' + (d1.error || '')); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
-                        // 2. 关联到职位
-                        var resumeId = d1.resume.id;
-                        var resp2 = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
-                        var d2 = await resp2.json();
-                        if (!d2.success) {{ alert('关联失败'); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
-                        // 3. 更新状态
-                        var notes = prompt('备注（可选）:','')||'';
-                        await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}});
-                        location.reload();
-                    }};
-                    reader.readAsDataURL(file);
+                    var resp1 = await fetch('/api/add_resume_multipart', {{method:'POST', body:formData}});
+                    var d1 = await resp1.json();
+                    if (!d1.success) {{ alert('上传失败: ' + (d1.error || '')); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
+                    var resumeId = d1.resume.id;
+                    var resp2 = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
+                    var d2 = await resp2.json();
+                    if (!d2.success) {{ alert('关联失败'); btn.disabled = false; btn.textContent = '📤 申请'; return; }}
+                    var notes = prompt('备注（可选）:','')||'';
+                    await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}});
+                    location.reload();
                 }} catch(e) {{
                     alert('上传出错: ' + e);
+                    console.error('upload error', e);
                     btn.disabled = false;
                     btn.textContent = '📤 申请';
                 }}
@@ -1175,6 +1174,45 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 self.send_json({"success": True, "resume": entry})
             else:
                 self.send_json({"success": False, "error": "缺少 file 字段(base64)"}, 400)
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_add_resume_multipart(self, body: bytes, content_type: str):
+        """multipart 上传简历到简历库"""
+        try:
+            boundary = None
+            for part in content_type.split(";"):
+                part = part.strip()
+                if part.startswith("boundary="):
+                    boundary = part[9:]
+            if not boundary:
+                self.send_json({"success": False, "error": "缺少 boundary"}, 400)
+                return
+            name = "未命名简历"
+            file_data = None
+            delimiter = b"--" + boundary.encode()
+            parts = body.split(delimiter)
+            for part in parts:
+                if b"Content-Disposition" not in part:
+                    continue
+                header_end = part.find(b"\r\n\r\n")
+                if header_end == -1:
+                    continue
+                headers_raw = part[:header_end].decode("utf-8", errors="replace")
+                content = part[header_end+4:]
+                if content.endswith(b"\r\n"):
+                    content = content[:-2]
+                elif content.endswith(b"--\r\n"):
+                    content = content[:-4]
+                if 'name="name"' in headers_raw:
+                    name = content.decode("utf-8", errors="replace").strip()
+                elif 'name="resume"' in headers_raw:
+                    file_data = content
+            if not file_data:
+                self.send_json({"success": False, "error": "缺少 resume 文件"}, 400)
+                return
+            entry = self.agent.tracker.add_resume(name, file_data)
+            self.send_json({"success": True, "resume": entry})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
