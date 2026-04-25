@@ -633,6 +633,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if (cached) {{
                 try {{
                     var d = JSON.parse(cached);
+                    if (!d.jobs || d.jobs.length === 0) {{
+                        sessionStorage.removeItem('searchResults');
+                        return false;
+                    }}
                     searchData = d;
                     renderResults(d);
                     document.getElementById('searchBtn').textContent = _btn_search_again;
