@@ -728,8 +728,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
                 </div>
-                <div class="job-desc-snippet" id="tdesc-{j['id']}" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">{(j.get('description','') or '')[:150]}</div>
-                <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','')}</div>
+                <div class="job-desc-snippet" id="tdesc-{j['id']}" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
+                <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">🔗 查看</a>
                     <button onclick="upd('{j['id']}','applied')" class="btn btn-small">📤 申请</button>

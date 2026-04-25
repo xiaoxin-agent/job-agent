@@ -192,7 +192,7 @@ class JobSearchEngine:
                             "title": job.get("title", ""),
                             "company": job.get("company", ""),
                             "location": job.get("location", ""),
-                            "description": self._clean_html(job.get("description", ""))[:300],
+                            "description": self._clean_html(job.get("description", ""))[:1500],
                             "url": job.get("url", ""),
                             "date": job.get("created_at", ""),
                             "source": "GitHub Jobs"
@@ -321,7 +321,7 @@ class JobSearchEngine:
                                 "title": title,
                                 "company": item.get("company", ""),
                                 "location": "Remote",
-                                "description": self._clean_html(desc)[:300],
+                                "description": self._clean_html(desc)[:1500],
                                 "url": f"https://remoteok.io/remote-jobs/{item.get('slug', '')}",
                                 "date": item.get("date", ""),
                                 "source": "RemoteOK",
