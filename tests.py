@@ -559,6 +559,76 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         self.assertIn('onclick="uploadResume()"', html)
         self.assertIn("add_resume_multipart", html)
 
+    def test_21_resume_assign_and_verify_in_library(self):
+        """端到端测试：关联简历后，简历库仍能找到该简历"""
+        import requests
+        # 上传一份简历到简历库
+        r = requests.post(f"http://localhost:{self.port}/api/add_resume_multipart",
+            files={'resume': ('e2e_test.pdf', b'%PDF E2E test resume content', 'application/pdf')},
+            data={'name': 'e2e_test.pdf'})
+        d = r.json()
+        self.assertTrue(d.get("success"))
+        resume_id = d["resume"]["id"]
+        resume_name = d["resume"]["name"]
+
+        # 保存职位到跟踪列表
+        agent = self._agent
+        agent.save_job({
+            "title": "E2E Link Test Job",
+            "company": "E2E Co",
+            "location": "Test City",
+            "match_score": 80
+        })
+        job_id = agent.tracker.tracked_jobs[0]["id"]
+
+        # 关联简历到职位
+        r2 = requests.post(f"http://localhost:{self.port}/api/assign_resume",
+            json={"job_id": job_id, "resume_id": resume_id})
+        d2 = r2.json()
+        self.assertTrue(d2.get("success"), f"assign_resume failed: {d2}")
+
+        # === 验证点1：职位有正确的 resume_id ===
+        job = agent.tracker.get_job(job_id)
+        self.assertEqual(job.get("resume_id"), resume_id)
+        self.assertEqual(job.get("resume_name"), resume_name)
+
+        # === 验证点2：简历库列表仍能找到该简历 ===
+        r3 = requests.get(f"http://localhost:{self.port}/api/list_resumes")
+        d3 = r3.json()
+        self.assertTrue(d3.get("success"))
+        lib_ids = [r["id"] for r in d3.get("resumes", [])]
+        self.assertIn(resume_id, lib_ids, f"简历库列表未包含已关联的简历 {resume_id}")
+
+        # 找到该简历条目，验证名称一致
+        lib_entry = next(r for r in d3["resumes"] if r["id"] == resume_id)
+        self.assertEqual(lib_entry["name"], resume_name)
+
+        # === 验证点3：简历库的元数据文件 (resume_index.json) 未丢失 ===
+        import os
+        base = os.path.dirname(agent.tracker.jobs_file)
+        index_path = os.path.join(base, "resumes", "resume_index.json")
+        self.assertTrue(os.path.exists(index_path), "resume_index.json 不存在")
+        with open(index_path, 'r') as f:
+            index = json.load(f)
+        # index is a list of dicts, find entry by id
+        lib_ids = [r["id"] for r in index]
+        self.assertIn(resume_id, lib_ids, f"resume_index.json 中缺少 resume_id {resume_id}")
+        lib_entry = next(r for r in index if r["id"] == resume_id)
+        self.assertEqual(lib_entry["name"], resume_name)
+
+        # === 验证点4：职位专属副本目录存在（副本文件以 resume_id 命名） ===
+        job_dir = os.path.join(base, "resumes", f"job_{job_id}")
+        self.assertTrue(os.path.exists(job_dir), f"职位副本目录 {job_dir} 不存在")
+        job_pdf = os.path.join(job_dir, f"{resume_id}.pdf")
+        self.assertTrue(os.path.exists(job_pdf), f"职位副本 {job_pdf} 不存在")
+
+        # === 验证点5：简历库原始 PDF 依然存在 ===
+        lib_pdf = os.path.join(base, "resumes", f"{resume_id}.pdf")
+        self.assertTrue(os.path.exists(lib_pdf), f"简历库原始 PDF {lib_pdf} 不存在")
+
+        # 清理创建的职位
+        agent.tracker.delete_job(job_id)
+
 
 def cleanup():
     """清理测试数据"""
