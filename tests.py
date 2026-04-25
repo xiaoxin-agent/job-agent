@@ -464,10 +464,10 @@ class TestWebServer(unittest.TestCase):
         """跟踪页面包含 resume 相关 JS 函数"""
         resp = urlopen(f"http://localhost:{self.port}/tracked")
         html = resp.read().decode("utf-8")
-        self.assertIn("applyWithResume", html)
-        self.assertIn("uploadNewResume", html)
-        self.assertIn("useResume", html)
-        self.assertIn("add_resume_multipart", html)
+        self.assertIn("quickApply", html)
+        self.assertIn("linkResume", html)
+        self.assertIn("uploadNewResumeAndLink", html)
+        self.assertIn("assignResume", html)
         self.assertIn("assign_resume", html)
     
     def test_18_js_page_validates(self):

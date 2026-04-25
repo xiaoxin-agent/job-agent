@@ -812,14 +812,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
-                    <button onclick="applyWithResume('{j['id']}')" class="btn btn-small" id="apply-btn-{j['id']}">{btn_apply}</button>
+                    <button onclick="quickApply('{j['id']}')" class="btn btn-small" id="apply-btn-{j['id']}">{btn_apply}</button>
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'" style="display:inline">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank" style="display:inline">🖊 编辑</a></div>') if j.get('resume_id') else ''}
+                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'" style="display:inline">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank" style="display:inline">🖊 编辑</a></div>') if j.get('resume_id') else '<div class="job-resume"><a href="#" onclick="linkResume('+j['id']+')" class="link-url" style="display:inline">📎 关联简历</a></div>'}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
@@ -849,58 +849,48 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id, status:st, notes:notes}})}});
             location.reload();
         }}
-        async function applyWithResume(id) {{
-            var resumes = await (await fetch('/api/list_resumes')).json();
-            var list = (resumes.success ? resumes.resumes : []);
-            var html = '<div id="resume-modal-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center">';
-            html += '<div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto">';
-            html += '<h3 style="margin-bottom:12px">选择简历</h3>';
-            if (list.length > 0) {{
-                html += '<div style="margin-bottom:12px">';
-                list.forEach(function(r) {{
-                    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">';
-                    html += '<span>📄 ' + r.name + '</span>';
-                    html += '<div>';
-                    html += '<button onclick="useResume(&quot;' + id + '&quot;,&quot;' + r.id + '&quot;)" class="btn btn-small" style="margin-right:4px">使用</button>';
-                    
-                    html += '</div></div>';
-                }});
-                html += '</div>';
-                html += '<hr style="margin:12px 0">';
-            }}
-                        html += '<div><button onclick="uploadNewResume(&quot;' + id + '&quot;)" class="btn" style="width:100%">📤 上传新简历</button></div>';
-            html += '<div style="margin-top:12px;text-align:right"><button onclick="closeResumeModal()" class="btn btn-small">取消</button></div>';
-            html += '</div></div>';
-            document.body.insertAdjacentHTML('beforeend', html);
+        function quickApply(jobId) {{
+            var notes = prompt('\u6dfb\u52a0\u5907\u6ce8\uff08\u53ef\u9009\uff09:','')||'';
+            fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}})
+            .then(function() {{ location.reload(); }});
         }}
         function closeResumeModal() {{
             var el = document.getElementById('resume-modal-overlay');
             if (el) el.remove();
         }}
-        async function useResume(jobId, resumeId) {{
-            closeResumeModal();
-            var btn = document.getElementById('apply-btn-' + jobId);
-            btn.disabled = true;
-            btn.textContent = '⏳ 关联中…';
-            try {{
-                var resp = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
-                var d = await resp.json();
-                if (d.success) {{
-                    var notes = prompt('备注（可选）:','')||'';
-                    await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}});
-                    location.reload();
-                }} else {{
-                    alert('关联失败: ' + (d.error || ''));
-                    btn.disabled = false;
-                    btn.textContent = '📤 申请';
+        function linkResume(jobId) {{
+            var old = document.getElementById('resume-modal-overlay');
+            if (old) old.remove();
+            fetch('/api/list_resumes').then(function(r){{return r.json()}}).then(function(data){{
+                var list = data.success ? data.resumes : [];
+                var h = '<div id=\"resume-modal-overlay\" style=\"position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center\">';
+                h += '<div style=\"background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto\">';
+                h += '<h3 style=\"margin-bottom:12px\">\U0001f4ce \u5173\u8054\u7b80\u5386</h3>';
+                if (list.length > 0) {{
+                    list.forEach(function(r){{
+                        h += '<div style=\"display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee\">';
+                        h += '<span>\U0001f4c4 ' + r.name + '</span>';
+                        h += '<button onclick=\"assignResume(\\'' + jobId + '\\',\\'' + r.id + '\\')\" class=\"btn btn-small\">\u5173\u8054</button>';
+                        h += '</div>';
+                    }});
+                    h += '<hr style=\"margin:12px 0\">';
                 }}
-            }} catch(e) {{
-                alert('错误: ' + e);
-                btn.disabled = false;
-                btn.textContent = '📤 申请';
-            }}
+                h += '<div><button onclick=\"uploadNewResumeAndLink(\\'' + jobId + '\\')\" class=\"btn\" style=\"width:100%\">\U0001f4e4 \u4e0a\u4f20\u65b0\u7b80\u5386\u5e76\u5173\u8054</button></div>';
+                h += '<div style=\"margin-top:12px;text-align:right\"><button onclick=\"closeResumeModal()\" class=\"btn btn-small\">\u53d6\u6d88</button></div>';
+                h += '</div></div>';
+                document.body.insertAdjacentHTML('beforeend', h);
+            }});
         }}
-        async function uploadNewResume(jobId) {{
+        async function assignResume(jobId, resumeId) {{
+            closeResumeModal();
+            try {{
+                var r = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
+                var d = await r.json();
+                if (d.success) {{ location.reload(); }}
+                else {{ alert('\u5173\u8054\u5931\u8d25: ' + (d.error || '')); }}
+            }} catch(e) {{ alert('\u9519\u8bef: ' + e); }}
+        }}
+        async function uploadNewResumeAndLink(jobId) {{
             var input = document.createElement('input');
             input.type = 'file';
             input.accept = '.pdf,.doc,.docx';
@@ -910,29 +900,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 closeResumeModal();
                 var file = e.target.files[0];
                 if (!file) {{ document.body.removeChild(input); return; }}
-                var btn = document.getElementById('apply-btn-' + jobId);
-                btn.disabled = true;
-                btn.textContent = '⏳ 上传中…';
                 var formData = new FormData();
                 formData.append('name', file.name);
                 formData.append('resume', file);
                 try {{
-                    var resp1 = await fetch('/api/add_resume_multipart', {{method:'POST', body:formData}});
-                    var d1 = await resp1.json();
-                    if (!d1.success) {{ alert('上传失败: ' + (d1.error || '')); btn.disabled = false; btn.textContent = '📤 申请'; document.body.removeChild(input); return; }}
-                    var resumeId = d1.resume.id;
-                    var resp2 = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
-                    var d2 = await resp2.json();
-                    if (!d2.success) {{ alert('关联失败'); btn.disabled = false; btn.textContent = '📤 申请'; document.body.removeChild(input); return; }}
-                    var notes = prompt('备注（可选）:','')||'';
-                    await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}});
+                    var r1 = await fetch('/api/add_resume_multipart', {{method:'POST', body:formData}});
+                    var d1 = await r1.json();
+                    if (!d1.success) {{ alert('\u4e0a\u4f20\u5931\u8d25: ' + (d1.error || '')); document.body.removeChild(input); return; }}
+                    var r2 = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:d1.resume.id}})}});
+                    var d2 = await r2.json();
+                    if (!d2.success) {{ alert('\u5173\u8054\u5931\u8d25'); document.body.removeChild(input); return; }}
                     document.body.removeChild(input);
                     location.reload();
                 }} catch(e) {{
-                    alert('上传出错: ' + e);
-                    console.error('upload error', e);
-                    btn.disabled = false;
-                    btn.textContent = '📤 申请';
+                    alert('\u4e0a\u4f20\u51fa\u9519: ' + e);
+                    console.error('linkupload error', e);
                 }}
             }};
             input.click();
