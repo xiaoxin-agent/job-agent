@@ -186,8 +186,10 @@ class JobSearchEngine:
             if response.status_code == 200:
                 data = response.json()
                 for job in data[:max_results]:
-                    desc = (job.get("description", "") + " " + job.get("title", "")).lower()
-                    if any(kw.lower() in desc for kw in keywords):
+                    title = job.get("title", "")
+                    desc_text = job.get("description", "")
+                    full_text = (desc_text + " " + title).lower()
+                    if any(kw.lower() in full_text for kw in keywords):
                         jobs.append(self._format_job({
                             "title": job.get("title", ""),
                             "company": job.get("company", ""),
@@ -310,13 +312,44 @@ class JobSearchEngine:
                 data = response.json()
                 if isinstance(data, list) and len(data) > 1:
                     # Use user keywords if provided, else fall back to profile skills
+                    import re
                     skills = keywords if keywords else self.profile.get_skill_keywords()
-                    for item in data[1:20]:
+                    for item in data[1:]:
                         title = item.get("position", "")
                         desc = item.get("description", "")
-                        content = (title + " " + desc).lower()
+                        title_lower = title.lower()
+                        desc_lower = desc.lower()
                         
-                        if any(s.lower() in content for s in skills):
+                        # Match full keyword phrase (word boundary) — allows partial keyword overlap in title
+                        _EXCLUDE_DESC_WORDS = {'driver': ['driver of', 'driver for', 'key driver']}
+                        
+                        matched = False
+                        for s in skills:
+                            sw = s.strip().lower()
+                            if not sw:
+                                continue
+                            # Title match (word boundary)
+                            if re.search(r'\b' + re.escape(sw) + r'\b', title_lower):
+                                matched = True
+                                break
+                        
+                        if not matched:
+                            # Description match with exclusion for common false positives
+                            for s in skills:
+                                sw = s.strip().lower()
+                                if not sw or not re.search(r'\b' + re.escape(sw) + r'\b', desc_lower):
+                                    continue
+                                excluded = False
+                                if sw in _EXCLUDE_DESC_WORDS:
+                                    for pat in _EXCLUDE_DESC_WORDS[sw]:
+                                        if pat in desc_lower:
+                                            excluded = True
+                                            break
+                                if not excluded:
+                                    matched = True
+                                    break
+                        
+                        if matched:
                             tags = item.get("tags", [])
                             job_type = self._infer_job_type(tags, title, desc)
                             jobs.append(self._format_job({
