@@ -154,17 +154,19 @@ class JobSearchEngine:
         text = (title + " " + desc).lower()
         tag_text = " ".join(t.lower() for t in (tags or []) if isinstance(t, str))
         full_text = text + " " + tag_text
-        if any(kw in full_text for kw in ["contract", "contractor"]):
+        # Use word boundary matching to avoid false positives like 'internal' → 'intern'
+        words = set(full_text.split())
+        if any(w in words for w in ["contract", "contractor"]):
             return "Contract"
-        if any(kw in full_text for kw in ["part.time", "parttime"]):
+        if any(w in words for w in ["part-time", "parttime", "part time"]):
             return "Part-Time"
-        if any(kw in full_text for kw in ["full.time", "fulltime", "permanent"]):
+        if any(w in words for w in ["full-time", "fulltime", "full time", "permanent"]):
             return "Full-Time"
-        if any(kw in full_text for kw in ["intern", "internship"]):
+        if any(w in words for w in ["intern", "internship"]):
             return "Internship"
-        if any(kw in full_text for kw in ["freelance", "freelancer"]):
+        if any(w in words for w in ["freelance", "freelancer"]):
             return "Freelance"
-        if "co-op" in full_text or "coop" in full_text:
+        if "co-op" in words or "coop" in words:
             return "Co-op"
         return ""
     
@@ -540,7 +542,8 @@ class JobSearchEngine:
                 job_type = "Part-Time"
             elif any(kw in desc for kw in ["full.time", "fulltime", "permanent"]):
                 job_type = "Full-Time"
-            elif any(kw in desc for kw in ["intern", "internship"]):
+            # Match whole word to avoid 'internal' matching 'intern'
+            elif any(kw in desc.split() for kw in ["intern", "internship"]):
                 job_type = "Internship"
             elif any(kw in desc for kw in ["freelance", "freelancer"]):
                 job_type = "Freelance"
