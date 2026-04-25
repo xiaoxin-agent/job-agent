@@ -171,6 +171,8 @@ class JobSearchEngine:
         return ""
     
     def search_github_jobs(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        if isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
         """搜索GitHub Jobs"""
         jobs = []
         
@@ -211,6 +213,8 @@ class JobSearchEngine:
         jobs = []
         if not keywords:
             keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
         
         try:
             from curl_cffi import requests
@@ -441,10 +445,12 @@ class JobSearchEngine:
         
         return links
     
-    def search_all(self, max_per_source: int = 3, sources: List[str] = None, keywords: List[str] = None, location: str = None) -> Dict:
+    def search_all(self, max_per_source: int = 8, sources: List[str] = None, keywords: List[str] = None, location: str = None) -> Dict:
         """多源搜索，可指定来源和关键词/地点"""
         if keywords is None:
             keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
         if location is None:
             location = self.profile.profile.get("preferred_locations", ["Canada"])[0]
         
