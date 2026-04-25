@@ -1504,7 +1504,20 @@ async function saveEdit() {{
 }}
 
 function downloadPdf() {{
-  window.open('/api/get_resume?job_id=' + jobId, '_blank');
+  // 如果有编辑版本，下载 HTML；否则下载原始 PDF
+  var downloadUrl = '/api/get_resume?job_id=' + jobId;
+  var previewEl = document.getElementById('preview');
+  if (previewEl && previewEl.innerHTML !== '' && previewEl.innerHTML !== '加载中...' && previewEl.innerHTML !== originalHtml) {{
+    // 有编辑改动，下载为 HTML
+    var blob = new Blob([previewEl.innerHTML.replace(/<\\/p>/g, '\\n\\n').replace(/<br>/g, '\\n').replace(/<strong>(.*?)<\\/strong>/g, '$1')], {{type: 'text/plain;charset=utf-8'}});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'resume_edited.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }} else {{
+    window.open(downloadUrl, '_blank');
+  }}
 }}
 
 loadPreview();
