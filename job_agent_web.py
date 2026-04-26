@@ -460,6 +460,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/analyze_apply": self.api_analyze_apply,
             "/api/record_apply": self.api_record_apply,
             "/api/tailor_resume": self.api_tailor_resume,
+            "/api/analyze_skill_gap": self.api_analyze_skill_gap,
         }
 
         handler = api_routes.get(path)
@@ -809,6 +810,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>🏢 {j['company']}</span>
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
+                    <span id="skill-gap-{j['id']}">{j.get('skill_gap_html','')}</span>
                 </div>
                 <div class="job-desc-toggle" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
@@ -831,6 +833,31 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div class="section"><div class="tab-bar">{tabs}</div></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
+        // Skill gap detail popup via event delegation
+        document.addEventListener('click', function(e) {{
+            var closeBtn = e.target.closest('.skill-gap-close-btn');
+            if (closeBtn) {{
+                var detailModal = closeBtn.closest('#skill-gap-detail-modal');
+                if (detailModal) detailModal.remove();
+                return;
+            }}
+            var gapSpan = e.target.closest('.skill-gap-group');
+            if (gapSpan) {{
+                var detailsRaw = gapSpan.getAttribute('data-gap-details');
+                if (!detailsRaw) return;
+                try {{
+                    var details = JSON.parse(detailsRaw);
+                    // Remove existing detail modal
+                    var old = document.getElementById('skill-gap-detail-modal');
+                    if (old) old.remove();
+                    var h = '<div id="skill-gap-detail-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1001;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
+                    h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;line-height:1.6">';
+                    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f3af 技能差距分析</h3><button class="skill-gap-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div>';
+                    h += details + '</div></div>';
+                    document.body.insertAdjacentHTML('beforeend', h);
+                }} catch(e) {{}}
+            }}
+        }});
         function closeApplyModal() {{
             var el = document.getElementById('apply-analysis-modal');
             if (el) el.remove();
@@ -996,6 +1023,17 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 alert('请求出错: ' + e);
             }});
         }}
+        function analyzeSkillGap(jobId) {{
+            fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+            .then(function(r){{return r.json()}})
+            .then(function(d){{
+                if (d.success) {{
+                    var el = document.getElementById('skill-gap-' + jobId);
+                    if (el) {{ el.outerHTML = d.html; }}
+                }}
+            }})
+            .catch(function(e){{}});
+        }}
         function closeResumeModal() {{
             var el = document.getElementById('resume-modal-overlay');
             if (el) el.remove();
@@ -1028,8 +1066,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             try {{
                 var r = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:resumeId}})}});
                 var d = await r.json();
-                if (d.success) {{ location.reload(); }}
-                else {{ alert('\u5173\u8054\u5931\u8d25: ' + (d.error || '')); }}
+                if (d.success) {{ 
+                    location.reload();
+                }} else {{ alert('\u5173\u8054\u5931\u8d25: ' + (d.error || '')); }}
             }} catch(e) {{ alert('\u9519\u8bef: ' + e); }}
         }}
         async function uploadNewResumeAndLink(jobId) {{
@@ -1613,6 +1652,135 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": True, "markdown": tailored_md})
         except Exception as e:
             self.send_json({"success": False, "error": f"优化失败: {str(e)}"}, 500)
+
+    def api_analyze_skill_gap(self, data):
+        """分析简历与职位要求之间的技能差距"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+            if not job.get("resume_id"):
+                self.send_json({"success": False, "error": "未关联简历"}, 400)
+                return
+
+            resume_md = self.agent.tracker.get_job_resume_markdown(job_id)
+            if not resume_md:
+                self.send_json({"success": False, "error": "未找到简历内容"}, 404)
+                return
+
+            job_title = job.get("title", "")
+            job_desc = job.get("description", "")
+            company = job.get("company", "")
+
+            prompt = f"""分析以下简历和职位描述的技能差距。
+
+### 职位
+{company} - {job_title}
+
+### 职位描述
+{job_desc}
+
+### 简历
+{resume_md}
+
+请以 JSON 格式输出分析结果，不要其他文字：
+{{
+  "matching_skills": ["技能A", "技能B"],  // 简历中有且职位也要求的技能
+  "missing_skills": ["技能C", "技能D"],    // 职位要求但在简历中未体现的关键技能
+  "weak_skills": ["技能E"],               // 简历中有但需要加强的技能
+  "suggestions": ["建议1", "建议2"]       // 学习或提升建议
+}}
+"""
+
+            import urllib.request
+            import json as j
+
+            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+            if not api_key:
+                models_cfg = os.path.expanduser("~/.openclaw/agents/main/agent/models.json")
+                if os.path.exists(models_cfg):
+                    with open(models_cfg) as f:
+                        cfg = j.load(f)
+                    api_key = cfg.get("providers", {}).get("deepseek", {}).get("apiKey", "")
+            if not api_key:
+                self.send_json({"success": False, "error": "未找到 DeepSeek API Key"}, 500)
+                return
+
+            req_body = j.dumps({
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "你是技能分析专家。输出纯 JSON，不要 markdown 代码块。"},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 2048,
+                "stream": False
+            })
+
+            req = urllib.request.Request(
+                "https://api.deepseek.com/chat/completions",
+                data=req_body.encode(),
+                headers={"Content-Type": "application/json", "Authorization": "Bearer " + api_key},
+                method="POST"
+            )
+            resp = urllib.request.urlopen(req, timeout=120)
+            result = j.loads(resp.read().decode())
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            # 清理可能包裹的 markdown 代码块
+            content = content.strip()
+            if content.startswith("```"):
+                content = content.split("\n", 1)[-1]
+                content = content.rsplit("```", 1)[0].strip()
+            if content.startswith("json"):
+                content = content[4:].strip()
+
+            gap_data = j.loads(content)
+
+            # 生成 HTML 标签，存储在 job dict
+            missing = gap_data.get("missing_skills", [])
+            weak = gap_data.get("weak_skills", [])
+            matching = gap_data.get("matching_skills", [])
+            suggestions = gap_data.get("suggestions", [])
+
+            parts = []
+            for s in missing[:5]:
+                parts.append(f'<span class="skill-gap-badge gap-missing" title="缺少的技能" style="display:inline-block;background:#fee;color:#d32f2f;border:1px solid #fcc;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u26a0 {s}</span>')
+            for s in weak[:3]:
+                parts.append(f'<span class="skill-gap-badge gap-weak" title="需要加强" style="display:inline-block;background:#fff3e0;color:#e65100;border:1px solid #ffe0b2;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u2191 {s}</span>')
+
+            # 用 popover 显示详情
+            details_html = ""
+            if matching:
+                details_html += "<div style='margin-bottom:6px'><b>\u2705 已有技能:</b> " + ", ".join(matching) + "</div>"
+            if missing:
+                details_html += "<div style='margin-bottom:6px;color:#d32f2f'><b>\u26a0 缺少技能:</b> " + ", ".join(missing) + "</div>"
+            if weak:
+                details_html += "<div style='margin-bottom:6px;color:#e65100'><b>\u2191 需加强:</b> " + ", ".join(weak) + "</div>"
+            if suggestions:
+                details_html += "<div style='margin-top:6px;color:#1565c0;font-size:12px'><b>\U0001f4a1 建议:</b><br>" + "<br>".join(suggestions) + "</div>"
+
+            gap_html = "".join(parts)
+            if gap_html:
+                # Store details in a data attribute, handle click via event delegation
+                import html
+                details_escaped = html.escape(j.dumps(details_html, ensure_ascii=False))
+                gap_html = '<span class="skill-gap-group" style="display:inline-block;margin-left:4px;cursor:pointer" data-gap-details="' + details_escaped + '">' + gap_html + '</span>'
+
+            # 保存到职位数据
+            job["skill_gap_html"] = gap_html
+            self.agent.tracker.save()
+
+            self.send_json({"success": True, "html": gap_html})
+        except json.JSONDecodeError:
+            self.send_json({"success": False, "error": "AI 返回格式异常，请重试"}, 500)
+        except Exception as e:
+            self.send_json({"success": False, "error": f"分析失败: {str(e)}"}, 500)
 
     def _find_job_from_cache(self, job_id: str) -> Optional[Dict]:
         """从搜索缓存中查找职位"""
