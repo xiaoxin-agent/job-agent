@@ -1371,22 +1371,73 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 h += '<div class="resume-card">';
                 h += '<div><span class="resume-name">\U0001F4C4 ' + r.name + '</span><br><span class="resume-date">' + r.created_at + '</span></div>';
                 h += '<div class="resume-actions">';
-                h += '<a href="/api/get_resume?resume_id=' + r.id + '" target="_blank" class="btn btn-small">\U0001F441\u200D\U0001F5E8\uFE0F \u9884\u89C8</a>';
-                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-delete btn-del-resume">' + RESUME_DELETE + '</button>';
+                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-preview-resume">\U0001F441\u200D\U0001F5E8\uFE0F \u9884\u89C8</button>';
+                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-download-resume" style="margin-left:4px">\U0001F4E5 \u4E0B\u8F7D</button>';
+                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-delete btn-del-resume" style="margin-left:4px">' + RESUME_DELETE + '</button>';
                 h += '</div></div>';
             }});
             list.innerHTML = h;
         }}
-        // Event delegation for delete buttons
+
+        // Event delegation
         document.addEventListener('click', function(e) {{
-            var btn = e.target.closest('.btn-del-resume');
-            if (!btn) return;
-            var id = btn.getAttribute('data-resume-id');
+            var previewBtn = e.target.closest('.btn-preview-resume');
+            if (previewBtn) {{
+                e.preventDefault();
+                var rid = previewBtn.getAttribute('data-resume-id');
+                showResumeLibraryPreview(rid);
+                return;
+            }}
+            var downloadBtn = e.target.closest('.btn-download-resume');
+            if (downloadBtn) {{
+                e.preventDefault();
+                var rid = downloadBtn.getAttribute('data-resume-id');
+                window.open('/api/get_resume?resume_id=' + rid, '_blank');
+                return;
+            }}
+            var closeBtn = e.target.closest('.resume-lib-modal-close');
+            if (closeBtn) {{
+                var modal = closeBtn.closest('#resume-lib-preview-modal');
+                if (modal) modal.remove();
+                return;
+            }}
+            var delBtn = e.target.closest('.btn-del-resume');
+            if (!delBtn) return;
+            var id = delBtn.getAttribute('data-resume-id');
             if (!confirm('\u786E\u5B9A\u5220\u9664\uFF1F')) return;
             fetch('/api/delete_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{resume_id:id}})}})
               .then(function(r){{ return r.json(); }})
               .then(function(d){{ if(d.success) loadResumes(); }});
         }});
+
+        async function showResumeLibraryPreview(resumeId) {{
+            var old = document.getElementById('resume-lib-preview-modal');
+            if (old) old.remove();
+            var h = '<div id="resume-lib-preview-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center">';
+            h += '<div style="background:#fff;border-radius:12px;padding:0;max-width:700px;width:95%;box-shadow:0 8px 32px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:85vh">';
+            h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e0e0e0;flex-shrink:0">';
+            h += '<h3 style="margin:0;font-size:16px">\U0001F4C4 \u7B80\u5386\u9884\u89C8</h3>';
+            h += '<div>';
+            h += '<a href="/api/get_resume?resume_id=' + resumeId + '" target="_blank" class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px">\U0001F4E5 \u4E0B\u8F7D</a>';
+            h += '<button class="resume-lib-modal-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1">\u00d7</button>';
+            h += '</div></div>';
+            h += '<div id="resume-lib-preview-content" style="overflow-y:auto;padding:20px;line-height:1.7;font-size:14px;flex:1">';
+            h += '<div style="text-align:center;padding:40px;color:#999">\u52A0\u8F7D\u4E2D...</div></div>';
+            h += '</div></div>';
+            document.body.insertAdjacentHTML('beforeend', h);
+            // Click overlay to close
+            var modal = document.getElementById('resume-lib-preview-modal');
+            modal.addEventListener('click', function(ev) {{
+                if (ev.target === modal) modal.remove();
+            }});
+            try {{
+                var r = await fetch('/api/preview_resume?resume_id=' + resumeId);
+                document.getElementById('resume-lib-preview-content').innerHTML = await r.text() || '<p style="color:#888">\u6682\u65E0\u5185\u5BB9</p>';
+            }} catch(e) {{
+                document.getElementById('resume-lib-preview-content').innerHTML = '<p style="color:red">\u52A0\u8F7D\u5931\u8D25: ' + e + '</p>';
+            }}
+        }}
+
         async function uploadResume() {{
             var input = document.createElement('input');
             input.type = 'file';
