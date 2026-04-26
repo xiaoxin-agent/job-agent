@@ -459,6 +459,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/save_job_resume_md": self.api_save_job_resume_md,
             "/api/analyze_apply": self.api_analyze_apply,
             "/api/record_apply": self.api_record_apply,
+            "/api/tailor_resume": self.api_tailor_resume,
         }
 
         handler = api_routes.get(path)
@@ -822,7 +823,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'" style="display:inline">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank" style="display:inline">🖊 编辑</a></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">📎 关联简历</button></div>'}
+                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'" style="display:inline">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank" style="display:inline">🖊 编辑</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">🎯 优化</button></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">📎 关联简历</button></div>'}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
@@ -976,6 +977,24 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }} catch(e) {{
                 alert('记录出错: ' + e);
             }}
+        }}
+        function tailorResume(jobId) {{
+            var btn = document.getElementById('tailor-' + jobId);
+            if (btn) {{ btn.textContent = '⏳ 生成中...'; btn.disabled = true; }}
+            fetch('/api/tailor_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+            .then(function(r){{return r.json()}})
+            .then(function(d){{
+                if (btn) {{ btn.textContent = '🎯 优化'; btn.disabled = false; }}
+                if (d.success) {{
+                    window.open('/resume_view?job_id=' + jobId, '_blank');
+                }} else {{
+                    alert('优化失败: ' + (d.error || ''));
+                }}
+            }})
+            .catch(function(e){{
+                if (btn) {{ btn.textContent = '🎯 优化'; btn.disabled = false; }}
+                alert('请求出错: ' + e);
+            }});
         }}
         function closeResumeModal() {{
             var el = document.getElementById('resume-modal-overlay');
@@ -1504,6 +1523,81 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": True, "record": result.get("record")})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_tailor_resume(self, data):
+        """根据职位要求优化简历（通过 Ollama LLM）"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+            resume_md = self.agent.tracker.get_job_resume_markdown(job_id)
+            if not resume_md:
+                self.send_json({"success": False, "error": "未找到简历内容（请先关联简历）"}, 404)
+                return
+
+            job_title = job.get("title", "")
+            job_desc = job.get("description", "")
+            company = job.get("company", "")
+
+            # 调用 Ollama 生成优化版简历
+            prompt = f"""你是一位专业的简历优化专家。请根据以下职位要求，优化简历内容。
+
+### 目标职位
+公司: {company}
+职位: {job_title}
+
+### 职位描述
+{job_desc}
+
+### 当前简历 Markdown
+{resume_md}
+
+### 要求
+1. 保留简历的基本格式（Markdown）
+2. 突出与目标职位相关的技能和经验
+3. 调整措辞以匹配职位描述中的关键词
+4. 适当精简不相关的内容
+5. 保持一页以内
+6. 只输出优化后的简历 Markdown，不要额外说明
+"""
+
+            import urllib.request
+            import json as j
+
+            req_body = j.dumps({
+                "model": "glm-4.7-flash",
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 4096
+                }
+            })
+
+            req = urllib.request.Request(
+                "http://10.0.0.1:11434/api/generate",
+                data=req_body.encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            resp = urllib.request.urlopen(req, timeout=120)
+            result = j.loads(resp.read().decode())
+
+            tailored_md = result.get("response", "")
+            if not tailored_md:
+                self.send_json({"success": False, "error": "Ollama 返回为空"}, 500)
+                return
+
+            # 保存优化后的简历
+            self.agent.tracker.save_job_resume_markdown(job_id, tailored_md)
+            self.send_json({"success": True, "markdown": tailored_md})
+        except Exception as e:
+            self.send_json({"success": False, "error": f"优化失败: {str(e)}"}, 500)
 
     def _find_job_from_cache(self, job_id: str) -> Optional[Dict]:
         """从搜索缓存中查找职位"""

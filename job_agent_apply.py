@@ -111,14 +111,65 @@ class RemoteOKApplyAdapter(ApplyAdapter):
         return "\n".join(parts)
 
 
+class IndeedApplyAdapter(ApplyAdapter):
+    """Indeed 申请适配器"""
+
+    def analyze(self, job: dict) -> dict:
+        company = job.get("company", "")
+        desc = job.get("description", "")
+        job_type = job.get("job_type", "")
+        location = job.get("location", "")
+
+        emails = re.findall(r"[\w.+-]+@[\w-]+\.[\w.-]+", desc)
+        company_links = []
+        for link in re.findall(r"https?://[^\s\"'<>]+", desc):
+            domain = link.lower().split("/")[2] if "://" in link else ""
+            if "indeed" not in domain and "example" not in domain:
+                company_links.append(link)
+
+        domain = re.sub(r"[^a-zA-Z0-9]", "", company.lower()) if company else "unknown"
+        career_url = f"https://careers.{domain}.com"
+
+        return {
+            "can_auto_apply": False,
+            "method": "url",
+            "instructions": f"前往 {company} 官网提交申请",
+            "target": company,
+            "details": self._details(company, job_type, location, career_url, emails, company_links),
+            "next_steps": [
+                "打开 Indeed 页面，点击 \"Apply on Company Site\"",
+                f"或直接前往 {career_url} 搜索职位",
+                "上传定制简历和求职信",
+                "返回系统记录申请状态"
+            ]
+        }
+
+    def _details(self, company, job_type, location, career_url, emails, company_links) -> str:
+        parts = [f"\U0001f3e2 {company}"]
+        if job_type:
+            parts.append(f"\U0001f4cb {job_type}")
+        if location:
+            parts.append(f"\U0001f4cd {location}")
+        parts.append("")
+        parts.append("\U0001f4cc Indeed 申请方式：")
+        parts.append("   1. Easy Apply — 通过 Indeed 直接投递")
+        parts.append(f"   2. Apply on Company Site — 前往 {company} 官网")
+        parts.append(f"\U0001f517 猜测的招聘页: {career_url}")
+        if emails:
+            parts.append(f"\U0001f4e7 描述中邮箱: {', '.join(emails)}")
+        if company_links:
+            parts.append(f"\U0001f517 链接: {', '.join(company_links)}")
+        return "\n".join(parts)
+
+
 class ApplyManager:
     """申请管理器——统一入口"""
 
     def __init__(self, data_dir: str = None):
         self.adapters: Dict[str, ApplyAdapter] = {
             "RemoteOK": RemoteOKApplyAdapter(),
-            "GitHub Jobs": RemoteOKApplyAdapter(),  # 目前 fallback 到相同的分析逻辑
-            "Indeed": RemoteOKApplyAdapter(),
+            "GitHub Jobs": RemoteOKApplyAdapter(),
+            "Indeed": IndeedApplyAdapter(),
         }
         self.data_dir = data_dir or os.path.join(os.path.dirname(__file__), "agent_data")
         self._ensure_dirs()
