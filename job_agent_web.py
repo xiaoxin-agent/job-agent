@@ -9,9 +9,10 @@ import os
 import datetime
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Dict
+from typing import Dict, Optional
 
 from job_agent_core import JobAgent
+from job_agent_apply import ApplyManager
 
 PORT = 9999
 
@@ -456,6 +457,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/download_resume_pdf": self.api_download_resume_pdf,
             "/api/convert_markdown": self.api_convert_markdown,
             "/api/save_job_resume_md": self.api_save_job_resume_md,
+            "/api/analyze_apply": self.api_analyze_apply,
+            "/api/record_apply": self.api_record_apply,
         }
 
         handler = api_routes.get(path)
@@ -812,7 +815,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
-                    <button onclick="quickApply('{j['id']}')" class="btn btn-small" id="apply-btn-{j['id']}">{btn_apply}</button>
+                    <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {j['status'] == 'applied' and 'btn-save' or 'btn-primary'}" id="apply-anal-btn-{j['id']}">{j['status'] == 'applied' and '✅ 已申请' or '📤 申请'}</button>
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
@@ -827,6 +830,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div class="section"><div class="tab-bar">{tabs}</div></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
+        function closeApplyModal() {{
+            var el = document.getElementById('apply-analysis-modal');
+            if (el) el.remove();
+        }}
+        var ANALYZING_TEXT = '\u5206\u6790\u4e2d...';
+        var APPLY_TEXT = '\u7533\u8bf7';
+        var RECORDED_TEXT = '\u2705 \u5df2\u8bb0\u5f55';
+
         async function delJob(id) {{
             if (!confirm('确定删除？')) return;
             await fetch('/api/delete_job', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id}})}});
@@ -853,6 +864,118 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var notes = prompt('\u6dfb\u52a0\u5907\u6ce8\uff08\u53ef\u9009\uff09:','')||'';
             fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}})
             .then(function() {{ location.reload(); }});
+        }}
+
+        // ===== Apply Analysis =====
+        async function analyzeApply(jobId) {{
+            var old = document.getElementById('apply-analysis-modal');
+            if (old) old.remove();
+
+            var btn = document.getElementById('apply-anal-btn-' + jobId);
+            var origText = null;
+            if (btn && !btn.disabled) {{
+                origText = btn.textContent;
+                btn.textContent = ANALYZING_TEXT;
+                btn.disabled = true;
+            }}
+
+            try {{
+                var r = await fetch('/api/analyze_apply', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
+                var d = await r.json();
+                if (!d.success) {{ alert('分析失败: ' + (d.error || '')); return; }}
+                showApplyAnalysis(jobId, d.analysis, d.job);
+            }} catch(e) {{
+                alert('分析出错: ' + e);
+            }} finally {{
+                if (btn && origText !== null) {{ btn.textContent = origText; btn.disabled = false; }}
+            }}
+        }}
+
+        function showApplyAnalysis(jobId, analysis, jobInfo) {{
+            var h = '<div id="apply-analysis-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center">';
+            h += '<div style="background:#fff;border-radius:12px;padding:0;max-width:560px;width:95%;box-shadow:0 8px 32px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:80vh">';
+
+            // Title
+            h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e0e0e0;flex-shrink:0">';
+            h += '<h3 style="margin:0;font-size:16px">\U0001F4E4 申请分析</h3>';
+            h += '<button style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1" onclick="closeApplyModal()">\u00d7</button>';
+            h += '</div>';
+
+            // Content
+            h += '<div style="overflow-y:auto;padding:20px;flex:1">';
+
+            // Job info
+            h += '<div style="margin-bottom:14px">';
+            h += '<div style="font-weight:600;font-size:15px">' + jobInfo.title + '</div>';
+            h += '<div style="color:#666;font-size:13px">' + jobInfo.company + ' \u00b7 ' + jobInfo.source + '</div>';
+            h += '</div>';
+
+            // Method badge
+            var method = analysis.method;
+            var methodLabel = method === 'email' ? '\U0001F4E7 邮箱申请' : '\U0001F64B 手动申请';
+            h += '<div style="margin-bottom:12px;padding:8px 12px;border-radius:6px;background:' + (method === 'email' ? '#e8f0fe' : '#fef7e0') + ';font-size:13px">';
+            h += '<strong>' + methodLabel + '</strong>: ' + analysis.instructions;
+            h += '</div>';
+
+            // Details
+            if (analysis.details) {{
+                h += '<div style="margin-bottom:12px;padding:8px 12px;background:#f5f5f5;border-radius:6px;font-size:13px;line-height:1.6;white-space:pre-wrap">';
+                h += analysis.details;
+                h += '</div>';
+            }}
+
+            // Next steps
+            if (analysis.next_steps && analysis.next_steps.length > 0) {{
+                h += '<div style="margin-bottom:12px">';
+                h += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">\U0001F4CB 下一步</div>';
+                h += '<ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.8">';
+                analysis.next_steps.forEach(function(s) {{
+                    h += '<li>' + s + '</li>';
+                }});
+                h += '</ol></div>';
+            }}
+
+            h += '</div>';  // end scroll content
+
+            // Footer buttons
+            h += '<div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid #e0e0e0;flex-shrink:0">';
+            h += '<button class="btn" onclick="closeApplyModal()">\u53d6\u6d88</button>';
+            var recordBtnId = 'apply-rec-' + jobId;
+            h += '<button class="btn btn-primary" id="' + recordBtnId + '">\u2705 \u5df2\u7533\u8bf7</button>';
+            h += '</div>';
+
+            h += '</div></div>';
+            document.body.insertAdjacentHTML('beforeend', h);
+            // Delegate click on the "\u5df2\u7533\u8bf7" button
+            setTimeout(function() {{
+                var b = document.getElementById(recordBtnId);
+                if (b) b.onclick = function() {{ recordManualApply(jobId); }};
+            }}, 0);
+        }}
+
+        async function recordManualApply(jobId) {{
+            try {{
+                var r = await fetch('/api/record_apply', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
+                var d = await r.json();
+                if (d.success) {{
+                    var modal = document.getElementById('apply-analysis-modal');
+                    if (modal) modal.remove();
+                    // Update button to show applied
+                    var btn = document.getElementById('apply-anal-btn-' + jobId);
+                    if (btn) {{
+                        btn.textContent = RECORDED_TEXT;
+                        btn.disabled = true;
+                        btn.style.backgroundColor = '#e6f4ea';
+                        btn.style.color = '#34a853';
+                        btn.style.border = '1px solid #34a853';
+                        btn.className = 'btn btn-small';
+                    }}
+                }} else {{
+                    alert('记录失败: ' + (d.error || ''));
+                }}
+            }} catch(e) {{
+                alert('记录出错: ' + e);
+            }}
         }}
         function closeResumeModal() {{
             var el = document.getElementById('resume-modal-overlay');
@@ -1344,6 +1467,59 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": ok})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_analyze_apply(self, data):
+        """分析职位的申请方式"""
+        try:
+            job_id = data.get("job_id", "")
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                # 尝试从搜索缓存中找
+                job = self._find_job_from_cache(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+            result = self.agent.apply_manager.analyze(job)
+            self.send_json({"success": True, "analysis": result, "job": {
+                "title": job.get("title", ""),
+                "company": job.get("company", ""),
+                "source": job.get("source", ""),
+            }})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_record_apply(self, data):
+        """记录申请动作"""
+        try:
+            job_id = data.get("job_id", "")
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                job = self._find_job_from_cache(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+            result = self.agent.apply_manager.record_manual_apply(job)
+            # 同时更新跟踪状态
+            self.agent.tracker.update_status(job_id, "applied")
+            self.send_json({"success": True, "record": result.get("record")})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def _find_job_from_cache(self, job_id: str) -> Optional[Dict]:
+        """从搜索缓存中查找职位"""
+        try:
+            from job_agent_core import JobAgent
+            md_path = os.path.join(os.path.dirname(self.agent.data_dir), "search_cache.md")
+            if os.path.exists(md_path):
+                # 简单的 KEY=VALUE 解析
+                import re
+                for line in open(md_path, encoding="utf-8"):
+                    parts = line.strip().split("=", 1)
+                    if len(parts) == 2 and parts[0] == f"job_{job_id}":
+                        return json.loads(parts[1])
+        except:
+            pass
+        return None
 
     # ===================== 页面 =====================
 

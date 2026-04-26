@@ -12,6 +12,7 @@ import random
 import hashlib
 import time
 from typing import List, Dict, Optional
+from job_agent_apply import ApplyManager
 
 # ============================================================
 # 配置文件
@@ -1391,6 +1392,7 @@ class JobAgent:
         self.engine = JobSearchEngine(self.profile)
         self.analyzer = JobAnalyzer(self.profile)
         self.tracker = JobTracker(os.path.join(self.data_dir, "tracked_jobs.json"))
+        self.apply_manager = ApplyManager(self.data_dir)
         
         # 确保数据目录存在
         os.makedirs(self.data_dir, exist_ok=True)

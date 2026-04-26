@@ -23,7 +23,7 @@
         h += '<div>';
         h += '<button class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px" onclick="toggleResumeMdEdit()">\u270f \u5feb\u901f\u7f16\u8f91</button>';
         h += '<a class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px" href="/resume_view?job_id=' + jobId + '" target="_blank">\u{1f58a} \u5168\u5c4f\u7f16\u8f91</a>';
-        h += '<button style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1" onclick="this.closest(\'#resume-view-modal\').remove()">\u00d7</button>';
+        h += '<button style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1" onclick="resumeViewModalClose()">\u00d7</button>';
         h += '</div></div>';
         h += '<div id="resume-view-content" style="overflow-y:auto;padding:20px;line-height:1.7;font-size:14px">';
         h += '<div style="text-align:center;padding:40px;color:#999">\u52a0\u8f7d\u4e2d...</div></div>';
@@ -122,6 +122,15 @@ async function saveResumeMdFromModal() {
     }
 }
 
+// Global modal close helpers (avoid inline onclick with \' escaping issues)
+function resumeViewModalClose() {
+    var el = document.getElementById('resume-view-modal');
+    if (el) el.remove();
+}
+function closeApplyModal() {
+    var el = document.getElementById('apply-analysis-modal');
+    if (el) el.remove();
+}
 // Drag resize: change preview row height in grid
 // grid: header(auto) / preview(px) / handle(auto) / footer(1fr)
 document.addEventListener('mousedown', function(e) {
