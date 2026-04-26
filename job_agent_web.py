@@ -1525,7 +1525,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_tailor_resume(self, data):
-        """根据职位要求优化简历（通过 Ollama LLM）"""
+        """根据职位要求优化简历（通过 DeepSeek API）"""
         try:
             job_id = data.get("job_id", "")
             if not job_id:
@@ -1544,54 +1544,69 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             job_desc = job.get("description", "")
             company = job.get("company", "")
 
-            # 调用 Ollama 生成优化版简历
-            prompt = f"""你是一位专业的简历优化专家。请根据以下职位要求，优化简历内容。
+            # 调用 DeepSeek API (OpenAI 兼容) 生成优化版简历
+            import urllib.request
+            import json as j
 
-### 目标职位
-公司: {company}
-职位: {job_title}
+            system_msg = "你是一位专业的简历优化专家。根据职位要求优化简历，只输出 Markdown，不要额外说明。"
+            user_msg = f"""职位: {company} - {job_title}
 
-### 职位描述
+职位描述:
 {job_desc}
 
-### 当前简历 Markdown
+当前简历:
 {resume_md}
 
-### 要求
-1. 保留简历的基本格式（Markdown）
+要求：
+1. 保留 Markdown 格式
 2. 突出与目标职位相关的技能和经验
-3. 调整措辞以匹配职位描述中的关键词
-4. 适当精简不相关的内容
+3. 匹配职位描述中的关键词
+4. 精简不相关的内容
 5. 保持一页以内
 6. 只输出优化后的简历 Markdown，不要额外说明
 """
 
-            import urllib.request
-            import json as j
-
             req_body = j.dumps({
-                "model": "glm-4.7-flash",
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "num_predict": 4096
-                }
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg}
+                ],
+                "temperature": 0.6,
+                "max_tokens": 4096,
+                "stream": False
             })
 
+            # 从环境变量或配置文件读取 DeepSeek API Key
+            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+            if not api_key:
+                # 从 OpenClaw 配置读取
+                models_cfg = os.path.expanduser("~/.openclaw/agents/main/agent/models.json")
+                if os.path.exists(models_cfg):
+                    with open(models_cfg) as f:
+                        cfg = j.load(f)
+                    api_key = cfg.get("providers", {}).get("deepseek", {}).get("apiKey", "")
+            if not api_key:
+                self.send_json({"success": False, "error": "未找到 DeepSeek API Key"}, 500)
+                return
+
             req = urllib.request.Request(
-                "http://10.0.0.1:11434/api/generate",
+                "https://api.deepseek.com/chat/completions",
                 data=req_body.encode(),
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + api_key
+                },
                 method="POST"
             )
             resp = urllib.request.urlopen(req, timeout=120)
             result = j.loads(resp.read().decode())
 
-            tailored_md = result.get("response", "")
-            if not tailored_md:
-                self.send_json({"success": False, "error": "Ollama 返回为空"}, 500)
+            choices = result.get("choices", [])
+            if not choices:
+                self.send_json({"success": False, "error": f"API 返回为空: {result}"}, 500)
                 return
+            tailored_md = choices[0]["message"]["content"].strip()
 
             # 保存优化后的简历
             self.agent.tracker.save_job_resume_markdown(job_id, tailored_md)
