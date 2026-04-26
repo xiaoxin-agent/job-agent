@@ -461,6 +461,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/record_apply": self.api_record_apply,
             "/api/tailor_resume": self.api_tailor_resume,
             "/api/analyze_skill_gap": self.api_analyze_skill_gap,
+            "/api/learn_plan": self.api_learn_plan,
         }
 
         handler = api_routes.get(path)
@@ -841,8 +842,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 if (detailModal) detailModal.remove();
                 return;
             }}
+            var lpCloseBtn = e.target.closest('.learn-plan-close-btn');
+            if (lpCloseBtn) {{
+                var lpModal = lpCloseBtn.closest('#learn-plan-modal');
+                if (lpModal) lpModal.remove();
+                return;
+            }}
             var gapSpan = e.target.closest('.skill-gap-group');
             if (gapSpan) {{
+                var jobIdGap = gapSpan.getAttribute('data-gap-jobid') || '';
                 var detailsRaw = gapSpan.getAttribute('data-gap-details');
                 if (!detailsRaw) return;
                 try {{
@@ -853,11 +861,84 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     var h = '<div id="skill-gap-detail-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1001;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
                     h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;line-height:1.6">';
                     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f3af 技能差距分析</h3><button class="skill-gap-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div>';
-                    h += details + '</div></div>';
+                    h += details;
+                    h += '<div style="margin-top:12px;text-align:center"><button class="btn btn-small btn-primary learn-plan-btn" data-learn-jobid="' + jobIdGap + '" style="font-size:12px">\U0001f4da 生成学习计划</button></div>';
+                    h += '</div></div>';
                     document.body.insertAdjacentHTML('beforeend', h);
                 }} catch(e) {{}}
             }}
+            var learnBtn = e.target.closest('.learn-plan-btn');
+            if (learnBtn) {{
+                var jobIdLearn = learnBtn.getAttribute('data-learn-jobid');
+                if (jobIdLearn) {{
+                    showLearnPlan(jobIdLearn);
+                }}
+            }}
         }});
+        function showLearnPlan(jobId) {{
+            var btnEl = document.querySelector('.learn-plan-btn[data-learn-jobid="' + jobId + '"]');
+            if (btnEl) {{ btnEl.textContent = '\u23f3 \u751f\u6210\u4e2d...'; btnEl.disabled = true; }}
+            fetch('/api/learn_plan', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+            .then(function(r){{return r.json()}})
+            .then(function(d){{
+                if (btnEl) {{ btnEl.textContent = '\U0001f4da \u751f\u6210\u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }}
+                if (!d.success) {{ alert('\u751f\u6210\u5931\u8d25: ' + (d.error || '')); return; }}
+                var oldModal = document.getElementById('learn-plan-modal');
+                if (oldModal) oldModal.remove();
+                var plan = d.plan;
+                var h = '<div id="learn-plan-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1002;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
+                h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:600px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;line-height:1.6">';
+                h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f4da \u5f3a\u5316\u5b66\u4e60\u8ba1\u5212</h3><button class="learn-plan-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">\u00d7</button></div>';
+                if (plan.focus_skills) {{
+                    h += '<div style="margin-bottom:12px"><b>\U0001f3af \u91cd\u70b9\u6280\u80fd</b></div>';
+                    plan.focus_skills.forEach(function(s) {{
+                        var priColor = s.priority == '\u9ad8' ? '#d32f2f' : s.priority == '\u4e2d' ? '#e65100' : '#1565c0';
+                        h += '<div style="background:#f8f9fa;border-radius:6px;padding:8px;margin-bottom:6px">';
+                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + s.skill + '</b> <span style="font-size:11px;color:' + priColor + ';font-weight:500">' + s.priority + '\u4f18\u5148\u7ea7</span></div>';
+                        h += '<div style="color:#555;font-size:12px;margin:4px 0">' + (s.reason || '') + '</div>';
+                        if (s.resources) {{
+                            s.resources.forEach(function(rsc) {{
+                                h += '<div style="font-size:11px;margin:2px 0;padding-left:8px">\u2022 <b>[' + (rsc.type || '\u8d44\u6e90') + ']</b> ' + (rsc.title || '') + (rsc.estimated_hours ? ' (' + rsc.estimated_hours + 'h)' : '') + '</div>';
+                            }});
+                        }}
+                        h += '</div>';
+                    }});
+                }}
+                if (plan.weekly_plan) {{
+                    h += '<div style="margin-top:12px"><b>\U0001f4c5 \u6bcf\u5468\u8ba1\u5212</b></div>';
+                    plan.weekly_plan.forEach(function(w) {{
+                        h += '<div style="background:#fff8e1;border-radius:6px;padding:8px;margin-bottom:6px">';
+                        h += '<div style="font-weight:500">\u7b2c' + w.week + '\u5468: ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(~' + (w.estimated_hours || '') + 'h)</span></div>';
+                        if (w.tasks) {{
+                            w.tasks.forEach(function(t) {{
+                                h += '<div style="font-size:12px;padding-left:8px">\u2713 ' + t + '</div>';
+                            }});
+                        }}
+                        h += '</div>';
+                    }});
+                }}
+                if (plan.projects) {{
+                    h += '<div style="margin-top:12px"><b>\U0001f4bb \u7ec3\u4e60\u9879\u76ee</b></div>';
+                    plan.projects.forEach(function(p) {{
+                        h += '<div style="background:#e3f2fd;border-radius:6px;padding:8px;margin-bottom:6px">';
+                        h += '<div style="font-weight:500">' + (p.name || '') + '</div>';
+                        h += '<div style="font-size:12px;color:#555">' + (p.description || '') + '</div>';
+                        if (p.skills) {{
+                            h += '<div style="font-size:11px;color:#1565c0;margin-top:4px">\u2022 \u6280\u80fd: ' + p.skills.join(', ') + '</div>';
+                        }}
+                        h += '</div>';
+                    }});
+                }}
+                if (plan.advice) {{
+                    h += '<div style="margin-top:12px;background:#f3e8ff;border-radius:6px;padding:10px;color:#6a1b9a">';
+                    h += '<b>\U0001f4a1 \u5efa\u8bae:</b><br>' + plan.advice;
+                    h += '</div>';
+                }}
+                h += '</div></div>';
+                document.body.insertAdjacentHTML('beforeend', h);
+            }})
+            .catch(function(e){{ if (btnEl) {{ btnEl.textContent = '\U0001f4da \u751f\u6210\u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }} alert('\u8bf7\u6c42\u5931\u8d25: ' + e); }});
+        }}
         function closeApplyModal() {{
             var el = document.getElementById('apply-analysis-modal');
             if (el) el.remove();
@@ -1785,7 +1866,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 # Store details in a data attribute, handle click via event delegation
                 import html
                 details_escaped = html.escape(j.dumps(details_html, ensure_ascii=False))
-                gap_html = '<span class="skill-gap-group" style="display:inline-block;margin-left:4px;cursor:pointer" data-gap-details="' + details_escaped + '">' + gap_html + '</span>'
+                gap_html = '<span class="skill-gap-group" style="display:inline-block;margin-left:4px;cursor:pointer" data-gap-details="' + details_escaped + '" data-gap-jobid="' + str(job_id) + '">' + gap_html + '</span>'
 
             # 保存到职位数据
             job["skill_gap_html"] = gap_html
@@ -1796,6 +1877,108 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": False, "error": "AI 返回格式异常，请重试"}, 500)
         except Exception as e:
             self.send_json({"success": False, "error": f"分析失败: {str(e)}"}, 500)
+
+    def api_learn_plan(self, data):
+        """根据技能差距生成强化学习计划"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+
+            job_title = job.get("title", "")
+            job_desc = job.get("description", "")
+            company = job.get("company", "")
+            resume_md = self.agent.tracker.get_job_resume_markdown(job_id) or ""
+
+            prompt = f"""你是一名资深技术导师。请为一个想申请以下职位的求职者制定一个详细的技能强化学习计划。
+
+### 目标职位
+{company} - {job_title}
+
+### 职位描述
+{job_desc}
+
+### 当前简历
+{resume_md[:3000]}
+
+### 输出格式（JSON，不要 markdown 代码块）
+{{
+  "position": "目标职位名称",
+  "focus_skills": [
+    {{
+      "skill": "技能名称",
+      "priority": "高/中/低",
+      "reason": "为什么这个技能重要",
+      "resources": [
+        {{"type": "课程/书籍/项目/文档", "title": "资源名称", "url": "链接（如果有）", "estimated_hours": 10}}
+      ]
+    }}
+  ],
+  "weekly_plan": [
+    {{"week": 1, "focus": "本周重点", "tasks": ["具体任务1", "具体任务2"], "estimated_hours": 5}}
+  ],
+  "projects": [
+    {{"name": "项目名", "description": "练习项目简述", "skills": ["涉及的技能"]}}
+  ],
+  "total_estimated_weeks": 4,
+  "advice": "总体建议（一段话）"
+}}
+"""
+
+            import urllib.request
+            import json as j
+
+            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+            if not api_key:
+                models_cfg = os.path.expanduser("~/.openclaw/agents/main/agent/models.json")
+                if os.path.exists(models_cfg):
+                    with open(models_cfg) as f:
+                        cfg = j.load(f)
+                    api_key = cfg.get("providers", {}).get("deepseek", {}).get("apiKey", "")
+            if not api_key:
+                self.send_json({"success": False, "error": "未找到 DeepSeek API Key"}, 500)
+                return
+
+            req_body = j.dumps({
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "你是资深技术导师和职业规划专家。输出纯 JSON。"},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 4096,
+                "stream": False
+            })
+
+            req = urllib.request.Request(
+                "https://api.deepseek.com/chat/completions",
+                data=req_body.encode(),
+                headers={"Content-Type": "application/json", "Authorization": "Bearer " + api_key},
+                method="POST"
+            )
+            resp = urllib.request.urlopen(req, timeout=120)
+            result = j.loads(resp.read().decode())
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            # 清理可能包裹的 markdown 代码块
+            content = content.strip()
+            if content.startswith("```"):
+                content = content.split("\n", 1)[-1]
+                content = content.rsplit("```", 1)[0].strip()
+            if content.startswith("json"):
+                content = content[4:].strip()
+
+            plan = j.loads(content)
+            self.send_json({"success": True, "plan": plan})
+        except json.JSONDecodeError:
+            self.send_json({"success": False, "error": "AI 返回格式异常，请重试"}, 500)
+        except Exception as e:
+            self.send_json({"success": False, "error": f"生成学习计划失败: {str(e)}"}, 500)
 
     def _find_job_from_cache(self, job_id: str) -> Optional[Dict]:
         """从搜索缓存中查找职位"""
