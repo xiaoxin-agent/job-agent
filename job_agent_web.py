@@ -866,6 +866,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var APPLY_TEXT = '\u7533\u8bf7';
         var RECORDED_TEXT = '\u2705 \u5df2\u8bb0\u5f55';
 
+        // Auto-analyze skill gaps for jobs with linked resume but no analysis
+        (function() {{
+            var els = document.querySelectorAll('[id^="skill-gap-"]');
+            for (var i = 0; i < els.length; i++) {{
+                (function(el) {{
+                    if (!el.textContent.trim()) {{
+                        var jobId = el.id.replace('skill-gap-', '');
+                        fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+                        .then(function(r){{return r.json()}})
+                        .then(function(d){{ if (d.success && d.html) {{ el.innerHTML = d.html; }}}});
+                    }}
+                }})(els[i]);
+            }}
+        }})();
+
         async function delJob(id) {{
             if (!confirm('确定删除？')) return;
             await fetch('/api/delete_job', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id}})}});
