@@ -257,6 +257,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "month_prefix": "Month ",
         "week_focus": "Week {}",
         "tasks_completed": "{} tasks completed",
+        "gap_modal_title": "🎯 Skill Gap Analysis",
         "saved_to_tracker": "✅ Saved to tracker, refresh to see",
         "link_resume_title": "\U0001f4ce Link Resume",
         "btn_assign": "\U0001f517 Assign",
@@ -397,6 +398,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "month_prefix": "",
         "week_focus": "第{}周",
         "tasks_completed": "{}/{} 任务完成",
+        "gap_modal_title": "🎯 技能差距分析",
         "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
         "link_resume_title": "\U0001f4ce 关联简历",
         "btn_assign": "\U0001f517 关联",
@@ -539,6 +541,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "month_prefix": "",
         "week_focus": "Semaine {}",
         "tasks_completed": "{} tâches terminées",
+        "gap_modal_title": "🎯 Analyse des écarts de compétences",
         "saved_to_tracker": "✅ Enregistré, actualisez pour voir",
         "link_resume_title": "\U0001f4ce Lier CV",
         "btn_assign": "\U0001f517 Assigner",
@@ -1020,6 +1023,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         parse_failed = t(lang, "parse_failed")
         cover_letter_title_short = t(lang, "cover_letter_title_short")
         loading_text = t(lang, "loading")
+        gap_modal_title = t(lang, "gap_modal_title")
         btn_save = t(lang, "btn_save")
         btn_regenerate = t(lang, "btn_regenerate")
         btn_copy = t(lang, "btn_copy")
@@ -1078,6 +1082,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _btn_save = {json.dumps(btn_save)};
         var _btn_regenerate = {json.dumps(btn_regenerate)};
         var _btn_copy = {json.dumps(btn_copy)};
+        var _gap_modal_title = {json.dumps(gap_modal_title)};
         var _confirm_delete = {json.dumps(confirm_delete)};
         var _note_prompt = {json.dumps(note_prompt)};
         var _link_resume_title = {json.dumps(t(lang, 'link_resume_title'))};
@@ -1110,7 +1115,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     if (old) old.remove();
                     var h = '<div id="skill-gap-detail-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1001;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
                     h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:15px;line-height:1.6">';
-                    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f3af 技能差距分析</h3><button class="skill-gap-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div>';
+                    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">' + _gap_modal_title + '</h3><button class="skill-gap-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div>';
                     h += details;
                     h += '<div style="margin-top:12px;text-align:center" id="learn-btn-area-' + jobIdGap + '"><button class="btn btn-small btn-primary learn-plan-btn" data-learn-jobid="' + jobIdGap + '" style="font-size:12px">\U0001f4da ' + _loading_text + '</button></div>';
                     // Check if plan already exists
