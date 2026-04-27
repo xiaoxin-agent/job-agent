@@ -1258,7 +1258,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     if (!result || !result.plan) return;
                     // Use different text: '查看' if plan was already saved, '生成' if freshly generated
                     if (btnEl) {{
-                        btnEl.textContent = result.isSaved ? '\U0001f4da \u67e5\u770b\u5b66\u4e60\u8ba1\u5212' : '\U0001f4da \u5b66\u4e60\u8ba1\u5212';
+                        btnEl.textContent = result.isSaved ? _btn_view_plan : _btn_generate_plan;
                         btnEl.disabled = false;
                     }}
                     renderLearnPlanModal(jobId, result.plan, result.progress);
