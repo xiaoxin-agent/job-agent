@@ -1531,6 +1531,13 @@ class JobAgent:
             if body_desc and len(body_desc) > len(result['description']):
                 result['description'] = body_desc
 
+        # Fallback for SPA sites (e.g. Google Careers): extract from <script> tags
+        # containing \u003c escaped HTML (common in SPA compiled bundles)
+        if len(result['description']) < 1000:
+            script_desc = self._extract_from_script_tags(html)
+            if script_desc and len(script_desc) > len(result['description']):
+                result['description'] = script_desc
+
         return result
 
     def _extract_jsonld_company(self, jd: dict) -> str:
@@ -1578,6 +1585,109 @@ class JobAgent:
             return ''
         return self.engine._clean_html(f'<div>{best}</div>')
 
+    def _extract_from_script_tags(self, html: str) -> str:
+        """Extract job description from script tags with u-escaped HTML
+        (SPA sites like Google Careers store content in compiled JS bundles)."""
+        import re
+        bs = chr(92)  # backslash
+        scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
+        candidates = []
+
+        for s in scripts:
+            if len(s) < 200:
+                continue
+            # Look for escaped unicode HTML patterns in the raw script content
+            has_escaped = (bs + 'u003c') in s or (bs + 'u003e') in s
+            has_keywords = 'qualification' in s.lower() or 'responsibilit' in s.lower()
+            if not has_escaped and not has_keywords:
+                continue
+
+            # Decode unicode escape sequences
+            if has_escaped:
+                decoded = s.replace(bs + 'u003c', '<').replace(bs + 'u003e', '>')
+                decoded = decoded.replace(bs + 'u003d', '=').replace(bs + 'u0026', '&')
+                decoded = decoded.replace(bs + 'u0027', "'").replace(bs + 'u0022', '"')
+                decoded = decoded.replace(bs + 'u002f', '/')
+            else:
+                decoded = s
+
+            # Build a structured description by pairing headings with <ul> sections
+            parts = []
+            decoded_padded = ' ' + decoded + ' '
+            # Find <hN> directly followed by <ul>
+            for m in re.finditer(
+                r'(<h[1-6][^>]*>.*?</h[1-6]>)\s*(<ul>.*?</ul>)',
+                decoded_padded, re.DOTALL
+            ):
+                heading = re.sub(r'<[^>]+>', '', m.group(1)).strip()
+                ul_content = m.group(2)
+                items = []
+                for li in re.findall(r'<li[^>]*>(.*?)</li>', ul_content, re.DOTALL):
+                    clean = re.sub(r'<[^>]+>', '', li).strip()
+                    clean = clean.replace(bs + 'n', chr(10))
+                    clean = re.sub(r'\s+', ' ', clean).strip()
+                    for e, r in [('&amp;','&'),('&lt;','<'),('&gt;','>')]:
+                        clean = clean.replace(e, r)
+                    clean = re.sub(r'&#[0-9]+;', '', clean)
+                    if clean and len(clean) > 10:
+                        items.append('    - ' + clean)
+                if items:
+                    parts.append(heading)
+                    parts.extend(items)
+
+            # Find <ul> sections that had no preceding heading
+            remaining = decoded_padded
+            for m in re.finditer(
+                r'<h[1-6][^>]*>.*?</h[1-6]>\s*<ul>.*?</ul>',
+                decoded_padded, re.DOTALL
+            ):
+                remaining = remaining.replace(m.group(0), '', 1)
+            for ul in re.findall(r'<ul>(.*?)</ul>', remaining, re.DOTALL):
+                items = []
+                for li in re.findall(r'<li[^>]*>(.*?)</li>', ul, re.DOTALL):
+                    clean = re.sub(r'<[^>]+>', '', li).strip()
+                    clean = clean.replace(bs + 'n', chr(10))
+                    clean = re.sub(r'\s+', ' ', clean).strip()
+                    for e, r in [('&amp;','&'),('&lt;','<'),('&gt;','>')]:
+                        clean = clean.replace(e, r)
+                    clean = re.sub(r'&#[0-9]+;', '', clean)
+                    if clean and len(clean) > 10:
+                        items.append('    - ' + clean)
+                if items:
+                    if not any('Responsibilit' in p for p in parts):
+                        parts.insert(0, 'Responsibilities')
+                    parts.extend(items)
+
+            if parts:
+                candidates.append(chr(10).join(parts))
+                continue
+
+            # Fallback: plain text
+            text = re.sub(r'<[^>]+>', ' ', decoded)
+            text = text.replace(bs + 'n', chr(10))
+            text = re.sub(r'\s+', ' ', text).strip()
+            if len(text) > 300:
+                candidates.append(text)
+
+        if not candidates:
+            return ''
+
+        candidates.sort(key=len, reverse=True)
+        best = candidates[0]
+        if len(best) < 200:
+            return ''
+
+        for marker in ['Minimum qualifications', 'Preferred qualifications', 'Responsibilities', 'About the job']:
+            idx = best.find(marker)
+            if idx > 0:
+                best = best[idx:]
+                break
+
+        return best
+
+    def generate_cover_letter(self, job: Dict) -> str:
+        """generate cover letter"""
+        return self.analyzer.generate_cover_letter(job)
     def generate_cover_letter(self, job: Dict) -> str:
         """生成求职信"""
         return self.analyzer.generate_cover_letter(job)
