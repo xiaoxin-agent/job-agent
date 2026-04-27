@@ -5,6 +5,7 @@
 """
 
 import json
+import base64
 import os
 import datetime
 import urllib.parse
@@ -1393,14 +1394,22 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                     for proj in plan.get("projects", []):
                                         if any(s.lower() in task.lower() for s in proj.get("skills",[])):
                                             related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
-                                    # Escape for JS (string concat to avoid f-string escaping hell)
-                                    _esq = lambda s: s.replace("'", "\\'").replace("\n","") if s else ""
-                                    rjs = _esq(related_res_html)
-                                    pjs = _esq(related_proj_html)
-                                    ajs = _esq(plan.get("advice","") or "")
-                                    fjs = _esq(focus)
-                                    tjs = _esq(task[:30])
-                                    tasks_for_day += f'<div class="cal-task {done_cls}" onclick="showTaskDetail(\'{tjs}\',\'{fjs}\',{week_num},{t_idx},\'{rjs}\',\'{pjs}\',\'{ajs}\')" title="{task}">{task[:22]}</div>'
+                                    # Store detail data as encoded JSON data attributes
+                                    # Use base64 to avoid any escaping issues in HTML attributes
+                                    import base64
+                                    detail_obj = {
+                                        "task": task,
+                                        "focus": focus,
+                                        "week": week_num,
+                                        "resources_html": related_res_html,
+                                        "projects_html": related_proj_html,
+                                        "advice_text": plan.get("advice","") or ""
+                                    }
+                                    detail_json = json.dumps(detail_obj, ensure_ascii=False)
+                                    detail_b64 = base64.b64encode(detail_json.encode()).decode()
+                                    disp = task[:14] + "..." if len(task) > 14 else task
+                                    tasks_for_day += f'''
+                                    <div class="cal-task {done_cls}" data-detail="{detail_b64}" title="{task}">{disp}</div>'''
 
                         week_days += f'''
                         <div class="cal-day">
@@ -1516,39 +1525,45 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             </div>
         </div>
         <script>
-        function showTaskDetail(taskText, focus, week, taskIdx, resourcesHtml, projectsHtml, adviceHtml) {
-            document.getElementById('td-title').textContent = taskText;
-            document.getElementById('td-week').textContent = '\U0001f4c5 \u7b2c' + week + '\u5468 \u2014 ' + focus;
+        // Task detail: click delegation on .cal-task
+        document.addEventListener('click', function(e) {
+            var el = e.target.closest('.cal-task');
+            if (!el || !el.dataset.detail) return;
+            try {
+                var d = JSON.parse(atob(el.dataset.detail));
+                document.getElementById('td-title').textContent = d.task;
+                document.getElementById('td-week').textContent = '\U0001f4c5 \u7b2c' + d.week + '\u5468 \u2014 ' + d.focus;
 
-            var rDiv = document.getElementById('td-resources');
-            var rSec = document.getElementById('td-section-resources');
-            if (resourcesHtml) {
-                rDiv.innerHTML = resourcesHtml;
-                rSec.style.display = '';
-            } else {
-                rSec.style.display = 'none';
-            }
+                var rDiv = document.getElementById('td-resources');
+                var rSec = document.getElementById('td-section-resources');
+                if (d.resources_html) {
+                    rDiv.innerHTML = d.resources_html;
+                    rSec.style.display = '';
+                } else {
+                    rSec.style.display = 'none';
+                }
 
-            var pDiv = document.getElementById('td-projects');
-            var pSec = document.getElementById('td-section-projects');
-            if (projectsHtml) {
-                pDiv.innerHTML = projectsHtml;
-                pSec.style.display = '';
-            } else {
-                pSec.style.display = 'none';
-            }
+                var pDiv = document.getElementById('td-projects');
+                var pSec = document.getElementById('td-section-projects');
+                if (d.projects_html) {
+                    pDiv.innerHTML = d.projects_html;
+                    pSec.style.display = '';
+                } else {
+                    pSec.style.display = 'none';
+                }
 
-            var aDiv = document.getElementById('td-advice');
-            var aSec = document.getElementById('td-section-advice');
-            if (adviceHtml) {
-                aDiv.innerHTML = adviceHtml;
-                aSec.style.display = '';
-            } else {
-                aSec.style.display = 'none';
-            }
+                var aDiv = document.getElementById('td-advice');
+                var aSec = document.getElementById('td-section-advice');
+                if (d.advice_text) {
+                    aDiv.textContent = d.advice_text;
+                    aSec.style.display = '';
+                } else {
+                    aSec.style.display = 'none';
+                }
 
-            document.getElementById('td-overlay').style.display = 'flex';
-        }
+                document.getElementById('td-overlay').style.display = 'flex';
+            } catch(err) { console.warn('Task detail parse error', err); }
+        });
 
         function closeTaskDetail() {
             document.getElementById('td-overlay').style.display = 'none';
