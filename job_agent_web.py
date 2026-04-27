@@ -1376,7 +1376,31 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                 # Distribute tasks roughly across week days (for display)
                                 day_idx = t_idx % 7
                                 if day_idx == d:
-                                    tasks_for_day += f'<div class="cal-task {done_cls}" title="{task}">{task[:20]}</div>'
+                                    # Build task detail: collect related resources from focus_skills
+                                    related_res_html = ""
+                                    related_proj_html = ""
+                                    for fs in plan.get("focus_skills", []):
+                                        sk = fs.get("skill", "").lower()
+                                        if sk and (sk in task.lower() or any(w in task.lower() for w in sk.split()[:3])):
+                                            items = "".join(
+                                                '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
+                                                    ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
+                                                ) + '</li>'
+                                                for r in fs.get("resources", [])
+                                            )
+                                            if items:
+                                                related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + '优先级)</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
+                                    for proj in plan.get("projects", []):
+                                        if any(s.lower() in task.lower() for s in proj.get("skills",[])):
+                                            related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
+                                    # Escape for JS (string concat to avoid f-string escaping hell)
+                                    _esq = lambda s: s.replace("'", "\\'").replace("\n","") if s else ""
+                                    rjs = _esq(related_res_html)
+                                    pjs = _esq(related_proj_html)
+                                    ajs = _esq(plan.get("advice","") or "")
+                                    fjs = _esq(focus)
+                                    tjs = _esq(task[:30])
+                                    tasks_for_day += f'<div class="cal-task {done_cls}" onclick="showTaskDetail(\'{tjs}\',\'{fjs}\',{week_num},{t_idx},\'{rjs}\',\'{pjs}\',\'{ajs}\')" title="{task}">{task[:22]}</div>'
 
                         week_days += f'''
                         <div class="cal-day">
@@ -1452,13 +1476,90 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         .cal-task.task-done {{ background:#e8f5e9; text-decoration:line-through; color:#888; }}
         .empty-state {{ text-align:center; padding:60px 20px; color:#888; }}
         .empty-state a {{ color:#1a73e8; }}
+        .td-overlay {{ position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.45); z-index:9999; display:none; align-items:center; justify-content:center; }}
+        .td-modal {{ background:#fff; border-radius:12px; max-width:520px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.2); padding:24px; position:relative; }}
+        .td-close {{ position:absolute; top:12px; right:16px; font-size:22px; cursor:pointer; color:#999; background:none; border:none; }}
+        .td-close:hover {{ color:#333; }}
+        .td-title {{ font-size:17px; font-weight:600; margin-bottom:4px; padding-right:30px; }}
+        .td-week {{ font-size:12px; color:#888; margin-bottom:16px; }}
+        .td-section {{ margin-bottom:16px; }}
+        .td-section-title {{ font-size:13px; font-weight:500; color:#555; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; }}
+        .td-skill-section {{ margin-bottom:8px; padding:8px; background:#f8f9fa; border-radius:6px; font-size:12px; }}
+        .td-skill-name {{ font-weight:600; margin-bottom:4px; }}
+        .td-skill-section ul {{ margin:4px 0 0; padding-left:16px; }}
+        .td-skill-section li {{ margin-bottom:3px; line-height:1.4; }}
+        .td-project-item {{ padding:8px; background:#fff7e6; border-radius:6px; margin-bottom:6px; font-size:13px; }}
+        .td-advice {{ padding:10px; background:#e8f5e9; border-radius:6px; font-size:13px; line-height:1.5; color:#2e7d32; }}
+        .cal-task {{ cursor:pointer; }}
+        .cal-task:hover {{ opacity:0.85; box-shadow:0 1px 4px rgba(0,0,0,0.15); }}
         </style>'''
+
+        # Task detail modal (built as string literals to avoid f-string hell)
+        modal = '''
+        <div class="td-overlay" id="td-overlay" onclick="closeTaskDetail()">
+            <div class="td-modal" onclick="event.stopPropagation()">
+                <button class="td-close" onclick="closeTaskDetail()">&times;</button>
+                <div class="td-title" id="td-title"></div>
+                <div class="td-week" id="td-week"></div>
+                <div class="td-section" id="td-section-resources" style="display:none">
+                    <div class="td-section-title">\U0001f4da \u63a8\u8350\u8d44\u6e90</div>
+                    <div id="td-resources"></div>
+                </div>
+                <div class="td-section" id="td-section-projects" style="display:none">
+                    <div class="td-section-title">\U0001f4a1 \u76f8\u5173\u9879\u76ee</div>
+                    <div id="td-projects"></div>
+                </div>
+                <div class="td-section" id="td-section-advice" style="display:none">
+                    <div class="td-section-title">\U0001f4ad \u5b66\u4e60\u5efa\u8bae</div>
+                    <div class="td-advice" id="td-advice"></div>
+                </div>
+            </div>
+        </div>
+        <script>
+        function showTaskDetail(taskText, focus, week, taskIdx, resourcesHtml, projectsHtml, adviceHtml) {
+            document.getElementById('td-title').textContent = taskText;
+            document.getElementById('td-week').textContent = '\U0001f4c5 \u7b2c' + week + '\u5468 \u2014 ' + focus;
+
+            var rDiv = document.getElementById('td-resources');
+            var rSec = document.getElementById('td-section-resources');
+            if (resourcesHtml) {
+                rDiv.innerHTML = resourcesHtml;
+                rSec.style.display = '';
+            } else {
+                rSec.style.display = 'none';
+            }
+
+            var pDiv = document.getElementById('td-projects');
+            var pSec = document.getElementById('td-section-projects');
+            if (projectsHtml) {
+                pDiv.innerHTML = projectsHtml;
+                pSec.style.display = '';
+            } else {
+                pSec.style.display = 'none';
+            }
+
+            var aDiv = document.getElementById('td-advice');
+            var aSec = document.getElementById('td-section-advice');
+            if (adviceHtml) {
+                aDiv.innerHTML = adviceHtml;
+                aSec.style.display = '';
+            } else {
+                aSec.style.display = 'none';
+            }
+
+            document.getElementById('td-overlay').style.display = 'flex';
+        }
+
+        function closeTaskDetail() {
+            document.getElementById('td-overlay').style.display = 'none';
+        }
+        </script>'''
 
         body = style + f'''
         <div class="container">
             <h1>\U0001f4c5 学习日历</h1>
             {cards}
-        </div>'''
+        </div>''' + modal
 
         self._send_html(self._page(t(lang, "tracked_title"), body, lang=lang))
 
