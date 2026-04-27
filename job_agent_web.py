@@ -1829,6 +1829,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         lang = self._get_lang(params)
         jobs = self.agent.tracker.tracked_jobs
         learn_plan_week = t(lang, "learn_plan_week")
+        lang_sfx = {"en": "", "zh-CN": "周", "fr": ""}
+        learn_plan_suffix = lang_sfx.get(lang, "")
         cal_month_names = t(lang, "cal_month_names")
         cal_weekday_labels = t(lang, "cal_weekday_labels")
         cal_modal_resources = t(lang, "cal_modal_resources")
@@ -2117,6 +2119,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         </div>
         <script>
         var _learn_plan_week = __learn_plan_week;
+        var _learn_plan_suffix = __learn_plan_suffix;
         var _cal_modal_resources = __cal_modal_resources;
         var _cal_modal_projects = __cal_modal_projects;
         var _cal_modal_advice = __cal_modal_advice;
@@ -2127,7 +2130,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             try {
                 var d = JSON.parse(decodeURIComponent(atob(el.dataset.detail)));
                 document.getElementById('td-title').textContent = d.task;
-                document.getElementById('td-week').textContent = '\U0001f4c5 ' + _learn_plan_week + ' ' + (d.week || '') + ' \u2014 ' + (d.focus || '');
+                document.getElementById('td-week').textContent = '\U0001f4c5 ' + (_learn_plan_week || '') + ' ' + (d.week || '') + (_learn_plan_suffix || '') + ' \u2014 ' + (d.focus || '');
 
                 var rDiv = document.getElementById('td-resources');
                 var rSec = document.getElementById('td-section-resources');
@@ -2204,6 +2207,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var __cal_modal_projects = {json.dumps(cal_modal_projects, ensure_ascii=False)};
         var __cal_modal_advice = {json.dumps(cal_modal_advice, ensure_ascii=False)};
         var __learn_plan_week = {json.dumps(learn_plan_week, ensure_ascii=False)};
+        var __learn_plan_suffix = {json.dumps(learn_plan_suffix, ensure_ascii=False)};
         </script>
         ''' + modal
 
