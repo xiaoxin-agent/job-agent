@@ -1613,36 +1613,32 @@ class JobAgent:
 
             # Build a structured description by pairing headings with <ul> sections
             parts = []
-            decoded_padded = ' ' + decoded + ' '
-            # Find <hN> directly followed by <ul>
+            # Build structured description by scanning decoded HTML sequentially
+            # This handles both heading+<ul> pairs and headingless <ul> sections
+            parts = []
+            # Find all heading+ul pairs AND lone uls in document order
+            seen_headings = set()
             for m in re.finditer(
-                r'(<h[1-6][^>]*>.*?</h[1-6]>)\s*(<ul>.*?</ul>)',
-                decoded_padded, re.DOTALL
+                r'(<h[1-6][^>]*>.*?</h[1-6]>)\s*(<ul>.*?</ul>)'
+                r'|<ul>(.*?)</ul>',
+                decoded, re.DOTALL
             ):
-                heading = re.sub(r'<[^>]+>', '', m.group(1)).strip()
-                ul_content = m.group(2)
-                items = []
-                for li in re.findall(r'<li[^>]*>(.*?)</li>', ul_content, re.DOTALL):
-                    clean = re.sub(r'<[^>]+>', '', li).strip()
-                    clean = clean.replace(bs + 'n', chr(10))
-                    clean = re.sub(r'\s+', ' ', clean).strip()
-                    for e, r in [('&amp;','&'),('&lt;','<'),('&gt;','>')]:
-                        clean = clean.replace(e, r)
-                    clean = re.sub(r'&#[0-9]+;', '', clean)
-                    if clean and len(clean) > 10:
-                        items.append('    - ' + clean)
-                if items:
-                    parts.append(heading)
-                    parts.extend(items)
+                heading_html = m.group(1)
+                paired_ul = m.group(2)
+                lone_ul = m.group(3)
 
-            # Find <ul> sections that had no preceding heading
-            remaining = decoded_padded
-            for m in re.finditer(
-                r'<h[1-6][^>]*>.*?</h[1-6]>\s*<ul>.*?</ul>',
-                decoded_padded, re.DOTALL
-            ):
-                remaining = remaining.replace(m.group(0), '', 1)
-            for ul in re.findall(r'<ul>(.*?)</ul>', remaining, re.DOTALL):
+                if heading_html and paired_ul:
+                    heading = re.sub(r'<[^>]+>', '', heading_html).strip()
+                    ul = paired_ul
+                elif lone_ul:
+                    ul = lone_ul
+                    if not any('Responsibilit' in p for p in parts):
+                        heading = 'Responsibilities'
+                    else:
+                        heading = None
+                else:
+                    continue
+
                 items = []
                 for li in re.findall(r'<li[^>]*>(.*?)</li>', ul, re.DOTALL):
                     clean = re.sub(r'<[^>]+>', '', li).strip()
@@ -1653,10 +1649,22 @@ class JobAgent:
                     clean = re.sub(r'&#[0-9]+;', '', clean)
                     if clean and len(clean) > 10:
                         items.append('    - ' + clean)
+
                 if items:
-                    if not any('Responsibilit' in p for p in parts):
-                        parts.insert(0, 'Responsibilities')
+                    if heading:
+                        parts.append(heading)
                     parts.extend(items)
+
+            # Deduplicate: remove consecutive duplicate sections
+            deduped = []
+            seen_lines = set()
+            for line in parts:
+                key = line.lower().strip()
+                if key not in seen_lines:
+                    deduped.append(line)
+                    if len(line) > 10:
+                        seen_lines.add(key)
+            parts = deduped
 
             if parts:
                 candidates.append(chr(10).join(parts))
@@ -1677,9 +1685,9 @@ class JobAgent:
         if len(best) < 200:
             return ''
 
-        for marker in ['Minimum qualifications', 'Preferred qualifications', 'Responsibilities', 'About the job']:
+        for marker in ['Responsibilities', 'Minimum qualifications', 'Preferred qualifications', 'About the job']:
             idx = best.find(marker)
-            if idx > 0:
+            if idx >= 0:
                 best = best[idx:]
                 break
 
