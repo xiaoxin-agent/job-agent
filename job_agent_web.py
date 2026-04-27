@@ -401,6 +401,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/profile": self.handle_profile_page,
             "/letter": self.handle_letter_page,
             "/resumes": self.handle_resume_page,
+            "/learn_calendar": self.handle_learn_calendar_page,
             "/resume_view": self.handle_resume_view_page,
         }
 

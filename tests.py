@@ -668,6 +668,155 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         # 清理
         agent.tracker.delete_job(job_id)
 
+    def test_22_learn_calendar_page_browser(self):
+        """端对端：学习日历页面从浏览器角度浏览"""
+        import requests
+        agent = self._agent
+
+        # Clean up any leftover jobs from previous tests
+        for j in list(agent.tracker.tracked_jobs):
+            agent.tracker.delete_job(j["id"])
+
+        # === 1. 创建一个带学习计划的职位（模拟AI生成后的状态） ===
+        sample_plan = {
+            "position": "Test Engineer",
+            "focus_skills": [
+                {"skill": "Python", "priority": "高", "reason": "核心开发语言",
+                 "resources": [{"type": "课程", "title": "Python高级编程", "estimated_hours": 20}]}
+            ],
+            "weekly_plan": [
+                {"week": 1, "focus": "Python基础强化", "tasks": ["完成Python入门", "练习数据结构"], "estimated_hours": 10},
+                {"week": 2, "focus": "Web框架", "tasks": ["学习Flask", "搭建博客项目"], "estimated_hours": 12}
+            ],
+            "projects": [
+                {"name": "REST API服务", "description": "用Flask构建RESTful API", "skills": ["Python", "Flask"]}
+            ],
+            "total_estimated_weeks": 2,
+            "advice": "坚持每天2小时学习效果最佳。"
+        }
+        sample_progress = {
+            "w1_t0": {"done": True, "text": "完成Python入门", "week": 1},
+            "w1_t1": {"done": False, "text": "练习数据结构", "week": 1},
+            "w2_t0": {"done": False, "text": "学习Flask", "week": 2},
+            "w2_t1": {"done": False, "text": "搭建博客项目", "week": 2}
+        }
+
+        agent.save_job({
+            "title": "Test Engineer",
+            "company": "Test Corp",
+            "location": "Remote",
+            "match_score": 85
+        })
+        # Find our job (saved jobs go to position 0)
+        job_id = agent.tracker.tracked_jobs[0]["id"]
+        self.assertEqual(agent.tracker.tracked_jobs[0]["title"], "Test Engineer",
+            "tracked_jobs[0] should be our newly saved job")
+        # Directly set learn_plan on the tracked job (bypass add_job's field filtering)
+        job = agent.tracker.get_job(job_id)
+        job["learn_plan"] = sample_plan
+        job["learn_plan_progress"] = sample_progress
+        agent.tracker.save()
+
+        # Verify data is really there
+        job_verify = agent.tracker.get_job(job_id)
+        self.assertIsNotNone(job_verify.get("learn_plan"), "learn_plan should be persisted")
+
+        # === 2. 直接请求学习日历页面（模拟浏览器导航） ===
+        resp = urlopen(f"http://localhost:{self.port}/learn_calendar")
+        self.assertEqual(resp.status, 200, "学习日历页面应返回200")
+        html = resp.read().decode("utf-8")
+
+        # === 3. 页面内容校验 ===
+        # 3a. 标题
+        self.assertIn("学习日历", html, "页面应包含标题")
+
+        # 3b. 职位信息
+        self.assertIn("Test Engineer", html, "应显示职位名称")
+        self.assertIn("Test Corp", html, "应显示公司名称")
+
+        # 3c. 每周日历
+        self.assertIn("第1周", html, "应显示第1周")
+        self.assertIn("第2周", html, "应显示第2周")
+        self.assertIn("Python基础强化", html, "第1周应显示学习重点")
+        self.assertIn("Web框架", html, "第2周应显示学习重点")
+
+        # 3d. 学习任务显示在日历格中
+        self.assertIn("完成Python入门", html, "日历格应显示学习任务")
+        self.assertIn("练习数据结构", html, "日历格应显示学习任务")
+        self.assertIn("学习Flask", html, "日历格应显示学习任务")
+        self.assertIn("搭建博客项目", html, "日历格应显示学习任务")
+
+        # 3e. 进度展示
+        self.assertIn("1/4", html, "进度应显示 1/4（已完成1个任务）")
+        self.assertIn("50%", html, "第1周进度应为50%（2个任务完成1个）")
+
+        # 3f. 已完成任务有 task-done 类（用于绿色删除线样式）
+        self.assertIn("task-done", html, "已完成任务应有 task-done 类")
+
+        # 3g. 导航栏包含学习日历入口
+        self.assertIn("学习日历", html, "导航栏应有学习日历链接")
+
+        # 3h. 页面结构校验
+        self.assertIn("cal-job-card", html, "每个职位有 cal-job-card 容器")
+        self.assertIn("week-calendar", html, "每周有 week-calendar 容器")
+        self.assertIn("cal-grid", html, "有日历网格 cal-grid")
+        self.assertIn("cal-progress-circle", html, "有进度环 cal-progress-circle")
+
+        # 3i. 今日日期标记
+        from datetime import date
+        today = date.today()
+        self.assertIn(str(today.day), html, "日历格应显示今日日期")
+
+        # === 4. GET /api/learn_plan 返回已保存计划 ===
+        resp2 = urlopen(f"http://localhost:{self.port}/api/learn_plan?job_id={job_id}")
+        d2 = json.loads(resp2.read().decode("utf-8"))
+        self.assertTrue(d2.get("success"), "GET learn_plan 应成功")
+        self.assertTrue(d2.get("saved"), "应有已保存标记")
+        self.assertIn("plan", d2, "应返回 plan")
+        self.assertIn("progress", d2, "应返回 progress")
+        self.assertEqual(d2["plan"]["position"], "Test Engineer", "返回的职位名应匹配")
+        self.assertTrue(d2["progress"]["w1_t0"]["done"], "第1周第0个任务应为已完成")
+
+        # === 5. POST /api/learn_plan_progress 更新进度 ===
+        r3 = requests.post(f"http://localhost:{self.port}/api/learn_plan_progress",
+            json={"job_id": job_id, "task_id": "w1_t1", "done": True})
+        d3 = r3.json()
+        self.assertTrue(d3.get("success"), "更新进度应成功")
+        self.assertEqual(d3.get("done"), 2, "此时应完成2个任务")
+        self.assertEqual(d3.get("total"), 4, "总共4个任务")
+
+        # 验证保存到磁盘
+        job = agent.tracker.get_job(job_id)
+        self.assertTrue(job["learn_plan_progress"]["w1_t1"]["done"],"进度应持久化")
+
+        # === 6. GET /api/learn_plan_ical 导出日历 ===
+        resp4 = urlopen(f"http://localhost:{self.port}/api/learn_plan_ical?job_id={job_id}")
+        self.assertEqual(resp4.status, 200, "日历导出应返回200")
+        self.assertIn("text/calendar", resp4.headers.get("Content-Type", ""), "Content-Type 应为 text/calendar")
+        ical = resp4.read().decode("utf-8")
+        self.assertIn("BEGIN:VCALENDAR", ical, "ICal 格式应正确")
+        self.assertIn("END:VCALENDAR", ical)
+        self.assertIn("BEGIN:VEVENT", ical, "应有事件")
+        self.assertIn("Test Engineer", ical, "日历描述应包含职位名称")
+
+        # === 7. 没有学习计划时页面显示空状态提示 ===
+        # 先清理所有
+        for j in list(agent.tracker.tracked_jobs):
+            agent.tracker.delete_job(j["id"])
+        resp5 = urlopen(f"http://localhost:{self.port}/learn_calendar")
+        html5 = resp5.read().decode("utf-8")
+        self.assertIn("暂无学习计划", html5, "无计划时应显示空状态提示")
+
+        # 清理
+        for j in list(agent.tracker.tracked_jobs):
+            agent.tracker.delete_job(j["id"])
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._agent = None
+        cls.server.shutdown()
+        cls.server.server_close()
+
 
 def cleanup():
     """清理测试数据"""
