@@ -169,7 +169,6 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "rejected": "Rejected",
         "offer": "Offer",
         "no_results": "No results yet. Try a search!",
-        "loading": "Searching...",
         "error": "Error",
         # 跟踪页操作按钮
         "btn_apply": "📤 Apply",
@@ -241,6 +240,24 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_view": "🔗 View Posting",
         "btn_add_job": "📤 Add Job",
         "saved_text": "✅ Saved",
+        "btn_preview": "👁 Preview",
+        "btn_edit": "✏ Edit",
+        "btn_optimize": "🎯 Optimize",
+        "btn_link_resume": "📎 Link Resume",
+        "match_percent": "% Match",
+        "url_placeholder": "Paste job URL (Google Careers / LinkedIn / Indeed…)",
+        "confirm_delete": "Delete this job?",
+        "note_prompt": "Note (optional):",
+        "url_empty": "Please paste a job link",
+        "parse_failed": "Parse failed",
+        "cover_letter_title_short": "Cover Letter",
+        "loading": "Loading...",
+        "btn_regenerate": "🔄 Regenerate",
+        "btn_copy": "📋 Copy",
+        "month_prefix": "Month ",
+        "week_focus": "Week {}",
+        "tasks_completed": "{} tasks completed",
+        "saved_to_tracker": "✅ Saved to tracker, refresh to see",
         "exists_text": "⚠️ Exists",
 
     },
@@ -355,6 +372,24 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_view": "🔗 查看原文",
         "btn_add_job": "📤 添加职位",
         "saved_text": "✅ 已保存",
+        "btn_preview": "👁 预览",
+        "btn_edit": "✏ 编辑",
+        "btn_optimize": "🎯 优化",
+        "btn_link_resume": "📎 关联简历",
+        "match_percent": "% 匹配",
+        "url_placeholder": "粘贴职位链接，如 Google Careers / LinkedIn / Indeed…",
+        "confirm_delete": "确定删除？",
+        "note_prompt": "备注（可选）:",
+        "url_empty": "请粘贴职位链接",
+        "parse_failed": "解析失败",
+        "cover_letter_title_short": "求职信",
+        "loading": "加载中...",
+        "btn_regenerate": "🔄 重新生成",
+        "btn_copy": "📋 复制",
+        "month_prefix": "",
+        "week_focus": "第{}周",
+        "tasks_completed": "{}/{} 任务完成",
+        "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
         "exists_text": "⚠️ 已存在",
 
     },
@@ -471,6 +506,24 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_view": "🔗 Voir l'offre",
         "btn_add_job": "📤 Ajouter un poste",
         "saved_text": "✅ Enregistré",
+        "btn_preview": "👁 Aperçu",
+        "btn_edit": "✏ Modifier",
+        "btn_optimize": "🎯 Optimiser",
+        "btn_link_resume": "📎 Lier CV",
+        "match_percent": "% Correspondance",
+        "url_placeholder": "Collez le lien (Google Careers / LinkedIn / Indeed…)",
+        "confirm_delete": "Supprimer ce poste ?",
+        "note_prompt": "Note (optionnelle) :",
+        "url_empty": "Veuillez coller un lien",
+        "parse_failed": "Échec d'analyse",
+        "cover_letter_title_short": "Lettre de motivation",
+        "loading": "Chargement...",
+        "btn_regenerate": "🔄 Régénérer",
+        "btn_copy": "📋 Copier",
+        "month_prefix": "",
+        "week_focus": "Semaine {}",
+        "tasks_completed": "{} tâches terminées",
+        "saved_to_tracker": "✅ Enregistré, actualisez pour voir",
         "exists_text": "⚠️ Déjà enregistré",
         "btn_letter_generate": "✉️ Générer la lettre",
         "my_profile": "Mon profil",
@@ -931,6 +984,22 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         btn_view = t(lang, "btn_view")
         btn_letter = t(lang, "btn_letter")
         btn_add_job = t(lang, "btn_add_job")
+        btn_preview = t(lang, "btn_preview")
+        btn_edit = t(lang, "btn_edit")
+        btn_optimize = t(lang, "btn_optimize")
+        btn_link_resume = t(lang, "btn_link_resume")
+        match_percent = t(lang, "match_percent")
+        url_placeholder = t(lang, "url_placeholder")
+        confirm_delete = t(lang, "confirm_delete")
+        note_prompt = t(lang, "note_prompt")
+        url_empty = t(lang, "url_empty")
+        parse_failed = t(lang, "parse_failed")
+        cover_letter_title_short = t(lang, "cover_letter_title_short")
+        loading_text = t(lang, "loading")
+        btn_save = t(lang, "btn_save")
+        btn_regenerate = t(lang, "btn_regenerate")
+        btn_copy = t(lang, "btn_copy")
+        saved_to_tracker = t(lang, "saved_to_tracker")
         applied_text = t(lang, "applied")
         jobs_html = ""
         if not jobs:
@@ -946,7 +1015,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <div class="job-meta">
                     <span>{get_company_logo(j.get('company',''))} {j['company']}</span>
                     <span>📍 {j['location']}</span>
-                    <span>📊 {j.get('match_score',0)}% 匹配</span>
+                    <span>📊 {j.get('match_score',0)}{match_percent}</span>
                     <span id="skill-gap-{j['id']}">{j.get('skill_gap_html','')}</span>
                 </div>
                 <div class="job-desc-toggle">
@@ -963,20 +1032,30 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button class="btn btn-small cover-letter-btn" data-job-id="{j['id']}" style="font-size:12px">{btn_letter}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume"><span class="resume-icon">📜</span> <span class="resume-name">'+j['resume_name']+'</span> <span class="resume-actions"><a href="#" class="link-url view-resume-btn" data-job-id="' + j['id'] + '">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">🖊 编辑</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">🎯 优化</button></span></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">📎 关联简历</button></div>'}
+                {('<div class="job-resume"><span class="resume-icon">📜</span> <span class="resume-name">'+j['resume_name']+'</span> <span class="resume-actions"><a href="#" class="link-url view-resume-btn" data-job-id="' + j['id'] + '">'+btn_preview+'</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">'+btn_edit+'</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">'+btn_optimize+'</button></span></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">'+btn_link_resume+'</button></div>'}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
         <h1>{t(lang, 'tracked_title')}</h1>
         <div class="section"><div class="tab-bar">{tabs}</div></div>
         <div class="section section-add-url" style="margin-top:8px;margin-bottom:8px;padding:8px 0;display:flex;gap:8px;align-items:center">
-            <input id="manual-job-url" type="url" placeholder="粘贴职位链接，如 Google Careers / LinkedIn / Indeed…" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+            <input id="manual-job-url" type="url" placeholder="{url_placeholder}" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
             <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">{btn_add_job}</button>
         </div>
         <div id="manual-add-status" style="margin-bottom:8px;font-size:14px"></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
         var _btn_add_job = {json.dumps(btn_add_job)};
+        var _url_empty = {json.dumps(url_empty)};
+        var _parse_failed = {json.dumps(parse_failed)};
+        var _loading_text = {json.dumps(loading_text)};
+        var _saved_to_tracker = {json.dumps(saved_to_tracker)};
+        var _cover_letter_title_short = {json.dumps(cover_letter_title_short)};
+        var _btn_save = {json.dumps(btn_save)};
+        var _btn_regenerate = {json.dumps(btn_regenerate)};
+        var _btn_copy = {json.dumps(btn_copy)};
+        var _confirm_delete = {json.dumps(confirm_delete)};
+        var _note_prompt = {json.dumps(note_prompt)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
             var closeBtn = e.target.closest('.skill-gap-close-btn');
@@ -1005,7 +1084,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:15px;line-height:1.6">';
                     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f3af 技能差距分析</h3><button class="skill-gap-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div>';
                     h += details;
-                    h += '<div style="margin-top:12px;text-align:center" id="learn-btn-area-' + jobIdGap + '"><button class="btn btn-small btn-primary learn-plan-btn" data-learn-jobid="' + jobIdGap + '" style="font-size:12px">\U0001f4da 加载中...</button></div>';
+                    h += '<div style="margin-top:12px;text-align:center" id="learn-btn-area-' + jobIdGap + '"><button class="btn btn-small btn-primary learn-plan-btn" data-learn-jobid="' + jobIdGap + '" style="font-size:12px">\U0001f4da ' + _loading_text + '</button></div>';
                     // Check if plan already exists
                     fetch('/api/learn_plan?job_id=' + encodeURIComponent(jobIdGap))
                     .then(function(r){{return r.json()}})
@@ -1217,7 +1296,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         }})();
 
         async function delJob(id) {{
-            if (!confirm('确定删除？')) return;
+            if (!confirm(_confirm_delete)) return;
             await fetch('/api/delete_job', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id}})}});
             location.reload();
         }}
@@ -1234,7 +1313,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }}
         }}
         async function upd(id, st) {{
-            var notes = prompt('备注（可选）:','')||'';
+            var notes = prompt(_note_prompt,'')||'';
             await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id, status:st, notes:notes}})}});
             location.reload();
         }}
@@ -1247,12 +1326,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         // ===== Manual URL Job Addition =====
         async function fetchAndAddJob() {{
             var url = document.getElementById('manual-job-url').value.trim();
-            if (!url) {{ alert('请粘贴职位链接'); return; }}
+            if (!url) {{ alert(_url_empty); return; }}
             var btn = document.getElementById('manual-add-btn');
             var status = document.getElementById('manual-add-status');
             btn.disabled = true;
-            btn.textContent = '⏳ 解析中...';
-            status.innerHTML = '<span style="color:#888">正在抓取并分析职位信息...</span>';
+            btn.textContent = '⏳ ' + _loading_text;
+            status.innerHTML = '<span style="color:#888">' + _loading_text + '</span>';
             try {{
                 var r = await fetch('/api/fetch_job_from_url', {{
                     method:'POST', headers:{{'Content-Type':'application/json'}},
@@ -1260,7 +1339,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 }});
                 var d = await r.json();
                 if (!d.success) {{
-                    status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || '解析失败') + '</span>';
+                    status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || _parse_failed) + '</span>';
                     btn.disabled = false;
                     btn.textContent = _btn_add_job;
                     return;
@@ -1291,7 +1370,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             .then(function(r){{return r.json()}})
             .then(function(d){{
                 if (d.success) {{
-                    document.getElementById('manual-add-status').innerHTML = '<span style="color:#2e7d32">✅ 已保存到跟踪列表，刷新页面查看</span>';
+                    document.getElementById('manual-add-status').innerHTML = '<span style="color:#2e7d32">' + _saved_to_tracker + '</span>';
                     setTimeout(function(){{ location.reload(); }}, 1500);
                 }} else {{
                     alert(d.error || '保存失败');
@@ -1534,7 +1613,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var inner = document.createElement('div');
             inner.style.cssText = 'background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);border-radius:12px;padding:20px;max-width:600px;width:90%;max-height:80vh;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:14px;line-height:1.6;display:flex;flex-direction:column';
 
-            inner.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">✉ 求职信</h3><button class="cl-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div><textarea class="cl-textarea" style="width:100%;min-height:300px;flex:1;border:1px solid #ddd;border-radius:6px;padding:10px;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit" readonly>加载中...</textarea><div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="cl-save-btn btn btn-small btn-primary" style="font-size:12px">💾 保存</button><button class="cl-regenerate-btn btn btn-small" style="font-size:12px">🔄 重新生成</button><button class="cl-copy-btn btn btn-small" style="font-size:12px">📋 复制</button></div>';
+            inner.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">' + _cover_letter_title_short + '</h3><button class="cl-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div><textarea class="cl-textarea" style="width:100%;min-height:300px;flex:1;border:1px solid #ddd;border-radius:6px;padding:10px;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit" readonly>' + _loading_text + '</textarea><div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="cl-save-btn btn btn-small btn-primary" style="font-size:12px">' + _btn_save + '</button><button class="cl-regenerate-btn btn btn-small" style="font-size:12px">' + _btn_regenerate + '</button><button class="cl-copy-btn btn btn-small" style="font-size:12px">' + _btn_copy + '</button></div>';
 
             modal.appendChild(inner);
             document.body.appendChild(modal);
@@ -1575,24 +1654,24 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 .then(function(r){{ return r.json(); }})
                 .then(function(d) {{
                     if (d.success) {{
-                        saveBtn.textContent = '✅ 已保存';
-                        setTimeout(function(){{ saveBtn.textContent = '💾 保存'; }}, 2000);
+                        saveBtn.textContent = '✅ ' + _btn_save;
+                        setTimeout(function(){{ saveBtn.textContent = _btn_save; }}, 2000);
                     }} else {{
-                        alert('保存失败: ' + (d.error || ''));
+                        alert(_parse_failed + ': ' + (d.error || ''));
                     }}
                 }});
             }};
 
             regenBtn.onclick = function() {{
-                textarea.value = '正在重新生成...';
+                textarea.value = _loading_text;
                 textarea.readOnly = true;
                 loadLetter(true);
             }};
 
             copyBtn.onclick = function() {{
                 navigator.clipboard.writeText(textarea.value).then(function() {{
-                    copyBtn.textContent = '✅ 已复制';
-                    setTimeout(function(){{ copyBtn.textContent = '📋 复制'; }}, 2000);
+                    copyBtn.textContent = '✅ ' + _btn_copy;
+                    setTimeout(function(){{ copyBtn.textContent = _btn_copy; }}, 2000);
                 }});
             }};
         }}
