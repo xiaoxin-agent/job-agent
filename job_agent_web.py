@@ -996,9 +996,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                             w.tasks.forEach(function(t, tIdx) {{
                                 var tid = 'w' + w.week + '_t' + tIdx;
                                 var done = progress[tid] && progress[tid].done;
+                                var taskName = (typeof t === 'string') ? t : (t.name || '');
+                                var taskTip = (typeof t === 'object' && t.advice) ? t.advice : (progress[tid] && progress[tid].advice ? progress[tid].advice : plan.advice || '');
                                 h += '<div style="font-size:12px;padding:2px 0 2px 4px">';
                                 h += '<input type="checkbox" class="learn-task-cb" data-jobid="' + jobId + '" data-taskid="' + tid + '" ' + (done ? 'checked' : '') + ' style="vertical-align:middle;margin-right:4px"> ';
-                                h += '<span style="' + (done ? 'text-decoration:line-through;color:#888' : '') + '">' + t + '</span>';
+                                h += '<span style="' + (done ? 'text-decoration:line-through;color:#888' : '') + '" title="' + (taskTip ? taskTip.replace(/"/g,'&quot;') : '') + '">' + taskName + '</span>';
                                 h += '</div>';
                             }});
                         }}
@@ -1369,11 +1371,17 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         # Check tasks for this week
                         tasks_for_day = ""
                         if w.get("tasks"):
-                            for t_idx, task in enumerate(w["tasks"]):
+                            for t_idx, raw_task in enumerate(w["tasks"]):
                                 tid = f"w{week_num}_t{t_idx}"
                                 p = progress.get(tid, {})
                                 is_done = p.get("done", False)
                                 done_cls = "task-done" if is_done else ""
+                                # Get task text + per-task advice (handle both string and dict task formats)
+                                if isinstance(raw_task, dict):
+                                    task_text = raw_task.get("name", "")
+                                else:
+                                    task_text = raw_task
+                                task_tip = p.get("advice", "") or plan.get("advice", "") or ""
                                 # Distribute tasks roughly across week days (for display)
                                 day_idx = t_idx % 7
                                 if day_idx == d:
@@ -1382,7 +1390,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                     related_proj_html = ""
                                     for fs in plan.get("focus_skills", []):
                                         sk = fs.get("skill", "").lower()
-                                        if sk and (sk in task.lower() or any(w in task.lower() for w in sk.split()[:3])):
+                                        if sk and (sk in task_text.lower() or any(w in task_text.lower() for w in sk.split()[:3])):
                                             items = "".join(
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
@@ -1392,24 +1400,23 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                             if items:
                                                 related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + '优先级)</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
                                     for proj in plan.get("projects", []):
-                                        if any(s.lower() in task.lower() for s in proj.get("skills",[])):
+                                        if any(s.lower() in task_text.lower() for s in proj.get("skills",[])):
                                             related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
                                     # Store detail data as encoded JSON data attributes
-                                    # Use base64 to avoid any escaping issues in HTML attributes
                                     detail_obj = {
-                                        "task": task,
+                                        "task": task_text,
                                         "focus": focus,
                                         "week": week_num,
                                         "resources_html": related_res_html,
                                         "projects_html": related_proj_html,
-                                        "advice_text": plan.get("advice","") or ""
+                                        "advice_text": task_tip
                                     }
                                     detail_json = json.dumps(detail_obj, ensure_ascii=False)
                                     detail_uri = urllib.parse.quote(detail_json)
                                     detail_b64 = base64.b64encode(detail_uri.encode()).decode()
-                                    disp = task[:14] + "..." if len(task) > 14 else task
+                                    disp = task_text[:14] + "..." if len(task_text) > 14 else task_text
                                     tasks_for_day += f'''
-                                    <div class="cal-task {done_cls}" data-detail="{detail_b64}" title="{task}">{disp}</div>'''
+                                    <div class="cal-task {done_cls}" data-detail="{detail_b64}" title="{task_text}">{disp}</div>'''
 
                         week_days += f'''
                         <div class="cal-day">
@@ -1555,56 +1562,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var aDiv = document.getElementById('td-advice');
                 var aSec = document.getElementById('td-section-advice');
                 if (d.advice_text) {
-                    // Generate task-specific advice from resources and projects
-                    var taskFocused = d.task || '';
-                    var focusArea = d.focus || '';
-                    var lines = [];
-
-                    // Extract resource titles from resources_html
-                    var resMatches = (d.resources_html || '').match(/<strong>([^<]+)<\/strong>/g) || [];
-                    var resTitles = resMatches.map(function(m) {
-                        return m.replace(/<\/?strong>/g, '');
-                    });
-
-                    // Extract project names from projects_html
-                    var projMatches = (d.projects_html || '').match(/<strong>([^<]+)<\/strong>/g) || [];
-                    var projNames = projMatches.map(function(m) {
-                        return m.replace(/<\/?strong>/g, '');
-                    });
-
-                    // Build focused advice
-                    if (taskFocused.indexOf('学习') === 0 || taskFocused.indexOf('完成') === 0 || taskFocused.indexOf('阅读') === 0 || taskFocused.indexOf('掌握') === 0) {
-                        if (resTitles.length > 0) {
-                            lines.push('\U0001f3af \u4efb\u52a1\u76ee\u6807\uff1a' + taskFocused);
-                            lines.push('\U0001f4da \u5efa\u8bae\u4ece ' + resTitles.join('\u3001') + ' \u5f00\u59cb\u5b66\u4e60\uff0c\u91cd\u70b9\u7406\u89e3\u6838\u5fc3\u6982\u5ff5\u5e76\u52a8\u624b\u5b9e\u8df5\u3002');
-                        } else if (projNames.length > 0) {
-                            lines.push('\U0001f3af \u4efb\u52a1\u76ee\u6807\uff1a' + taskFocused);
-                            lines.push('\U0001f4a1 \u5efa\u8bae\u901a\u8fc7 ' + projNames.join('\u3001') + ' \u9879\u76ee\u6765\u5de9\u56fa\u6240\u5b66\u5185\u5bb9\u3002');
-                        } else {
-                            lines.push('\U0001f3af \u4efb\u52a1\u76ee\u6807\uff1a' + taskFocused);
-                            lines.push('\U0001f4aa \u5efa\u8bae\u5148\u770b\u5b8c\u6559\u7a0b/\u6587\u6863\uff0c\u518d\u81ea\u5df1\u52a8\u624b\u5199\u4e00\u4e2a\u5c0f\u8303\u4f8b\u9a8c\u8bc1\u7406\u89e3\u3002');
-                        }
-                    } else if (taskFocused.indexOf('部署') >= 0 || taskFocused.indexOf('配置') >= 0 || taskFocused.indexOf('搭建') >= 0) {
-                        lines.push('\U0001f3af \u4efb\u52a1\u76ee\u6807\uff1a' + taskFocused);
-                        lines.push('\U0001f527 \u8fd9\u662f\u5b9e\u6218\u6027\u4efb\u52a1\uff0c\u5efa\u8bae\u6309\u7167\u5b98\u65b9\u6587\u6863\u6b65\u9aa4\uff0c\u4e00\u6b65\u4e00\u6b65\u6267\u884c\uff0c\u9047\u5230\u95ee\u9898\u8bb0\u5f55\u5230\u7b14\u8bb0\u4e2d\u3002');
-                    } else if (taskFocused.indexOf('复习') >= 0 || taskFocused.indexOf('准备') >= 0 || taskFocused.indexOf('面试') >= 0) {
-                        lines.push('\U0001f3af \u4efb\u52a1\u76ee\u6807\uff1a' + taskFocused);
-                        lines.push('\U0001f4dd \u5efa\u8bae\u68b3\u7406\u51fa\u6846\u67b6\u56fe\uff0c\u91cd\u70b9\u56de\u987e\u4e4b\u524d\u505a\u8fc7\u7684\u9879\u76ee\u548c\u9047\u5230\u7684\u95ee\u9898\u3002');
-                    } else {
-                        lines.push('\U0001f3af \u4efb\u52a1\u76ee\u6807\uff1a' + taskFocused);
-                        lines.push('\U0001f4aa \u5efa\u8bae\u5206\u89e3\u4efb\u52a1\u4e3a\u53ef\u6267\u884c\u7684\u5c0f\u6b65\u9aa4\uff0c\u6bcf\u5b8c\u6210\u4e00\u6b65\u8fdb\u884c\u8c03\u8bd5\u548c\u603b\u7ed3\u3002');
-                    }
-
-                    // Add overall context if available
-                    if (focusArea) {
-                        lines.push('\U0001f4c5 \u672c\u5468\u91cd\u70b9\uff1a' + focusArea + '\uff0c\u8bf7\u786e\u4fdd\u5176\u4ed6\u4efb\u52a1\u4e5f\u6309\u8ba1\u5212\u63a8\u8fdb\u3002');
-                    }
-
-                    if (resTitles.length > 0 && projNames.length > 0) {
-                        lines.push('\U0001f3ed \u5b66\u5b8c\u540e\u5efa\u8bae\u7528 ' + projNames.join('\u3001') + ' \u505a\u7ec3\u4e60\uff0c\u628a\u7406\u8bba\u77e5\u8bc6\u8f6c\u5316\u4e3a\u5b9e\u9645\u80fd\u529b\u3002');
-                    }
-
-                    aDiv.innerHTML = lines.join('<br>');
+                    aDiv.textContent = d.advice_text;
                     aSec.style.display = '';
                 } else {
                     aSec.style.display = 'none';
@@ -2357,7 +2315,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     }}
   ],
   "weekly_plan": [
-    {{"week": 1, "focus": "本周重点", "tasks": ["具体任务1", "具体任务2"], "estimated_hours": 5}}
+    {{"week": 1, "focus": "本周重点", "tasks": [{{"name": "具体任务1", "advice": "针对该任务的详细学习建议，50-100字"}}, {{"name": "具体任务2", "advice": "针对该任务的详细学习建议"}}], "estimated_hours": 5}}
   ],
   "projects": [
     {{"name": "项目名", "description": "练习项目简述", "skills": ["涉及的技能"]}}
@@ -2419,9 +2377,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 for w in plan["weekly_plan"]:
                     week_num = w.get("week", 0)
                     if w.get("tasks"):
-                        for t_idx, task in enumerate(w["tasks"]):
+                        for t_idx, raw in enumerate(w["tasks"]):
                             task_id = f"w{week_num}_t{t_idx}"
-                            progress[task_id] = {"done": False, "text": task, "week": week_num}
+                            if isinstance(raw, dict):
+                                task_text = raw.get("name", "")
+                                task_advice = raw.get("advice", "")
+                            else:
+                                task_text = raw
+                                task_advice = ""
+                            progress[task_id] = {"done": False, "text": task_text, "week": week_num, "advice": task_advice}
             job["learn_plan_progress"] = progress
             self.agent.tracker.save()
             self.send_json({"success": True, "plan": plan, "saved": True})
@@ -2510,11 +2474,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         desc += "\
 任务:\
 "
-                        for t_idx, task in enumerate(w["tasks"]):
+                        for t_idx, raw in enumerate(w["tasks"]):
                             tid = f"w{week_num}_t{t_idx}"
                             p = progress.get(tid, {})
                             mark = "✅" if p.get("done") else "⬜"
-                            desc += f"{mark} {task}\
+                            if isinstance(raw, dict):
+                                raw = raw.get("name", "")
+                            desc += f"{mark} {raw}\
 "
                     lines.append(f"DESCRIPTION:{desc}")
                     lines.append("END:VEVENT")
