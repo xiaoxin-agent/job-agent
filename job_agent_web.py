@@ -835,7 +835,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button class="btn btn-small cover-letter-btn" data-job-id="{j['id']}" style="font-size:12px">✉ 求职信</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'" style="display:inline">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank" style="display:inline">🖊 编辑</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">🎯 优化</button></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">📎 关联简历</button></div>'}
+                {('<div class="job-resume"><span class="resume-icon">📜</span> <span class="resume-name">'+j['resume_name']+'</span> <span class="resume-actions"><a href="#" class="link-url view-resume-btn" data-job-id="' + j['id'] + '">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">🖊 编辑</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">🎯 优化</button></span></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">📎 关联简历</button></div>'}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
@@ -3234,6 +3234,13 @@ loadResume();
         .job-actions {{ display:flex; gap:6px; flex-wrap:wrap; }}
 
         .job-notes {{ margin-top:6px; color:#888; font-size:14px; }}
+
+        .job-resume {{ margin-top:8px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:14px; }}
+        .resume-icon {{ font-size:18px; line-height:1; }}
+        .resume-name {{ font-weight:500; color:#333; }}
+        .resume-actions {{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-left:auto; }}
+        .resume-actions .link-url {{ display:inline; color:#1a73e8; font-size:13px; }}
+        .resume-actions .btn-small {{ font-size:12px; }}
 
         .search-summary {{ margin:18px 0; }}
 
