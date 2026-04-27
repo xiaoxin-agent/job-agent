@@ -871,7 +871,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     var old = document.getElementById('skill-gap-detail-modal');
                     if (old) old.remove();
                     var h = '<div id="skill-gap-detail-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1001;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
-                    h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;line-height:1.6">';
+                    h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:15px;line-height:1.6">';
                     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f3af 技能差距分析</h3><button class="skill-gap-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div>';
                     h += details;
                     h += '<div style="margin-top:12px;text-align:center"><button class="btn btn-small btn-primary learn-plan-btn" data-learn-jobid="' + jobIdGap + '" style="font-size:12px">\U0001f4da 生成学习计划</button></div>';
@@ -950,7 +950,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 }}
                 var pct = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0;
                 var h = '<div id="learn-plan-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1002;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
-                h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:630px;width:92%;max-height:88vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;line-height:1.6">';
+                h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:630px;width:92%;max-height:88vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:15px;line-height:1.6">';
                 h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
                 h += '<h3 style="margin:0;font-size:15px">\U0001f4da \u5f3a\u5316\u5b66\u4e60\u8ba1\u5212</h3>';
                 h += '<button class="learn-plan-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">\u00d7</button></div>';
@@ -958,7 +958,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 // Progress bar
                 if (totalTasks > 0) {{
                     h += '<div style="margin-bottom:10px">';
-                    h += '<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:2px">';
+                    h += '<div style="display:flex;justify-content:space-between;font-size:13px;color:#666;margin-bottom:2px">';
                     h += '<span>\u8fdb\u5ea6</span><span id="learn-progress-txt-' + jobId + '">' + doneTasks + '/' + totalTasks + '</span></div>';
                     h += '<div style="background:#e0e0e0;border-radius:4px;height:8px;overflow:hidden">';
                     h += '<div id="learn-progress-bar-' + jobId + '" style="background:#4caf50;height:8px;width:' + pct + '%;border-radius:4px;transition:width 0.3s"></div></div></div>';
@@ -975,8 +975,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     plan.focus_skills.forEach(function(s) {{
                         var priColor = s.priority == '\u9ad8' ? '#d32f2f' : s.priority == '\u4e2d' ? '#e65100' : '#1565c0';
                         h += '<div style="background:#f8f9fa;border-radius:6px;padding:8px;margin-bottom:6px">';
-                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:11px;color:' + priColor + ';font-weight:500">' + (s.priority || '') + '\u4f18\u5148\u7ea7</span></div>';
-                        h += '<div style="color:#555;font-size:12px;margin:4px 0">' + (s.reason || '') + '</div>';
+                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:12px;color:' + priColor + ';font-weight:500">' + (s.priority || '') + '\u4f18\u5148\u7ea7</span></div>';
+                        h += '<div style="color:#555;font-size:14px;margin:4px 0">' + (s.reason || '') + '</div>';
                         if (s.resources) {{
                             s.resources.forEach(function(rsc) {{
                                 h += '<div style="font-size:11px;margin:2px 0;padding-left:8px">\u2022 <b>[' + (rsc.type || '\u8d44\u6e90') + ']</b> ' + (rsc.title || '') + (rsc.estimated_hours ? ' (' + rsc.estimated_hours + 'h)' : '') + '</div>';
@@ -988,7 +988,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
                 // Weekly plan with checkboxes
                 if (plan.weekly_plan) {{
-                    h += '<div style="margin-top:10px"><b>\U0001f4c5 \u6bcf\u5468\u8ba1\u5212</b> <span style="font-size:11px;color:#888">\u2215 \u52fe\u9009\u5df2\u5b8c\u6210\u7684\u4efb\u52a1</span></div>';
+                    h += '<div style="margin-top:10px"><b>\U0001f4c5 \u6bcf\u5468\u8ba1\u5212</b> <span style="font-size:12px;color:#888">\u2215 \u52fe\u9009\u5df2\u5b8c\u6210\u7684\u4efb\u52a1</span></div>';
                     plan.weekly_plan.forEach(function(w) {{
                         h += '<div style="background:#fff8e1;border-radius:6px;padding:8px;margin-bottom:6px">';
                         h += '<div style="font-weight:500">\u7b2c' + w.week + '\u5468: ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(\uff5e' + (w.estimated_hours || '') + 'h)</span></div>';
@@ -998,7 +998,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                 var done = progress[tid] && progress[tid].done;
                                 var taskName = (typeof t === 'string') ? t : (t.name || '');
                                 var taskTip = (typeof t === 'object' && t.advice) ? t.advice : (progress[tid] && progress[tid].advice ? progress[tid].advice : plan.advice || '');
-                                h += '<div style="font-size:12px;padding:2px 0 2px 4px">';
+                                h += '<div style="font-size:14px;padding:2px 0 2px 4px">';
                                 h += '<input type="checkbox" class="learn-task-cb" data-jobid="' + jobId + '" data-taskid="' + tid + '" ' + (done ? 'checked' : '') + ' style="vertical-align:middle;margin-right:4px"> ';
                                 h += '<span style="' + (done ? 'text-decoration:line-through;color:#888' : '') + '" title="' + (taskTip ? taskTip.replace(/"/g,'&quot;') : '') + '">' + taskName + '</span>';
                                 h += '</div>';
@@ -1014,9 +1014,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     plan.projects.forEach(function(p) {{
                         h += '<div style="background:#e3f2fd;border-radius:6px;padding:8px;margin-bottom:6px">';
                         h += '<div style="font-weight:500">' + (p.name || '') + '</div>';
-                        h += '<div style="font-size:12px;color:#555">' + (p.description || '') + '</div>';
+                        h += '<div style="font-size:14px;color:#555">' + (p.description || '') + '</div>';
                         if (p.skills) {{
-                            h += '<div style="font-size:11px;color:#1565c0;margin-top:4px">\u2022 \u6280\u80fd: ' + p.skills.join(', ') + '</div>';
+                            h += '<div style="font-size:12px;color:#1565c0;margin-top:4px">\u2022 \u6280\u80fd: ' + p.skills.join(', ') + '</div>';
                         }}
                         h += '</div>';
                     }});
@@ -1461,7 +1461,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         <div class="cal-progress-circle" style="--pct:{pct};--color:{pct_color}">
                             <span>{pct}%</span>
                         </div>
-                        <div style="font-size:11px;color:#888">{done_tasks}/{total_tasks}</div>
+                        <div style="font-size:13px;color:#888">{done_tasks}/{total_tasks}</div>
                     </div>
                 </div>
                 {week_calendars}
@@ -1472,21 +1472,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         .cal-job-card {{ background:#fff; border-radius:10px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }}
         .cal-job-header {{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }}
         .cal-job-header h2 {{ margin:0; font-size:16px; }}
-        .cal-company {{ color:#888; font-size:12px; }}
+        .cal-company {{ color:#888; font-size:14px; }}
         .cal-overall-progress {{ text-align:center; }}
         .cal-progress-circle {{ width:48px; height:48px; border-radius:50%; background:conic-gradient(var(--color) 0% var(--pct), #e0e0e0 var(--pct) 100%); display:flex; align-items:center; justify-content:center; }}
-        .cal-progress-circle span {{ background:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:var(--color); }}
+        .cal-progress-circle span {{ background:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:var(--color); }}
         .week-calendar {{ margin-bottom:20px; border:1px solid #eee; border-radius:8px; overflow:hidden; }}
         .week-header {{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:#f8f9fa; border-bottom:1px solid #eee; }}
-        .week-title {{ font-weight:500; font-size:13px; }}
-        .week-stats {{ display:flex; align-items:center; gap:8px; font-size:11px; color:#888; }}
+        .week-title {{ font-weight:500; font-size:15px; }}
+        .week-stats {{ display:flex; align-items:center; gap:8px; font-size:13px; color:#888; }}
         .week-progress-bar {{ width:60px; height:6px; background:#e0e0e0; border-radius:3px; overflow:hidden; }}
         .week-progress-fill {{ height:6px; border-radius:3px; transition:width 0.3s; }}
         .cal-grid {{ display:grid; grid-template-columns:repeat(7, 1fr); gap:0; }}
-        .cal-day-header-label {{ text-align:center; padding:4px 0; font-size:11px; color:#888; background:#fafafa; }}
+        .cal-day-header-label {{ text-align:center; padding:4px 0; font-size:12px; color:#888; background:#fafafa; }}
         .cal-day {{ min-height:70px; border-right:1px solid #f0f0f0; border-bottom:1px solid #f0f0f0; padding:4px; }}
         .cal-day:nth-child(7n) {{ border-right:none; }}
-        .cal-day-header {{ font-size:11px; color:#888; margin-bottom:4px; }}
+        .cal-day-header {{ font-size:12px; color:#888; margin-bottom:4px; }}
         .cal-day-header.today-dot {{ background:#1a73e8; color:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; }}
         .cal-task {{ font-size:10px; padding:1px 3px; margin:1px 0; background:#e3f2fd; border-radius:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; }}
         .cal-task.task-done {{ background:#e8f5e9; text-decoration:line-through; color:#888; }}
@@ -1497,15 +1497,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         .td-close {{ position:absolute; top:12px; right:16px; font-size:22px; cursor:pointer; color:#999; background:none; border:none; }}
         .td-close:hover {{ color:#333; }}
         .td-title {{ font-size:17px; font-weight:600; margin-bottom:4px; padding-right:30px; }}
-        .td-week {{ font-size:12px; color:#888; margin-bottom:16px; }}
+        .td-week {{ font-size:14px; color:#888; margin-bottom:16px; }}
         .td-section {{ margin-bottom:16px; }}
-        .td-section-title {{ font-size:13px; font-weight:500; color:#555; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; }}
-        .td-skill-section {{ margin-bottom:8px; padding:8px; background:#f8f9fa; border-radius:6px; font-size:12px; }}
+        .td-section-title {{ font-size:15px; font-weight:500; color:#555; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; }}
+        .td-skill-section {{ margin-bottom:8px; padding:8px; background:#f8f9fa; border-radius:6px; font-size:14px; }}
         .td-skill-name {{ font-weight:600; margin-bottom:4px; }}
         .td-skill-section ul {{ margin:4px 0 0; padding-left:16px; }}
         .td-skill-section li {{ margin-bottom:3px; line-height:1.4; }}
-        .td-project-item {{ padding:8px; background:#fff7e6; border-radius:6px; margin-bottom:6px; font-size:13px; }}
-        .td-advice {{ padding:10px; background:#e8f5e9; border-radius:6px; font-size:13px; line-height:1.5; color:#2e7d32; }}
+        .td-project-item {{ padding:8px; background:#fff7e6; border-radius:6px; margin-bottom:6px; font-size:14px; }}
+        .td-advice {{ padding:12px; background:#e8f5e9; border-radius:6px; font-size:15px; line-height:1.6; color:#2e7d32; }}
         .cal-task {{ cursor:pointer; }}
         .cal-task:hover {{ opacity:0.85; box-shadow:0 1px 4px rgba(0,0,0,0.15); }}
         </style>'''
@@ -2693,22 +2693,22 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 <title>编辑简历 - {resume_name}</title>
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
-body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; padding:0; display:flex; flex-direction:column; height:100vh; }}
+body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; padding:0; display:flex; flex-direction:column; height:100vh; font-size:16px; }}
 .header {{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:#fff; border-bottom:1px solid #e0e0e0; flex-shrink:0; }}
-.header h1 {{ font-size:18px; }}
-.header .subtitle {{ font-size:12px; color:#888; font-weight:normal; margin-left:8px; }}
-.btn {{ display:inline-block; padding:7px 14px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:6px; cursor:pointer; text-decoration:none; font-size:13px; }}
+.header h1 {{ font-size:20px; }}
+.header .subtitle {{ font-size:14px; color:#888; font-weight:normal; margin-left:8px; }}
+.btn {{ display:inline-block; padding:8px 16px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:6px; cursor:pointer; text-decoration:none; font-size:14px; }}
 .btn:hover {{ background:#e8e8e8; }}
 .btn-save {{ background:#34a853; color:#fff; border:none; }}
 .btn-save:hover {{ background:#2d9249; }}
 .btn-download {{ background:#5f6368; color:#fff; border:none; }}
 .btn-download:hover {{ background:#4a4d52; }}
-.btn-back {{ background:none; color:#555; border:none; font-size:14px; }}
+.btn-back {{ background:none; color:#555; border:none; font-size:15px; }}
 .btn-back:hover {{ color:#000; }}
 .main {{ display:flex; flex:1; overflow:hidden; }}
 .editor-pane {{ flex:1; display:flex; flex-direction:column; border-right:1px solid #e0e0e0; background:#fff; }}
-.editor-pane textarea {{ flex:1; width:100%; border:none; outline:none; padding:16px; font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace; font-size:13px; line-height:1.6; resize:none; }}
-.editor-toolbar {{ display:flex; align-items:center; gap:6px; padding:8px 12px; background:#f8f9fa; border-bottom:1px solid #e0e0e0; font-size:12px; color:#666; flex-shrink:0; }}
+.editor-pane textarea {{ flex:1; width:100%; border:none; outline:none; padding:20px; font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace; font-size:15px; line-height:1.7; resize:none; }}
+.editor-toolbar {{ display:flex; align-items:center; gap:6px; padding:10px 14px; background:#f8f9fa; border-bottom:1px solid #e0e0e0; font-size:14px; color:#666; flex-shrink:0; }}
 .editor-toolbar .btn-icon {{ padding:4px 10px; font-size:14px; cursor:pointer; border-radius:4px; background:none; border:1px solid transparent; font-weight:600; }}
 .editor-toolbar .btn-icon:hover {{ background:#e0e0e0; border-color:#ccc; }}
 .preview-pane {{ flex:1; overflow-y:auto; padding:24px; background:#fff; line-height:1.7; font-size:14px; }}
@@ -2720,7 +2720,7 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-seri
 .preview-pane li {{ margin:3px 0; }}
 .preview-pane a {{ color:#1a73e8; }}
 .preview-pane strong {{ color:#111; }}
-.status {{ position:fixed; bottom:20px; right:20px; padding:8px 16px; border-radius:6px; font-size:13px; z-index:100; opacity:0; transition:opacity 0.3s; }}
+.status {{ position:fixed; bottom:20px; right:20px; padding:8px 16px; border-radius:6px; font-size:14px; z-index:100; opacity:0; transition:opacity 0.3s; }}
 .status.show {{ opacity:1; }}
 .status.success {{ background:#e6f4ea; color:#2e7d32; }}
 .status.error {{ background:#fce8e6; color:#d32f2f; }}
@@ -2903,11 +2903,11 @@ loadResume();
 
         * {{ margin:0; padding:0; box-sizing:border-box; }}
 
-        body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; }}
+        body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; font-size:16px; }}
 
         nav {{ background:#fff; display:flex; padding:0 16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); gap:8px; overflow-x:auto; position:sticky; top:0; z-index:100; }}
 
-        nav a {{ padding:14px 12px; text-decoration:none; color:#666; font-weight:500; border-bottom:3px solid transparent; white-space:nowrap; }}
+        nav a {{ padding:14px 14px; text-decoration:none; color:#666; font-weight:500; font-size:15px; border-bottom:3px solid transparent; white-space:nowrap; }}
 
         nav a:hover {{ color:#333; }}
 
@@ -2947,7 +2947,7 @@ loadResume();
 
         .btn-lg {{ padding:14px 28px; font-size:16px; }}
 
-        .btn-small {{ padding:5px 12px; font-size:13px; }}
+        .btn-small {{ padding:5px 12px; font-size:14px; }}
 
         .btn-save {{ background:#34a853; color:#fff; border:none; }}
 
@@ -2991,9 +2991,9 @@ loadResume();
 
         .job-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }}
 
-        .job-title {{ font-weight:600; font-size:16px; }}
+        .job-title {{ font-weight:600; font-size:17px; }}
 
-        .job-score {{ padding:3px 10px; border-radius:12px; font-size:13px; font-weight:600; }}
+        .job-score {{ padding:3px 12px; border-radius:14px; font-size:14px; font-weight:600; }}
 
         .score-high {{ background:#e6f4ea; color:#34a853; }}
 
@@ -3001,35 +3001,35 @@ loadResume();
 
         .score-low {{ background:#fce8e6; color:#ea4335; }}
 
-        .job-type-tag {{ display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
+        .job-type-tag {{ display:inline-block; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
 
-        .job-meta {{ display:flex; flex-wrap:wrap; gap:12px; font-size:14px; color:#666; margin-bottom:8px; }}
+        .job-meta {{ display:flex; flex-wrap:wrap; gap:14px; font-size:15px; color:#666; margin-bottom:8px; }}
 
-        .job-desc {{ font-size:14px; color:#555; margin-bottom:10px; line-height:1.5; }}
+        .job-desc {{ font-size:15px; color:#555; margin-bottom:10px; line-height:1.55; }}
 
-        .job-desc-full {{ font-size:14px; color:#333; margin-bottom:10px; line-height:1.6; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:10px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
+        .job-desc-full {{ font-size:15px; color:#333; margin-bottom:10px; line-height:1.65; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:12px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
 
         .job-actions {{ display:flex; gap:6px; flex-wrap:wrap; }}
 
-        .job-notes {{ margin-top:6px; color:#888; font-size:13px; }}
+        .job-notes {{ margin-top:6px; color:#888; font-size:14px; }}
 
         .search-summary {{ margin:18px 0; }}
 
         .result-stats {{ display:flex; gap:16px; margin:10px 0; }}
 
-        .link-item {{ background:#fff; border-radius:6px; padding:12px; margin:8px 0; font-size:14px; }}
+        .link-item {{ background:#fff; border-radius:6px; padding:14px; margin:10px 0; font-size:15px; }}
 
         .link-url {{ color:#1a73e8; word-break:break-all; display:block; margin-top:3px; }}
 
         .tab-bar {{ display:flex; flex-wrap:wrap; gap:4px; }}
 
-        .tab {{ padding:7px 14px; border-radius:18px; font-size:13px; text-decoration:none; color:#666; background:#e8e8e8; }}
+        .tab {{ padding:8px 16px; border-radius:20px; font-size:14px; text-decoration:none; color:#666; background:#e8e8e8; }}
 
         .tab.active {{ background:#1a73e8; color:#fff; }}
 
-        .status-tag {{ padding:3px 10px; border-radius:12px; font-size:12px; font-weight:500; }}
+        .status-tag {{ padding:3px 12px; border-radius:14px; font-size:13px; font-weight:500; }}
 
-        .job-desc-snippet {{ font-size:14px; color:#555; margin-bottom:8px; line-height:1.5; padding:4px 0; border-bottom:1px solid #eee; }}
+        .job-desc-snippet {{ font-size:15px; color:#555; margin-bottom:10px; line-height:1.55; padding:4px 0; border-bottom:1px solid #eee; }}
 
         .status-saved {{ background:#f0f0f0; color:#666; }}
 
