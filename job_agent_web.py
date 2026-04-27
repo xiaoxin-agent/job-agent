@@ -262,6 +262,10 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_assign": "\U0001f517 Assign",
         "upload_new_resume": "\U0001f4e4 Upload New Resume",
         "cancel": "Cancel",
+        "gap_skills": "✅ Existing Skills",
+        "gap_missing": "\u26a0 Missing Skills",
+        "gap_weak": "\u2191 Needs Improvement",
+        "gap_suggestions": "\U0001f4a1 Suggestions",
         "exists_text": "⚠️ Exists",
 
     },
@@ -398,6 +402,10 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_assign": "\U0001f517 关联",
         "upload_new_resume": "\U0001f4e4 上传新简历并关联",
         "cancel": "取消",
+        "gap_skills": "\u2705 已有技能",
+        "gap_missing": "\u26a0 缺少技能",
+        "gap_weak": "\u2191 需加强",
+        "gap_suggestions": "\U0001f4a1 建议",
         "exists_text": "⚠️ 已存在",
 
     },
@@ -536,6 +544,10 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_assign": "\U0001f517 Assigner",
         "upload_new_resume": "\U0001f4e4 T\u00e9l\u00e9charger un nouveau CV",
         "cancel": "Annuler",
+        "gap_skills": "\u2705 Compétences existantes",
+        "gap_missing": "\u26a0 Compétences manquantes",
+        "gap_weak": "\u2191 À améliorer",
+        "gap_suggestions": "\U0001f4a1 Suggestions",
         "exists_text": "⚠️ Déjà enregistré",
         "btn_letter_generate": "✉️ Générer la lettre",
         "my_profile": "Mon profil",
@@ -1028,7 +1040,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>{get_company_logo(j.get('company',''))} {j['company']}</span>
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}{match_percent}</span>
-                    <span id="skill-gap-{j['id']}">{j.get('skill_gap_html','')}</span>
+                    <span id="skill-gap-{j['id']}">{self._render_skill_gap_html(j, lang)}</span>
                 </div>
                 <div class="job-desc-toggle">
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
@@ -2789,7 +2801,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 details_escaped = html.escape(j.dumps(details_html, ensure_ascii=False))
                 gap_html = '<span class="skill-gap-group" style="display:inline-block;margin-left:4px;cursor:pointer" data-gap-details="' + details_escaped + '" data-gap-jobid="' + str(job_id) + '">' + gap_html + '</span>'
 
-            # 保存到职位数据
+            # 保存 gap_data 到职位数据（用于多语言渲染）
+            job["skill_gap_data"] = {
+                "matching": gap_data.get("matching_skills", []),
+                "missing": gap_data.get("missing_skills", []),
+                "weak": gap_data.get("weak_skills", []),
+                "suggestions": gap_data.get("suggestions", []),
+            }
             job["skill_gap_html"] = gap_html
             self.agent.tracker.save()
 
@@ -3405,6 +3423,42 @@ loadResume();
 </script>
 </body>
 </html>"""
+
+    def _render_skill_gap_html(self, job_data, lang):
+        """Render skill gap HTML from job data using i18n labels."""
+        gap_data = job_data.get("skill_gap_data")
+        if not gap_data:
+            return job_data.get("skill_gap_html", "")
+
+        t = lambda k: self.LANGUAGES.get(lang, {}).get(k, k)
+        missing = gap_data.get("missing", [])
+        weak = gap_data.get("weak", [])
+        matching = gap_data.get("matching", [])
+        suggestions = gap_data.get("suggestions", [])
+
+        parts = []
+        for s in missing[:5]:
+            parts.append(f'<span class="skill-gap-badge gap-missing" title="{t("gap_missing")}" style="display:inline-block;background:#fee;color:#d32f2f;border:1px solid #fcc;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u26a0 {s}</span>')
+        for s in weak[:3]:
+            parts.append(f'<span class="skill-gap-badge gap-weak" title="{t("gap_weak")}" style="display:inline-block;background:#fff3e0;color:#e65100;border:1px solid #ffe0b2;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u2191 {s}</span>')
+
+        details_html = ""
+        if matching:
+            details_html += f"<div style='margin-bottom:6px'><b>{t('gap_skills')}:</b> " + ", ".join(matching) + "</div>"
+        if missing:
+            details_html += f"<div style='margin-bottom:6px;color:#d32f2f'><b>{t('gap_missing')}:</b> " + ", ".join(missing) + "</div>"
+        if weak:
+            details_html += f"<div style='margin-bottom:6px;color:#e65100'><b>{t('gap_weak')}:</b> " + ", ".join(weak) + "</div>"
+        if suggestions:
+            details_html += f"<div style='margin-top:6px;color:#1565c0;font-size:12px'><b>{t('gap_suggestions')}:</b><br>" + "<br>".join(suggestions) + "</div>"
+
+        import json as j
+        import html
+        gap_html = "".join(parts)
+        if gap_html:
+            details_escaped = html.escape(j.dumps(details_html, ensure_ascii=False))
+            gap_html = '<span class="skill-gap-group" style="display:inline-block;margin-left:4px;cursor:pointer" data-gap-details="' + details_escaped + '" data-gap-jobid="' + str(job_data.get("id","")) + '">' + gap_html + '</span>'
+        return gap_html
 
     def _page(self, title, body, lang="zh-CN"):
         nav_items = ""
