@@ -1837,6 +1837,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         week_focus_tpl = t(lang, "week_focus")
         cal_title = t(lang, "learn_plan_modal_title")
         cal_empty = t(lang, "learn_plan_empty")
+        tasks_completed = t(lang, "tasks_completed")
         
         # Collect all jobs that have a learn plan
         plan_jobs = []
@@ -2021,7 +2022,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         <div class="week-header">
                             <div class="week-title">\U0001f4c5 {week_focus_tpl.format(week_num)} \u00b7 {month_name} \u00b7 {focus}</div>
                             <div class="week-stats">
-                                <span>{w_done}/{w_tasks} 任务完成</span>
+                                <span>{tasks_completed.format(w_done, w_tasks)}</span>
                                 <div class="week-progress-bar"><div class="week-progress-fill" style="width:{round(w_done/w_tasks*100) if w_tasks else 0}%;background:{pct_color}"></div></div>
                             </div>
                         </div>
@@ -2116,6 +2117,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         </div>
         <script>
         var _learn_plan_week = {json.dumps(learn_plan_week, ensure_ascii=False)};
+        var _cal_modal_resources = {json.dumps(cal_modal_resources, ensure_ascii=False)};
+        var _cal_modal_projects = {json.dumps(cal_modal_projects, ensure_ascii=False)};
+        var _cal_modal_advice = {json.dumps(cal_modal_advice, ensure_ascii=False)};
         // Task detail: click delegation on .cal-task
         document.addEventListener('click', function(e) {
             var el = e.target.closest('.cal-task');
@@ -2133,6 +2137,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 } else {
                     rSec.style.display = 'none';
                 }
+                document.getElementById('td-section-resources').children[0].textContent = _cal_modal_resources;
 
                 var pDiv = document.getElementById('td-projects');
                 var pSec = document.getElementById('td-section-projects');
@@ -2142,6 +2147,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 } else {
                     pSec.style.display = 'none';
                 }
+                document.getElementById('td-section-projects').children[0].textContent = _cal_modal_projects;
 
                 var aDiv = document.getElementById('td-advice');
                 var aSec = document.getElementById('td-section-advice');
@@ -2151,6 +2157,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 } else {
                     aSec.style.display = 'none';
                 }
+                document.getElementById('td-section-advice').children[0].textContent = _cal_modal_advice;
 
                 document.getElementById('td-overlay').style.display = 'flex';
             } catch(err) { console.warn('Task detail parse error', err); }
