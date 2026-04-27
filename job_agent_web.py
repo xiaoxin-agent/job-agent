@@ -258,6 +258,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "Week {}",
         "tasks_completed": "{} tasks completed",
         "gap_modal_title": "🎯 Skill Gap Analysis",
+        "btn_generate_plan": "📚 Generate Study Plan",
+        "btn_view_plan": "📚 View Study Plan",
+        "learn_plan_empty": "No study plans yet. Generate one from the <a href='/tracked'>tracked page</a>.",
         "saved_to_tracker": "✅ Saved to tracker, refresh to see",
         "link_resume_title": "\U0001f4ce Link Resume",
         "btn_assign": "\U0001f517 Assign",
@@ -399,6 +402,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "第{}周",
         "tasks_completed": "{}/{} 任务完成",
         "gap_modal_title": "🎯 技能差距分析",
+        "btn_generate_plan": "📚 生成学习计划",
+        "btn_view_plan": "📚 查看学习计划",
+        "learn_plan_empty": "暂无学习计划，请先在 <a href='/tracked'>跟踪页面</a> 为职位生成学习计划。",
         "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
         "link_resume_title": "\U0001f4ce 关联简历",
         "btn_assign": "\U0001f517 关联",
@@ -542,6 +548,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "Semaine {}",
         "tasks_completed": "{} tâches terminées",
         "gap_modal_title": "🎯 Analyse des écarts de compétences",
+        "btn_generate_plan": "📚 Générer un plan d'étude",
+        "btn_view_plan": "📚 Voir le plan d'étude",
+        "learn_plan_empty": "Aucun plan d'étude pour le moment. Générez-en un depuis la <a href='/tracked'>page de suivi</a>.",
         "saved_to_tracker": "✅ Enregistré, actualisez pour voir",
         "link_resume_title": "\U0001f4ce Lier CV",
         "btn_assign": "\U0001f517 Assigner",
@@ -1024,6 +1033,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         cover_letter_title_short = t(lang, "cover_letter_title_short")
         loading_text = t(lang, "loading")
         gap_modal_title = t(lang, "gap_modal_title")
+        btn_generate_plan = t(lang, "btn_generate_plan")
+        btn_view_plan = t(lang, "btn_view_plan")
+        learn_plan_empty = t(lang, "learn_plan_empty")
         btn_save = t(lang, "btn_save")
         btn_regenerate = t(lang, "btn_regenerate")
         btn_copy = t(lang, "btn_copy")
@@ -1083,6 +1095,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _btn_regenerate = {json.dumps(btn_regenerate)};
         var _btn_copy = {json.dumps(btn_copy)};
         var _gap_modal_title = {json.dumps(gap_modal_title)};
+        var _btn_generate_plan = {json.dumps(btn_generate_plan)};
+        var _btn_view_plan = {json.dumps(btn_view_plan)};
+        var _learn_plan_empty = {json.dumps(learn_plan_empty)};
         var _confirm_delete = {json.dumps(confirm_delete)};
         var _note_prompt = {json.dumps(note_prompt)};
         var _link_resume_title = {json.dumps(t(lang, 'link_resume_title'))};
@@ -1126,7 +1141,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         if (btnArea) {{
                             var btn = btnArea.querySelector('.learn-plan-btn');
                             if (btn) {{
-                                btn.textContent = d.plan ? '\U0001f4da \u67e5\u770b\u5b66\u4e60\u8ba1\u5212' : '\U0001f4da \u751f\u6210\u5b66\u4e60\u8ba1\u5212';
+                                btn.textContent = d.plan ? _btn_view_plan : _btn_generate_plan;
                             }}
                         }}
                     }});
@@ -1144,7 +1159,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         }});
                     function showLearnPlan(jobId) {{
                 var btnEl = document.querySelector('.learn-plan-btn[data-learn-jobid="' + jobId + '"]');
-                if (btnEl) {{ btnEl.textContent = '\u23f3 \u52a0\u8f7d\u4e2d...'; btnEl.disabled = true; }}
+                if (btnEl) {{ btnEl.textContent = _loading_text; btnEl.disabled = true; }}
                 // First try GET to load saved plan
                 fetch('/api/learn_plan?job_id=' + encodeURIComponent(jobId))
                 .then(function(r){{return r.json()}})
