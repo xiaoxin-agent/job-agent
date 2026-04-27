@@ -905,6 +905,107 @@ def cleanup():
             shutil.rmtree(d)
 
 
+class SkillGapI18nTests(unittest.TestCase):
+    """测试 skill gap 多语言功能"""
+
+    _agent = None
+    _port = 9999
+
+    @classmethod
+    def setUpClass(cls):
+        # 复用 TestWebServer 的 agent (setUpClass 在 loader 中已执行)
+        from job_agent_core import JobAgent
+        for tc in unittest.TestCase.__subclasses__():
+            if tc.__name__ == 'TestWebServer':
+                cls._agent = getattr(tc, '_agent', None)
+                cls._port = getattr(tc, 'port', 9999)
+                break
+
+    def test_skill_gap_i18n(self):
+        """验证 skill_gap 多语言：英文/中文应有不同的标签"""
+        import urllib.request
+        urlopen = urllib.request.urlopen
+
+        # Try to find the server port from any test that already started it
+        if hasattr(TestWebServer, 'port'):
+            port = TestWebServer.port
+        else:
+            port = 9999
+
+        # Use the server's agent if available
+        if hasattr(TestWebServer, '_agent') and TestWebServer._agent is not None:
+            agent = TestWebServer._agent
+        else:
+            self.skipTest("Server agent not available (tests run in non-standard order)")
+
+        # 保存 tracked_jobs 以备恢复
+        saved_jobs = list(agent.tracker.tracked_jobs)
+        for j in saved_jobs:
+            agent.tracker.delete_job(j["id"])
+
+        try:
+            # 创建一个带 skill_gap_data 的职位
+            agent.save_job({
+                "title": "ML Engineer",
+                "company": "Acme",
+                "location": "Remote",
+                "match_score": 90
+            })
+            job = agent.tracker.tracked_jobs[0]
+
+            gap_data = {
+                "matching": ["Python", "PyTorch"],
+                "missing": ["Kubernetes", "Docker"],
+                "weak": ["C++"],
+                "suggestions": ["Learn K8s basics", "Practice Docker"],
+            }
+            job["skill_gap_data"] = gap_data
+            job["skill_gap_html"] = ""
+            agent.tracker.save()
+
+            # 测试 EN
+            resp_en = urlopen(f"http://localhost:{port}/tracked?lang=en")
+            html_en = resp_en.read().decode("utf-8")
+            self.assertIn("Existing Skills", html_en, "英语应显示'Existing Skills'")
+            self.assertIn("Missing Skills", html_en, "英语应显示'Missing Skills'")
+            self.assertIn("Needs Improvement", html_en, "英语应显示'Needs Improvement'")
+            self.assertIn("Suggestions", html_en, "英语应显示'Suggestions'")
+            self.assertNotIn("已有技能", html_en, "英语页面不应有中文'已有技能'")
+
+            # 测试 zh-CN
+            resp_cn = urlopen(f"http://localhost:{port}/tracked?lang=zh-CN")
+            html_cn = resp_cn.read().decode("utf-8")
+            self.assertIn("已有技能", html_cn, "中文应显示'已有技能'")
+            self.assertIn("缺少技能", html_cn, "中文应显示'缺少技能'")
+            self.assertIn("需加强", html_cn, "中文应显示'需加强'")
+            self.assertIn("建议", html_cn, "中文应显示'建议'")
+            self.assertNotIn("Existing Skills", html_cn, "中文页面不应有英文'Existing Skills'")
+
+            # 测试 FR
+            resp_fr = urlopen(f"http://localhost:{port}/tracked?lang=fr")
+            html_fr = resp_fr.read().decode("utf-8")
+            self.assertIn("Compétences existantes", html_fr, "法语应显示'Compétences existantes'")
+            self.assertIn("Compétences manquantes", html_fr, "法语应显示'Compétences manquantes'")
+            self.assertIn("À améliorer", html_fr, "法语应显示'À améliorer'")
+            self.assertIn("Suggestions", html_fr, "法语应显示'Suggestions'")
+
+            # 测试无 gap_data fallback（旧缓存）
+            agent.save_job({"title": "Old Job", "company": "Old Co", "location": "NYC", "match_score": 50})
+            job2 = agent.tracker.tracked_jobs[1]
+            job2["skill_gap_html"] = '<span class="old-cached-data">Old cached data</span>'
+            agent.tracker.save()
+
+            resp_old = urlopen(f"http://localhost:{port}/tracked?lang=en")
+            html_old = resp_old.read().decode("utf-8")
+            self.assertIn("Old cached data", html_old, "无 gap_data 时应显示旧缓存 HTML")
+        finally:
+            # 恢复原始状态
+            for j in list(agent.tracker.tracked_jobs):
+                agent.tracker.delete_job(j["id"])
+            for j in saved_jobs:
+                agent.tracker.import_job(j)
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("🧪 求职Agent 测试套件")
@@ -922,6 +1023,7 @@ if __name__ == "__main__":
     
     # Web接口测试
     suite.addTests(loader.loadTestsFromTestCase(TestWebServer))
+    suite.addTests(loader.loadTestsFromTestCase(SkillGapI18nTests))
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

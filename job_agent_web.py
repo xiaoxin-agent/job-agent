@@ -3430,7 +3430,7 @@ loadResume();
         if not gap_data:
             return job_data.get("skill_gap_html", "")
 
-        t = lambda k: self.LANGUAGES.get(lang, {}).get(k, k)
+        _t = lambda k: t(lang, k)
         missing = gap_data.get("missing", [])
         weak = gap_data.get("weak", [])
         matching = gap_data.get("matching", [])
@@ -3438,19 +3438,19 @@ loadResume();
 
         parts = []
         for s in missing[:5]:
-            parts.append(f'<span class="skill-gap-badge gap-missing" title="{t("gap_missing")}" style="display:inline-block;background:#fee;color:#d32f2f;border:1px solid #fcc;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u26a0 {s}</span>')
+            parts.append(f'<span class="skill-gap-badge gap-missing" title="{_t("gap_missing")}" style="display:inline-block;background:#fee;color:#d32f2f;border:1px solid #fcc;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u26a0 {s}</span>')
         for s in weak[:3]:
-            parts.append(f'<span class="skill-gap-badge gap-weak" title="{t("gap_weak")}" style="display:inline-block;background:#fff3e0;color:#e65100;border:1px solid #ffe0b2;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u2191 {s}</span>')
+            parts.append(f'<span class="skill-gap-badge gap-weak" title="{_t("gap_weak")}" style="display:inline-block;background:#fff3e0;color:#e65100;border:1px solid #ffe0b2;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u2191 {s}</span>')
 
         details_html = ""
         if matching:
-            details_html += f"<div style='margin-bottom:6px'><b>{t('gap_skills')}:</b> " + ", ".join(matching) + "</div>"
+            details_html += f"<div style='margin-bottom:6px'><b>{_t('gap_skills')}:</b> " + ", ".join(matching) + "</div>"
         if missing:
-            details_html += f"<div style='margin-bottom:6px;color:#d32f2f'><b>{t('gap_missing')}:</b> " + ", ".join(missing) + "</div>"
+            details_html += f"<div style='margin-bottom:6px;color:#d32f2f'><b>{_t('gap_missing')}:</b> " + ", ".join(missing) + "</div>"
         if weak:
-            details_html += f"<div style='margin-bottom:6px;color:#e65100'><b>{t('gap_weak')}:</b> " + ", ".join(weak) + "</div>"
+            details_html += f"<div style='margin-bottom:6px;color:#e65100'><b>{_t('gap_weak')}:</b> " + ", ".join(weak) + "</div>"
         if suggestions:
-            details_html += f"<div style='margin-top:6px;color:#1565c0;font-size:12px'><b>{t('gap_suggestions')}:</b><br>" + "<br>".join(suggestions) + "</div>"
+            details_html += f"<div style='margin-top:6px;color:#1565c0;font-size:12px'><b>{_t('gap_suggestions')}:</b><br>" + "<br>".join(suggestions) + "</div>"
 
         import json as j
         import html
