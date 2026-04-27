@@ -1162,7 +1162,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var btnEl = document.querySelector('.learn-plan-btn[data-learn-jobid="' + jobId + '"]');
                 if (btnEl) {{ btnEl.textContent = _loading_text; btnEl.disabled = true; }}
                 // First try GET to load saved plan
-                fetch('/api/learn_plan?job_id=' + encodeURIComponent(jobId))
+                fetch('/api/learn_plan?job_id=' + encodeURIComponent(jobId) + '&lang=' + encodeURIComponent(_lang))
                 .then(function(r){{return r.json()}})
                 .then(function(initial){{
                     var plan = initial.plan;
@@ -1170,7 +1170,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     var isSaved = initial.saved;
                     if (!plan) {{
                         // No saved plan, generate one
-                        return fetch('/api/learn_plan', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+                        return fetch('/api/learn_plan', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, lang: _lang}})}})
                         .then(function(r){{return r.json()}})
                         .then(function(d){{
                             if (!d.success) {{ alert('\u751f\u6210\u5931\u8d25: ' + (d.error || '')); return null; }}
@@ -2853,6 +2853,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if not job_id:
                 self.send_json({"success": False, "error": "缺少 job_id"}, 400)
                 return
+            lang = data.get("lang", "")
+            if lang not in ("en", "zh-CN", "fr"):
+                lang = "zh-CN"
             job = self.agent.tracker.get_job(job_id)
             if not job:
                 self.send_json({"success": False, "error": "找不到该职位"}, 404)
@@ -2875,6 +2878,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             resume_md = self.agent.tracker.get_job_resume_markdown(job_id) or ""
 
             prompt = f"""你是一名资深技术导师。请为一个想申请以下职位的求职者制定一个详细的技能强化学习计划。
+请使用{lang}语言输出全部内容（技能名称保持英文）。
 
 ### 目标职位
 {company} - {job_title}
