@@ -95,6 +95,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "edit_profile": "Edit Profile",
         # 跟踪页
         "tracked_title": "📋 Tracked Jobs",
+        "learn_plan_title": "📅 Study Plan",
         "all_statuses": "All Statuses",
         "no_tracked": "No saved jobs yet.",
         # 画像页
@@ -206,6 +207,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "edit_profile": "编辑画像",
         # 跟踪页
         "tracked_title": "📋 跟踪职位",
+        "learn_plan_title": "📅 学习计划",
         "all_statuses": "所有状态",
         "no_tracked": "还没有保存职位",
         # 画像页
@@ -318,6 +320,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "edit_profile": "Modifier le profil",
         # Page de suivi
         "tracked_title": "📋 Offres suivies",
+        "learn_plan_title": "📅 Plan d\u0027\u00e9tude",
         "all_statuses": "Tous les statuts",
         "no_tracked": "Aucune offre enregistrée.",
         # Page de profil
@@ -402,7 +405,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/profile": self.handle_profile_page,
             "/letter": self.handle_letter_page,
             "/resumes": self.handle_resume_page,
-            "/learn_calendar": self.handle_learn_calendar_page,
+            "/learn_plan": self.handle_learn_calendar_page,
             "/resume_view": self.handle_resume_view_page,
         }
 
@@ -966,7 +969,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
                 // Action buttons: ical export
                 h += '<div style="margin-bottom:10px;display:flex;gap:6px">';
-                h += '<a href="/api/learn_plan_ical?job_id=' + encodeURIComponent(jobId) + '" download class="btn btn-small" style="font-size:11px;text-decoration:none">\U0001f4c5 \u5bfc\u51fa\u65e5\u5386</a>';
+                h += '<a href="/api/learn_plan_ical?job_id=' + encodeURIComponent(jobId) + '" download class="btn btn-small" style="font-size:11px;text-decoration:none">\U0001f4c5 \u5bfc\u51fa\u8ba1\u5212</a>';
                 h += '</div>';
 
                 // Focus skills
@@ -979,7 +982,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         h += '<div style="color:#555;font-size:14px;margin:4px 0">' + (s.reason || '') + '</div>';
                         if (s.resources) {{
                             s.resources.forEach(function(rsc) {{
-                                h += '<div style="font-size:11px;margin:2px 0;padding-left:8px">\u2022 <b>[' + (rsc.type || '\u8d44\u6e90') + ']</b> ' + (rsc.title || '') + (rsc.estimated_hours ? ' (' + rsc.estimated_hours + 'h)' : '') + '</div>';
+                                var rscUrl = rsc.url ? '<a href="' + rsc.url + '" target="_blank" style="margin-left:4px;font-size:11px;color:#1a73e8">\U0001f517</a>' : '';
+                                h += '<div style="font-size:11px;margin:2px 0;padding-left:8px">\u2022 <b>[' + (rsc.type || '\u8d44\u6e90') + ']</b> ' + (rsc.title || '') + (rsc.estimated_hours ? ' (' + rsc.estimated_hours + 'h)' : '') + rscUrl + '</div>';
                             }});
                         }}
                         h += '</div>';
@@ -1394,6 +1398,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                             items = "".join(
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
+                                                ) + (
+                                                    ' <a href="' + r.get("url","") + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 打开</a>' if r.get("url") else ''
                                                 ) + '</li>'
                                                 for r in fs.get("resources", [])
                                             )
@@ -1579,11 +1585,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
         body = style + f'''
         <div class="container">
-            <h1>\U0001f4c5 学习日历</h1>
+            <h1>\U0001f4c5 学习计划</h1>
             {cards}
         </div>''' + modal
 
-        self._send_html(self._page(t(lang, "tracked_title"), body, lang=lang))
+        self._send_html(self._page(t(lang, "learn_plan_title"), body, lang=lang))
 
     def handle_profile_page(self, params):
         lang = self._get_lang(params)
@@ -2873,7 +2879,7 @@ loadResume();
             ("/profile", t(lang, "nav_profile")),
             ("/letter", t(lang, "nav_letter")),
             ("/resumes", t(lang, "nav_resume")),
-            ("/learn_calendar", "\U0001f4c5 \u5b66\u4e60\u65e5\u5386"),
+            ("/learn_plan", "\U0001f4c5 \u5b66\u4e60\u8ba1\u5212"),
         ]
         # Persist lang in nav links so switching pages doesn't lose language
         qs = f"?lang={lang}" if lang != "zh-CN" else ""

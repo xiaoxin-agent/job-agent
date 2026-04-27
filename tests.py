@@ -668,8 +668,8 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         # 清理
         agent.tracker.delete_job(job_id)
 
-    def test_22_learn_calendar_page_browser(self):
-        """端对端：学习日历页面从浏览器角度浏览"""
+    def test_22_learn_plan_page_browser(self):
+        """端对端：学习计划页面从浏览器角度浏览"""
         import requests
         agent = self._agent
 
@@ -721,14 +721,14 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         job_verify = agent.tracker.get_job(job_id)
         self.assertIsNotNone(job_verify.get("learn_plan"), "learn_plan should be persisted")
 
-        # === 2. 直接请求学习日历页面（模拟浏览器导航） ===
-        resp = urlopen(f"http://localhost:{self.port}/learn_calendar")
-        self.assertEqual(resp.status, 200, "学习日历页面应返回200")
+        # === 2. 直接请求学习计划页面（模拟浏览器导航） ===
+        resp = urlopen(f"http://localhost:{self.port}/learn_plan")
+        self.assertEqual(resp.status, 200, "学习计划页面应返回200")
         html = resp.read().decode("utf-8")
 
         # === 3. 页面内容校验 ===
         # 3a. 标题
-        self.assertIn("学习日历", html, "页面应包含标题")
+        self.assertIn("学习计划", html, "页面应包含标题")
 
         # 3b. 职位信息
         self.assertIn("Test Engineer", html, "应显示职位名称")
@@ -753,8 +753,8 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         # 3f. 已完成任务有 task-done 类（用于绿色删除线样式）
         self.assertIn("task-done", html, "已完成任务应有 task-done 类")
 
-        # 3g. 导航栏包含学习日历入口
-        self.assertIn("学习日历", html, "导航栏应有学习日历链接")
+        # 3g. 导航栏包含学习计划入口
+        self.assertIn("学习计划", html, "导航栏应有学习计划链接")
 
         # 3h. 页面结构校验
         self.assertIn("cal-job-card", html, "每个职位有 cal-job-card 容器")
@@ -803,7 +803,7 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         # 先清理所有
         for j in list(agent.tracker.tracked_jobs):
             agent.tracker.delete_job(j["id"])
-        resp5 = urlopen(f"http://localhost:{self.port}/learn_calendar")
+        resp5 = urlopen(f"http://localhost:{self.port}/learn_plan")
         html5 = resp5.read().decode("utf-8")
         self.assertIn("暂无学习计划", html5, "无计划时应显示空状态提示")
 
