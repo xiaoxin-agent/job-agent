@@ -700,6 +700,53 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         # 清理
         agent.tracker.delete_job(job_id)
 
+
+    def test_24_cover_letter_browser_simulation(self):
+        """端对端：模仿浏览器点击求职信按钮到弹窗加载完成"""
+        import requests
+        import re
+        import json
+        
+        base = f"http://localhost:{self.port}"
+        
+        # Step 1: Save a job
+        r = requests.post(f"{base}/api/save_job",
+            json={"job": {"title": "Browser Test Engineer", "company": "Playwright Inc",
+                         "match_score": 90,
+                         "match_details": {"skill_match": [
+                             {"category": "Testing", "keyword": "Playwright", "level": "expert"}
+                         ]}}})
+        self.assertTrue(r.json().get("success"))
+        
+        # Step 2: Fetch tracked page
+        r2 = requests.get(f"{base}/tracked")
+        html = r2.text
+        
+        # Step 3: Verify cover letter button exists with job id
+        pattern = r'cover-letter-btn[^>]*data-job-id="([^"]+)"'
+        matches = re.findall(pattern, html)
+        self.assertGreater(len(matches), 0, "跟踪页应有 cover-letter-btn 按钮")
+        job_id = matches[0]
+        
+        # Step 4: Simulate clicking — fetch cover letter via API
+        r3 = requests.get(f"{base}/api/get_cover_letter?job_id={job_id}&regen=1")
+        d3 = r3.json()
+        self.assertTrue(d3.get("success"), "GET cover letter 应该成功")
+        letter = d3.get("letter", "")
+        self.assertGreater(len(letter), 50, "求职信内容应超过50字符")
+        self.assertIn("Playwright", letter, "求职信应包含公司名")
+        
+        # Step 5: Verify save API works (simulates editing + clicking save)
+        r4 = requests.post(f"{base}/api/save_cover_letter",
+            json={"job_id": job_id, "letter": "Custom edited cover letter for resume."})
+        self.assertTrue(r4.json().get("success"), "保存求职信应成功")
+        
+        # Step 6: Verify saved content persists
+        r5 = requests.get(f"{base}/api/get_cover_letter?job_id={job_id}")
+        d5 = r5.json()
+        self.assertTrue(d5.get("success"))
+        self.assertEqual(d5.get("letter"), "Custom edited cover letter for resume.", "保存后应返回修改的内容")
+
     def test_23_learn_plan_page_browser(self):
         """端对端：学习计划页面从浏览器角度浏览"""
         import requests
