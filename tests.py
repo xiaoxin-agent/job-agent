@@ -377,14 +377,46 @@ class TestWebServer(unittest.TestCase):
             # HTTPError 也说明服务器正确响应了
             self.assertEqual(e.code, 404)
 
-    def test_13_resume_page(self):
+    def test_13_cover_letter_on_tracked_page(self):
+        """跟踪页包含求职信按钮"""
+        import requests
+        # First save a job
+        r = requests.post(f"http://localhost:{self.port}/api/save_job",
+            json={"job": {"title": "ML Engineer", "company": "TestCorp", "description": "Test ML job"}})
+        self.assertTrue(r.json().get("success"))
+        # Check tracked page has cover letter button
+        resp = urlopen(f"http://localhost:{self.port}/tracked")
+        html = resp.read().decode("utf-8")
+        self.assertIn("cover-letter-btn", html)
+        self.assertIn("求职信", html)
+        # Check search page does NOT have genLetter button
+        resp2 = urlopen(f"http://localhost:{self.port}/search")
+        html2 = resp2.read().decode("utf-8")
+        self.assertNotIn("genLetter", html2)
+        # Check cover letter API works
+        # Need to find the job ID
+        r2 = requests.get(f"http://localhost:{self.port}/tracked")
+        import re
+        job_ids = re.findall(r'cover-letter-btn[^>]+data-job-id="([^"]+)"', r2.text)
+        self.assertGreater(len(job_ids), 0, "应该在跟踪页找到 job_id")
+        job_id = job_ids[0]
+        r3 = requests.get(f"http://localhost:{self.port}/api/get_cover_letter?job_id={job_id}&regen=1")
+        d3 = r3.json()
+        self.assertTrue(d3.get("success"))
+        self.assertTrue(d3.get("letter", "") != "")
+        # Test save cover letter
+        r4 = requests.post(f"http://localhost:{self.port}/api/save_cover_letter",
+            json={"job_id": job_id, "letter": "Custom edited letter content"})
+        self.assertTrue(r4.json().get("success"))
+
+    def test_15_resume_page(self):
         """简历库页面返回200"""
         resp = urlopen(f"http://localhost:{self.port}/resumes")
         self.assertEqual(resp.status, 200)
         html = resp.read().decode("utf-8")
         self.assertIn("简历库", html)
 
-    def test_14_resume_add_and_list(self):
+    def test_16_resume_add_and_list(self):
         """模拟浏览器添加简历：multipart上传到简历库，然后列表返回新简历"""
         import requests
         url = f"http://localhost:{self.port}/api/add_resume_multipart"
@@ -414,7 +446,7 @@ class TestWebServer(unittest.TestCase):
         
         return resume_id
     
-    def test_15_resume_assign_and_delete(self):
+    def test_17_resume_assign_and_delete(self):
         """模拟浏览器：申请职位时关联简历，然后删除简历"""
         import requests
         # 先上传一个简历
@@ -460,7 +492,7 @@ class TestWebServer(unittest.TestCase):
         self.assertIsNone(job.get("resume_id"))
         self.assertIsNone(job.get("resume_name"))
     
-    def test_16_resume_tracked_page_has_js(self):
+    def test_18_resume_tracked_page_has_js(self):
         """跟踪页面包含 resume 相关 JS 函数"""
         resp = urlopen(f"http://localhost:{self.port}/tracked")
         html = resp.read().decode("utf-8")
@@ -470,7 +502,7 @@ class TestWebServer(unittest.TestCase):
         self.assertIn("assignResume", html)
         self.assertIn("assign_resume", html)
     
-    def test_18_js_page_validates(self):
+    def test_19_js_page_validates(self):
         """所有页面的 JS 语法正确 (用 Node.js 验证)"""
         import subprocess, json
         pages = ["/", "/tracked", "/resumes", "/dashboard", "/search"]
@@ -529,7 +561,7 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
             self.fail(msg)
         self.assertGreater(len(results), 0)
 
-    def test_19_resume_page_delete_button_html(self):
+    def test_20_resume_page_delete_button_html(self):
         """验证简历库页面删除按钮的 HTML 正确"""
         import requests
         resp = urlopen(f"http://localhost:{self.port}/resumes")
@@ -552,14 +584,14 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         self.assertIn("delete_resume", html,
             "事件委托应调用 delete_resume API")
 
-    def test_20_resume_page_upload_button_html(self):
+    def test_21_resume_page_upload_button_html(self):
         """验证上传按钮 HTML 正确"""
         resp = urlopen(f"http://localhost:{self.port}/resumes")
         html = resp.read().decode("utf-8")
         self.assertIn('onclick="uploadResume()"', html)
         self.assertIn("add_resume_multipart", html)
 
-    def test_21_resume_link_browser_simulation(self):
+    def test_22_resume_link_browser_simulation(self):
         """模仿浏览器：模拟点击关联简历→选简历→确认关联的完整流程"""
         import urllib.parse
 
@@ -668,7 +700,7 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         # 清理
         agent.tracker.delete_job(job_id)
 
-    def test_22_learn_plan_page_browser(self):
+    def test_23_learn_plan_page_browser(self):
         """端对端：学习计划页面从浏览器角度浏览"""
         import requests
         agent = self._agent

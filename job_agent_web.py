@@ -689,7 +689,6 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 h += '<div class="job-actions">';
                 if (job.url) h += '<a href="' + job.url + '" target="_blank" class="btn btn-small">' + _btn_view + '</a>';
                 h += '<button onclick="saveJob(' + i + ')" class="btn btn-small btn-save" id="save-' + i + '">' + _btn_save + '</button>';
-                h += '<button onclick="genLetter(' + i + ')" class="btn btn-small">' + _btn_letter + '</button>';
                 h += '</div></div>';
             }});
             if (d.search_links && d.search_links.length) {{
@@ -773,16 +772,6 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             document.getElementById('save-' + i).textContent = d.success ? _saved_text : _exists_text;
             document.getElementById('save-' + i).disabled = true;
         }}
-        async function genLetter(i) {{
-            if (!searchData || !searchData.jobs[i]) return;
-            var resp = await fetch('/api/generate_letter', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job: searchData.jobs[i]}})}});
-            var d = await resp.json();
-            if (d.success) {{
-                var w = window.open('/letter', '_blank');
-                w.letterContent = d.letter;
-            }}
-        }}
-        
         // Debug: show JS errors on page
         window.onerror = function(msg, url, line, col, err) {{
             var status = document.getElementById('search-status');
