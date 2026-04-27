@@ -2913,15 +2913,15 @@ loadResume();
 
         nav a.active {{ color:#1a73e8; border-bottom-color:#1a73e8; }}
 
-        .container {{ max-width:960px; margin:0 auto; padding:20px; }}
+        .container {{ max-width:1200px; margin:0 auto; padding:20px 28px; }}
 
         h1 {{ margin-bottom:20px; }}
 
-        .hero {{ text-align:center; padding:50px 20px 30px; }}
+        .hero {{ text-align:center; padding:60px 30px 40px; }}
 
-        .hero h1 {{ font-size:42px; }}
+        .hero h1 {{ font-size:48px; }}
 
-        .subtitle {{ color:#666; font-size:16px; margin:8px 0 24px; }}
+        .subtitle {{ color:#666; font-size:18px; margin:10px 0 28px; }}
 
         .hero-actions {{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }}
 
@@ -2947,7 +2947,7 @@ loadResume();
 
         .btn-lg {{ padding:14px 28px; font-size:16px; }}
 
-        .btn-small {{ padding:4px 10px; font-size:12px; }}
+        .btn-small {{ padding:5px 12px; font-size:13px; }}
 
         .btn-save {{ background:#34a853; color:#fff; border:none; }}
 
@@ -2987,13 +2987,13 @@ loadResume();
 
         .dot.filled {{ background:#1a73e8; }}
 
-        .job-card {{ background:#fff; border-radius:8px; padding:14px; margin:10px 0; box-shadow:0 1px 3px rgba(0,0,0,0.06); }}
+        .job-card {{ background:#fff; border-radius:10px; padding:18px; margin:12px 0; box-shadow:0 1px 4px rgba(0,0,0,0.08); }}
 
-        .job-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }}
+        .job-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }}
 
-        .job-title {{ font-weight:600; font-size:14px; }}
+        .job-title {{ font-weight:600; font-size:16px; }}
 
-        .job-score {{ padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; }}
+        .job-score {{ padding:3px 10px; border-radius:12px; font-size:13px; font-weight:600; }}
 
         .score-high {{ background:#e6f4ea; color:#34a853; }}
 
@@ -3001,35 +3001,35 @@ loadResume();
 
         .score-low {{ background:#fce8e6; color:#ea4335; }}
 
-        .job-type-tag {{ display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
+        .job-type-tag {{ display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
 
-        .job-meta {{ display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:#666; margin-bottom:6px; }}
+        .job-meta {{ display:flex; flex-wrap:wrap; gap:12px; font-size:14px; color:#666; margin-bottom:8px; }}
 
-        .job-desc {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; }}
+        .job-desc {{ font-size:14px; color:#555; margin-bottom:10px; line-height:1.5; }}
 
-        .job-desc-full {{ font-size:13px; color:#333; margin-bottom:8px; line-height:1.5; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:8px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
+        .job-desc-full {{ font-size:14px; color:#333; margin-bottom:10px; line-height:1.6; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:10px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
 
         .job-actions {{ display:flex; gap:6px; flex-wrap:wrap; }}
 
-        .job-notes {{ margin-top:6px; color:#888; font-size:12px; }}
+        .job-notes {{ margin-top:6px; color:#888; font-size:13px; }}
 
-        .search-summary {{ margin:16px 0; }}
+        .search-summary {{ margin:18px 0; }}
 
-        .result-stats {{ display:flex; gap:16px; margin:8px 0; }}
+        .result-stats {{ display:flex; gap:16px; margin:10px 0; }}
 
-        .link-item {{ background:#fff; border-radius:6px; padding:10px; margin:6px 0; font-size:13px; }}
+        .link-item {{ background:#fff; border-radius:6px; padding:12px; margin:8px 0; font-size:14px; }}
 
         .link-url {{ color:#1a73e8; word-break:break-all; display:block; margin-top:3px; }}
 
         .tab-bar {{ display:flex; flex-wrap:wrap; gap:4px; }}
 
-        .tab {{ padding:6px 12px; border-radius:16px; font-size:12px; text-decoration:none; color:#666; background:#e8e8e8; }}
+        .tab {{ padding:7px 14px; border-radius:18px; font-size:13px; text-decoration:none; color:#666; background:#e8e8e8; }}
 
         .tab.active {{ background:#1a73e8; color:#fff; }}
 
-        .status-tag {{ padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }}
+        .status-tag {{ padding:3px 10px; border-radius:12px; font-size:12px; font-weight:500; }}
 
-        .job-desc-snippet {{ font-size:13px; color:#555; margin-bottom:8px; line-height:1.4; padding:4px 0; border-bottom:1px solid #eee; }}
+        .job-desc-snippet {{ font-size:14px; color:#555; margin-bottom:8px; line-height:1.5; padding:4px 0; border-bottom:1px solid #eee; }}
 
         .status-saved {{ background:#f0f0f0; color:#666; }}
 
@@ -3041,23 +3041,23 @@ loadResume();
 
         .status-offer {{ background:#e6f4ea; color:#34a853; }}
 
-        .section {{ margin:24px 0; }}
+        .section {{ margin:28px 0; }}
 
-        .section h2 {{ margin-bottom:12px; font-size:18px; }}
+        .section h2 {{ margin-bottom:14px; font-size:20px; }}
 
         .profile-form {{ max-width:480px; }}
 
         .form-row {{ display:flex; align-items:center; gap:10px; margin:10px 0; }}
 
-        .form-row label {{ width:90px; font-size:13px; color:#555; flex-shrink:0; }}
+        .form-row label {{ width:90px; font-size:14px; color:#555; flex-shrink:0; }}
 
-        .form-row input {{ flex:1; padding:7px 10px; border:1px solid #ddd; border-radius:5px; font-size:13px; }}
+        .form-row input {{ flex:1; padding:8px 12px; border:1px solid #ddd; border-radius:5px; font-size:14px; }}
 
-        .salary-range {{ display:flex; align-items:center; gap:6px; }}
+        .salary-range {{ display:flex; align-items:center; gap:8px; }}
 
         .salary-range input {{ width:100px; }}
 
-        .skills-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+        .skills-table {{ width:100%; border-collapse:collapse; font-size:14px; }}
 
         .skills-table th, .skills-table td {{ padding:8px; border-bottom:1px solid #eee; text-align:left; }}
 
