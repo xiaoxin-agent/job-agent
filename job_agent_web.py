@@ -21,6 +21,7 @@ from job_agent_apply import ApplyManager
 
 LOGOS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'logos')
 
+
 def get_company_logo(company_name: str) -> str:
     """Return an <img> tag or emoji for the company."""
     if not company_name:
@@ -100,6 +101,24 @@ def get_company_emoji(company_name: str) -> str:
         if key in name:
             return emoji
     return '🏢'
+
+
+def _build_logo_map() -> dict:
+    """Build a dict: company_name_lower -> <img data-uri> or emoji fallback."""
+    result = {}
+    from urllib.parse import quote
+    import os as _os
+    for key in COMPANY_EMOJIS:
+        name = key.lower().strip()
+        svg_path = _os.path.join(LOGOS_DIR, f'{name}.svg')
+        if _os.path.exists(svg_path):
+            with open(svg_path, 'r') as f:
+                svg = f.read()
+            encoded = quote(svg, safe='')
+            result[key] = f'<img src="data:image/svg+xml,{encoded}" style="width:18px;height:18px;vertical-align:middle;margin-right:3px" alt="{key}">'
+        else:
+            result[key] = get_company_emoji(key)
+    return result
 
 
 PORT = 9999
@@ -741,14 +760,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _sr_h2 = {json.dumps(search_results_h2)};
         var _jl_h2 = {json.dumps(job_list_h2)};
         
-        // Company emoji mapping (from backend)
-        var _companyEmojis = {json.dumps(COMPANY_EMOJIS)};
-        function getCompanyEmoji(name) {{
+        // Company logo/emoji mapping (from backend)
+        var _companyLogos = {json.dumps(_build_logo_map())};
+        function getCompanyLogo(name) {{
             if (!name) return '\U0001F3E2';
             var n = name.toLowerCase().trim();
-            if (_companyEmojis[n]) return _companyEmojis[n];
-            for (var k in _companyEmojis) {{
-                if (n.indexOf(k) >= 0) return _companyEmojis[k];
+            if (_companyLogos[n]) return _companyLogos[n];
+            for (var k in _companyLogos) {{
+                if (n.indexOf(k) >= 0) return _companyLogos[k];
             }}
             return '\U0001F3E2';
         }}
@@ -780,7 +799,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     h += '</div>';
                 h += '<div class="job-score ' + cls + '">' + sc + '%</div></div>';
                 h += '<div class="job-meta">';
-                h += '<span>' + getCompanyEmoji(job.company) + ' ' + (job.company || '') + '</span>';
+                h += '<span>' + getCompanyLogo(job.company) + ' ' + (job.company || '') + '</span>';
                 h += '<span>📍 ' + (job.location || '') + '</span>';
                 h += '<span>📅 ' + (job.date || '').substring(0, 10) + '</span>';
                 h += '<span>📡 ' + (job.source || '') + '</span></div>';
