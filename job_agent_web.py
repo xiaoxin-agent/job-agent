@@ -982,7 +982,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         h += '<div style="color:#555;font-size:14px;margin:4px 0">' + (s.reason || '') + '</div>';
                         if (s.resources) {{
                             s.resources.forEach(function(rsc) {{
-                                var rscUrl = rsc.url ? '<a href="' + rsc.url + '" target="_blank" style="margin-left:4px;font-size:11px;color:#1a73e8">\U0001f517</a>' : '';
+                                var rscLink = rsc.url || 'https://www.google.com/search?q=' + encodeURIComponent(rsc.title || s.skill);
+                                var rscUrl = '<a href="' + rscLink + '" target="_blank" style="margin-left:4px;font-size:11px;color:#1a73e8">\U0001f517</a>';
                                 h += '<div style="font-size:11px;margin:2px 0;padding-left:8px">\u2022 <b>[' + (rsc.type || '\u8d44\u6e90') + ']</b> ' + (rsc.title || '') + (rsc.estimated_hours ? ' (' + rsc.estimated_hours + 'h)' : '') + rscUrl + '</div>';
                             }});
                         }}
@@ -1399,7 +1400,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
                                                 ) + (
-                                                    ' <a href="' + r.get("url","") + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 打开</a>' if r.get("url") else ''
+                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 打开</a>'
                                                 ) + '</li>'
                                                 for r in fs.get("resources", [])
                                             )
@@ -2307,7 +2308,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 ### 当前简历
 {resume_md[:3000]}
 
-### 输出格式（JSON，不要 markdown 代码块）
+### ⚠️ 重要要求
+1. 每个 focus_skills 必须有至少 2 个推荐资源（resources），且必须提供真实的 url 链接（https 开头）
+2. 资源可以是慕课网、B站、YouTube、官方文档、GitHub 仓库、Coursera、Udemy 等真实存在的学习平台链接
+3. 实在找不到精确 URL 时，可以用搜索引擎搜索链接，例如 https://www.google.com/search?q=教程名
+4. 每个资源必须包含 type、title、url、estimated_hours 四个字段，url 不能为空
+
+### 输出格式（纯 JSON，不要 markdown 代码块）
 {{
   "position": "目标职位名称",
   "focus_skills": [
@@ -2316,7 +2323,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
       "priority": "高/中/低",
       "reason": "为什么这个技能重要",
       "resources": [
-        {{"type": "课程/书籍/项目/文档", "title": "资源名称", "url": "链接（如果有）", "estimated_hours": 10}}
+        {{"type": "课程/书籍/项目/文档", "title": "资源名称", "url": "https://...", "estimated_hours": 10}}
       ]
     }}
   ],
