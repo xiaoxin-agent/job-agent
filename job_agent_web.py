@@ -1104,6 +1104,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _btn_assign = {json.dumps(t(lang, 'btn_assign'))};
         var _upload_new_resume = {json.dumps(t(lang, 'upload_new_resume'))};
         var _cancel = {json.dumps(t(lang, 'cancel'))};
+        var _lang = {json.dumps(lang)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
             var closeBtn = e.target.closest('.skill-gap-close-btn');
@@ -1335,7 +1336,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 (function(el) {{
                     if (!el.textContent.trim()) {{
                         var jobId = el.id.replace('skill-gap-', '');
-                        fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+                        fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, lang: _lang}})}})
                         .then(function(r){{return r.json()}})
                         .then(function(d){{ if (d.success && d.html) {{ el.innerHTML = d.html; }}}});
                     }}
@@ -1564,7 +1565,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }});
         }}
         function analyzeSkillGap(jobId) {{
-            fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+            fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, lang: _lang}})}})
             .then(function(r){{return r.json()}})
             .then(function(d){{
                 if (d.success) {{
@@ -2239,6 +2240,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_get_cover_letter(self, data):
         try:
             job_id = data.get("job_id", "")
+            lang = data.get("lang", "")
+            if lang not in ("en", "zh-CN", "fr"):
+                lang = "zh-CN"
             regen = data.get("regen", "") == "1"
             letter = ""
             for j in self.agent.tracker.tracked_jobs:
@@ -2709,6 +2713,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if not job_id:
                 self.send_json({"success": False, "error": "缺少 job_id"}, 400)
                 return
+            lang = data.get("lang", "")
+            if lang not in ("en", "zh-CN", "fr"):
+                lang = "zh-CN"
             job = self.agent.tracker.get_job(job_id)
             if not job:
                 self.send_json({"success": False, "error": "找不到该职位"}, 404)
@@ -2727,6 +2734,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             company = job.get("company", "")
 
             prompt = f"""分析以下简历和职位描述的技能差距。
+请使用{lang}语言输出答案和描述，技能名称保持英文。
 
 ### 职位
 {company} - {job_title}
@@ -2739,10 +2747,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
 请以 JSON 格式输出分析结果，不要其他文字：
 {{
-  "matching_skills": ["技能A", "技能B"],  // 简历中有且职位也要求的技能
-  "missing_skills": ["技能C", "技能D"],    // 职位要求但在简历中未体现的关键技能
-  "weak_skills": ["技能E"],               // 简历中有但需要加强的技能
-  "suggestions": ["建议1", "建议2"]       // 学习或提升建议
+  "matching_skills": ["skillA", "skillB"],  // 简历中有且职位也要求的技能
+  "missing_skills": ["skillC", "skillD"],    // 职位要求但在简历中未体现的关键技能
+  "weak_skills": ["skillE"],               // 简历中有但需要加强的技能
+  "suggestions": ["建议1", "建议2"]       // 学习或提升建议，用对应语言输出
 }}
 """
 
@@ -2797,22 +2805,23 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             matching = gap_data.get("matching_skills", [])
             suggestions = gap_data.get("suggestions", [])
 
+            _t = lambda k: t(lang, k)
             parts = []
             for s in missing[:5]:
-                parts.append(f'<span class="skill-gap-badge gap-missing" title="缺少的技能" style="display:inline-block;background:#fee;color:#d32f2f;border:1px solid #fcc;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u26a0 {s}</span>')
+                parts.append(f'<span class="skill-gap-badge gap-missing" title="{_t("gap_missing")}" style="display:inline-block;background:#fee;color:#d32f2f;border:1px solid #fcc;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u26a0 {s}</span>')
             for s in weak[:3]:
-                parts.append(f'<span class="skill-gap-badge gap-weak" title="需要加强" style="display:inline-block;background:#fff3e0;color:#e65100;border:1px solid #ffe0b2;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u2191 {s}</span>')
+                parts.append(f'<span class="skill-gap-badge gap-weak" title="{_t("gap_weak")}" style="display:inline-block;background:#fff3e0;color:#e65100;border:1px solid #ffe0b2;border-radius:4px;padding:1px 6px;font-size:11px;margin:1px">\u2191 {s}</span>')
 
             # 用 popover 显示详情
             details_html = ""
             if matching:
-                details_html += "<div style='margin-bottom:6px'><b>\u2705 已有技能:</b> " + ", ".join(matching) + "</div>"
+                details_html += f"<div style='margin-bottom:6px'><b>{_t('gap_skills')}:</b> " + ", ".join(matching) + "</div>"
             if missing:
-                details_html += "<div style='margin-bottom:6px;color:#d32f2f'><b>\u26a0 缺少技能:</b> " + ", ".join(missing) + "</div>"
+                details_html += f"<div style='margin-bottom:6px;color:#d32f2f'><b>{_t('gap_missing')}:</b> " + ", ".join(missing) + "</div>"
             if weak:
-                details_html += "<div style='margin-bottom:6px;color:#e65100'><b>\u2191 需加强:</b> " + ", ".join(weak) + "</div>"
+                details_html += f"<div style='margin-bottom:6px;color:#e65100'><b>{_t('gap_weak')}:</b> " + ", ".join(weak) + "</div>"
             if suggestions:
-                details_html += "<div style='margin-top:6px;color:#1565c0;font-size:12px'><b>\U0001f4a1 建议:</b><br>" + "<br>".join(suggestions) + "</div>"
+                details_html += f"<div style='margin-top:6px;color:#1565c0;font-size:12px'><b>{_t('gap_suggestions')}:</b><br>" + "<br>".join(suggestions) + "</div>"
 
             gap_html = "".join(parts)
             if gap_html:
