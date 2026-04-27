@@ -1813,6 +1813,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def handle_learn_calendar_page(self, params):
         lang = self._get_lang(params)
         jobs = self.agent.tracker.tracked_jobs
+        learn_plan_week = t(lang, "learn_plan_week")
 
         # Collect all jobs that have a learn plan
         plan_jobs = []
@@ -2091,6 +2092,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             </div>
         </div>
         <script>
+        var _learn_plan_week = {json.dumps(learn_plan_week, ensure_ascii=False)};
         // Task detail: click delegation on .cal-task
         document.addEventListener('click', function(e) {
             var el = e.target.closest('.cal-task');
@@ -2098,7 +2100,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             try {
                 var d = JSON.parse(decodeURIComponent(atob(el.dataset.detail)));
                 document.getElementById('td-title').textContent = d.task;
-                document.getElementById('td-week').textContent = '\U0001f4c5 \u7b2c' + d.week + '\u5468 \u2014 ' + d.focus;
+                document.getElementById('td-week').textContent = '\U0001f4c5 ' + _learn_plan_week + ' ' + (d.week || '') + ' \u2014 ' + (d.focus || '');
 
                 var rDiv = document.getElementById('td-resources');
                 var rSec = document.getElementById('td-section-resources');
