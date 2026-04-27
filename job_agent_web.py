@@ -882,26 +882,26 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         
         <script>
         // i18n strings passed from Python
-        var _searching = {json.dumps(searching_text)};
-        var _src_prefix = {json.dumps(status_searching)};
-        var _done_prefix = {json.dumps(status_done)};
-        var _done_suffix = {json.dumps(status_done_end)};
-        var _failed = {json.dumps(status_failed)};
-        var _btn_search = {json.dumps(btn_search)};
-        var _btn_search_again = {json.dumps(btn_search_again)};
-        var _btn_save = {json.dumps(btn_save)};
-        var _btn_letter = {json.dumps(btn_letter)};
-        var _btn_view = {json.dumps(btn_view)};
-        var _saved_text = {json.dumps(saved_text)};
-        var _exists_text = {json.dumps(exists_text)};
-        var _jobs_label = {json.dumps(jobs_label)};
-        var _high_match = {json.dumps(high_match)};
-        var _avg_match = {json.dumps(avg_match)};
-        var _sr_h2 = {json.dumps(search_results_h2)};
-        var _jl_h2 = {json.dumps(job_list_h2)};
+        var _searching = {json.dumps(searching_text, ensure_ascii=False)};
+        var _src_prefix = {json.dumps(status_searching, ensure_ascii=False)};
+        var _done_prefix = {json.dumps(status_done, ensure_ascii=False)};
+        var _done_suffix = {json.dumps(status_done_end, ensure_ascii=False)};
+        var _failed = {json.dumps(status_failed, ensure_ascii=False)};
+        var _btn_search = {json.dumps(btn_search, ensure_ascii=False)};
+        var _btn_search_again = {json.dumps(btn_search_again, ensure_ascii=False)};
+        var _btn_save = {json.dumps(btn_save, ensure_ascii=False)};
+        var _btn_letter = {json.dumps(btn_letter, ensure_ascii=False)};
+        var _btn_view = {json.dumps(btn_view, ensure_ascii=False)};
+        var _saved_text = {json.dumps(saved_text, ensure_ascii=False)};
+        var _exists_text = {json.dumps(exists_text, ensure_ascii=False)};
+        var _jobs_label = {json.dumps(jobs_label, ensure_ascii=False)};
+        var _high_match = {json.dumps(high_match, ensure_ascii=False)};
+        var _avg_match = {json.dumps(avg_match, ensure_ascii=False)};
+        var _sr_h2 = {json.dumps(search_results_h2, ensure_ascii=False)};
+        var _jl_h2 = {json.dumps(job_list_h2, ensure_ascii=False)};
         
         // Company logo/emoji mapping (from backend)
-        var _companyLogos = {json.dumps(_build_logo_map())};
+        var _companyLogos = {json.dumps(_build_logo_map(), ensure_ascii=False)};
         function getCompanyLogo(name) {{
             if (!name) return '\U0001F3E2';
             var n = name.toLowerCase().trim();
@@ -1145,41 +1145,41 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div id="manual-add-status" style="margin-bottom:8px;font-size:14px"></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
-        var _btn_add_job = {json.dumps(btn_add_job)};
-        var _url_empty = {json.dumps(url_empty)};
-        var _parse_failed = {json.dumps(parse_failed)};
-        var _loading_text = {json.dumps(loading_text)};
-        var _saved_to_tracker = {json.dumps(saved_to_tracker)};
-        var _cover_letter_title_short = {json.dumps(cover_letter_title_short)};
-        var _btn_save = {json.dumps(btn_save)};
-        var _btn_regenerate = {json.dumps(btn_regenerate)};
-        var _btn_copy = {json.dumps(btn_copy)};
-        var _gap_modal_title = {json.dumps(gap_modal_title)};
-        var _btn_generate_plan = {json.dumps(btn_generate_plan)};
-        var _btn_view_plan = {json.dumps(btn_view_plan)};
-        var _learn_plan_empty = {json.dumps(learn_plan_empty)};
-        var _learn_plan_modal_title = {json.dumps(learn_plan_modal_title)};
-        var _learn_plan_progress_label = {json.dumps(learn_plan_progress)};
-        var _learn_plan_export = {json.dumps(learn_plan_export)};
-        var _learn_plan_focus = {json.dumps(learn_plan_focus)};
-        var _learn_plan_priority_high = {json.dumps(learn_plan_priority_high)};
-        var _learn_plan_priority_mid = {json.dumps(learn_plan_priority_mid)};
-        var _learn_plan_priority_low = {json.dumps(learn_plan_priority_low)};
-        var _learn_plan_resource_type = {json.dumps(learn_plan_resource_type)};
-        var _learn_plan_weekly = {json.dumps(learn_plan_weekly)};
-        var _learn_plan_check_hint = {json.dumps(learn_plan_check_hint)};
-        var _learn_plan_week = {json.dumps(learn_plan_week)};
-        var _learn_plan_hours = {json.dumps(learn_plan_hours)};
-        var _learn_plan_projects = {json.dumps(learn_plan_projects)};
-        var _learn_plan_skills = {json.dumps(learn_plan_skills)};
-        var _learn_plan_advice = {json.dumps(learn_plan_advice)};
-        var _confirm_delete = {json.dumps(confirm_delete)};
-        var _note_prompt = {json.dumps(note_prompt)};
-        var _link_resume_title = {json.dumps(t(lang, 'link_resume_title'))};
-        var _btn_assign = {json.dumps(t(lang, 'btn_assign'))};
-        var _upload_new_resume = {json.dumps(t(lang, 'upload_new_resume'))};
-        var _cancel = {json.dumps(t(lang, 'cancel'))};
-        var _lang = {json.dumps(lang)};
+        var _btn_add_job = {json.dumps(btn_add_job, ensure_ascii=False)};
+        var _url_empty = {json.dumps(url_empty, ensure_ascii=False)};
+        var _parse_failed = {json.dumps(parse_failed, ensure_ascii=False)};
+        var _loading_text = {json.dumps(loading_text, ensure_ascii=False)};
+        var _saved_to_tracker = {json.dumps(saved_to_tracker, ensure_ascii=False)};
+        var _cover_letter_title_short = {json.dumps(cover_letter_title_short, ensure_ascii=False)};
+        var _btn_save = {json.dumps(btn_save, ensure_ascii=False)};
+        var _btn_regenerate = {json.dumps(btn_regenerate, ensure_ascii=False)};
+        var _btn_copy = {json.dumps(btn_copy, ensure_ascii=False)};
+        var _gap_modal_title = {json.dumps(gap_modal_title, ensure_ascii=False)};
+        var _btn_generate_plan = {json.dumps(btn_generate_plan, ensure_ascii=False)};
+        var _btn_view_plan = {json.dumps(btn_view_plan, ensure_ascii=False)};
+        var _learn_plan_empty = {json.dumps(learn_plan_empty, ensure_ascii=False)};
+        var _learn_plan_modal_title = {json.dumps(learn_plan_modal_title, ensure_ascii=False)};
+        var _learn_plan_progress_label = {json.dumps(learn_plan_progress, ensure_ascii=False)};
+        var _learn_plan_export = {json.dumps(learn_plan_export, ensure_ascii=False)};
+        var _learn_plan_focus = {json.dumps(learn_plan_focus, ensure_ascii=False)};
+        var _learn_plan_priority_high = {json.dumps(learn_plan_priority_high, ensure_ascii=False)};
+        var _learn_plan_priority_mid = {json.dumps(learn_plan_priority_mid, ensure_ascii=False)};
+        var _learn_plan_priority_low = {json.dumps(learn_plan_priority_low, ensure_ascii=False)};
+        var _learn_plan_resource_type = {json.dumps(learn_plan_resource_type, ensure_ascii=False)};
+        var _learn_plan_weekly = {json.dumps(learn_plan_weekly, ensure_ascii=False)};
+        var _learn_plan_check_hint = {json.dumps(learn_plan_check_hint, ensure_ascii=False)};
+        var _learn_plan_week = {json.dumps(learn_plan_week, ensure_ascii=False)};
+        var _learn_plan_hours = {json.dumps(learn_plan_hours, ensure_ascii=False)};
+        var _learn_plan_projects = {json.dumps(learn_plan_projects, ensure_ascii=False)};
+        var _learn_plan_skills = {json.dumps(learn_plan_skills, ensure_ascii=False)};
+        var _learn_plan_advice = {json.dumps(learn_plan_advice, ensure_ascii=False)};
+        var _confirm_delete = {json.dumps(confirm_delete, ensure_ascii=False)};
+        var _note_prompt = {json.dumps(note_prompt, ensure_ascii=False)};
+        var _link_resume_title = {json.dumps(t(lang, 'link_resume_title'), ensure_ascii=False)};
+        var _btn_assign = {json.dumps(t(lang, 'btn_assign'), ensure_ascii=False)};
+        var _upload_new_resume = {json.dumps(t(lang, 'upload_new_resume'), ensure_ascii=False)};
+        var _cancel = {json.dumps(t(lang, 'cancel'), ensure_ascii=False)};
+        var _lang = {json.dumps(lang, ensure_ascii=False)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
             var closeBtn = e.target.closest('.skill-gap-close-btn');
@@ -1283,6 +1283,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 }});
             }}
 
+            function _mapPriority(p) {{
+                if (p === '\u9ad8' || p === 'High' || p === 'Haute') return _learn_plan_priority_high;
+                if (p === '\u4e2d' || p === 'Mid' || p === 'Moyenne') return _learn_plan_priority_mid;
+                if (p === '\u4f4e' || p === 'Low' || p === 'Faible') return _learn_plan_priority_low;
+                return p || '';
+            }}
             function renderLearnPlanModal(jobId, plan, progress) {{
                 var oldModal = document.getElementById('learn-plan-modal');
                 if (oldModal) oldModal.remove();
@@ -1323,9 +1329,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 if (plan.focus_skills) {{
                     h += '<div style="margin-bottom:10px"><b>' + _learn_plan_focus + '</b></div>';
                     plan.focus_skills.forEach(function(s) {{
-                        var priColor = s.priority == '\u9ad8' ? '#d32f2f' : s.priority == '\u4e2d' ? '#e65100' : '#1565c0';
+                        var priColor = s.priority == '\u9ad8' || s.priority == 'High' || s.priority == 'Haute' ? '#d32f2f' : s.priority == '\u4e2d' || s.priority == 'Mid' || s.priority == 'Moyenne' ? '#e65100' : '#1565c0';
                         h += '<div style="background:#f8f9fa;border-radius:6px;padding:8px;margin-bottom:6px">';
-                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:12px;color:' + priColor + ';font-weight:500">' + (s.priority || '') + '\u4f18\u5148\u7ea7</span></div>';
+                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:12px;color:' + priColor + ';font-weight:500">' + _mapPriority(s.priority) + '</span></div>';
                         h += '<div style="color:#555;font-size:14px;margin:4px 0">' + (s.reason || '') + '</div>';
                         if (s.resources) {{
                             s.resources.forEach(function(rsc) {{
@@ -1957,7 +1963,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                         "projects_html": related_proj_html,
                                         "advice_text": task_tip
                                     }
-                                    detail_json = json.dumps(detail_obj, ensure_ascii=False)
+                                    detail_json = json.dumps(json.dumps(detail_obj), ensure_ascii=False)
                                     detail_uri = urllib.parse.quote(detail_json)
                                     detail_b64 = base64.b64encode(detail_uri.encode()).decode()
                                     disp = task_text[:14] + "..." if len(task_text) > 14 else task_text
@@ -3420,7 +3426,7 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-seri
   <div class="preview-pane" id="preview">加载中...</div>
 </div>
 <script>
-var jobId = {json.dumps(job_id)};
+var jobId = {json.dumps(job_id, ensure_ascii=False)};
 var originalMd = "";
 var timer = null;
 
