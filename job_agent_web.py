@@ -1405,8 +1405,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                         "projects_html": related_proj_html,
                                         "advice_text": plan.get("advice","") or ""
                                     }
+                                    import urllib.parse
                                     detail_json = json.dumps(detail_obj, ensure_ascii=False)
-                                    detail_b64 = base64.b64encode(detail_json.encode()).decode()
+                                    detail_uri = urllib.parse.quote(detail_json)
+                                    detail_b64 = base64.b64encode(detail_uri.encode()).decode()
                                     disp = task[:14] + "..." if len(task) > 14 else task
                                     tasks_for_day += f'''
                                     <div class="cal-task {done_cls}" data-detail="{detail_b64}" title="{task}">{disp}</div>'''
@@ -1530,7 +1532,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var el = e.target.closest('.cal-task');
             if (!el || !el.dataset.detail) return;
             try {
-                var d = JSON.parse(atob(el.dataset.detail));
+                var d = JSON.parse(decodeURIComponent(atob(el.dataset.detail)));
                 document.getElementById('td-title').textContent = d.task;
                 document.getElementById('td-week').textContent = '\U0001f4c5 \u7b2c' + d.week + '\u5468 \u2014 ' + d.focus;
 
