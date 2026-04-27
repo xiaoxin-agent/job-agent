@@ -2958,8 +2958,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             company = job.get("company", "")
             resume_md = self.agent.tracker.get_job_resume_markdown(job_id) or ""
 
-            prompt = f"""你是一名资深技术导师。请为一个想申请以下职位的求职者制定一个详细的技能强化学习计划。
-请使用{lang}语言输出全部内容（技能名称保持英文）。
+            prompt = f"""You are a senior technical mentor. Create a detailed skill improvement study plan for a job seeker applying to the following position.
+IMPORTANT: Output ALL text content in {lang} language (skill names should remain in English).
+Do NOT use any other language in the output. The entire response must be in {lang}.
 
 ### 目标职位
 {company} - {job_title}
@@ -2982,15 +2983,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
   "focus_skills": [
     {{
       "skill": "技能名称",
-      "priority": "高/中/低",
-      "reason": "为什么这个技能重要",
+      "priority": "High/Mid/Low",
+      "reason": "Explain why this skill is important",
       "resources": [
-        {{"type": "课程/书籍/项目/文档", "title": "资源名称", "url": "https://...", "estimated_hours": 10}}
+        {{"type": "Course/Book/Project/Doc", "title": "Resource Title", "url": "https://...", "estimated_hours": 10}}
       ]
     }}
   ],
   "weekly_plan": [
-    {{"week": 1, "focus": "本周重点", "tasks": [{{"name": "具体任务1", "advice": "针对该任务的详细学习建议，50-100字"}}, {{"name": "具体任务2", "advice": "针对该任务的详细学习建议"}}], "estimated_hours": 5}}
+    {{"week": 1, "focus": "Weekly focus topic", "tasks": [{{"name": "Concrete task 1", "advice": "Detailed 50-100 word learning advice in {lang} for this task"}}, {{"name": "Concrete task 2", "advice": "Detailed learning advice in {lang}"}}], "estimated_hours": 5}}
   ],
   "projects": [
     {{"name": "项目名", "description": "练习项目简述", "skills": ["涉及的技能"]}}
