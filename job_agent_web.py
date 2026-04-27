@@ -1298,13 +1298,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 }});
             }}
 
-            function _mapPriority(p) {{
-                if (p === '\u9ad8' || p === 'High' || p === 'Haute') return _learn_plan_priority_high;
-                if (p === '\u4e2d' || p === 'Mid' || p === 'Moyenne') return _learn_plan_priority_mid;
-                if (p === '\u4f4e' || p === 'Low' || p === 'Faible') return _learn_plan_priority_low;
-                return p || '';
-            }}
-            function renderLearnPlanModal(jobId, plan, progress) {{
+                        function renderLearnPlanModal(jobId, plan, progress) {{
                 var oldModal = document.getElementById('learn-plan-modal');
                 if (oldModal) oldModal.remove();
                 // Count total tasks
@@ -1346,7 +1340,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     plan.focus_skills.forEach(function(s) {{
                         var priColor = s.priority == '\u9ad8' || s.priority == 'High' || s.priority == 'Haute' ? '#d32f2f' : s.priority == '\u4e2d' || s.priority == 'Mid' || s.priority == 'Moyenne' ? '#e65100' : '#1565c0';
                         h += '<div style="background:#f8f9fa;border-radius:6px;padding:8px;margin-bottom:6px">';
-                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:12px;color:' + priColor + ';font-weight:500">' + _mapPriority(s.priority) + '</span></div>';
+                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:12px;color:' + priColor + ';font-weight:500">' + s.priority + '</span></div>';
                         h += '<div style="color:#555;font-size:14px;margin:4px 0">' + (s.reason || '') + '</div>';
                         if (s.resources) {{
                             s.resources.forEach(function(rsc) {{
