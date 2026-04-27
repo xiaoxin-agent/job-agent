@@ -1445,6 +1445,139 @@ class JobAgent:
         """保存职位到跟踪列表"""
         return self.tracker.add_job(job)
     
+    def fetch_job_from_url(self, url: str) -> Dict:
+        """通过URL抓取并解析职位信息，返回 {title, company, location, description, job_type}"""
+        result = {"title": "", "company": "", "location": "", "description": "", "job_type": "", "url": url}
+        try:
+            from curl_cffi import requests
+            resp = requests.get(url, impersonate='chrome120', timeout=20)
+        except:
+            try:
+                resp = requests.get(url, timeout=20)
+            except Exception as e:
+                return result
+
+        if resp.status_code != 200:
+            return result
+
+        html = resp.text
+
+        # Try JSON-LD first (structured data)
+        import re
+        import json
+        jsonlds = re.findall(r"<script[^>]+type=['\"]application/ld\\+json['\"][^>]*>(.*?)</script>", html, re.DOTALL)
+        for jd_raw in jsonlds:
+            try:
+                jd = json.loads(jd_raw)
+                if not isinstance(jd, dict):
+                    jd = jd[0] if isinstance(jd, list) and len(jd) > 0 else {}
+                if jd.get('@type') in ('JobPosting', 'job'):
+                    result['title'] = jd.get('title', '')
+                    result['company'] = self._extract_jsonld_company(jd)
+                    result['location'] = self._extract_jsonld_location(jd)
+                    desc = jd.get('description', jd.get('baseSalary', {}).get('description', ''))
+                    if desc:
+                        result['description'] = self.engine._clean_html(desc)
+                    break
+            except:
+                pass
+
+        # Fallback: OG / meta tags
+        if not result['title']:
+            og_title = re.search(r"<meta[^>]+property=['\"]og:title['\"][^>]+content=['\"]([^'\"]+)", html)
+            if og_title:
+                result['title'] = og_title.group(1)
+            else:
+                title_m = re.search(r'<title>([^<]+)</title>', html, re.DOTALL)
+                if title_m:
+                    result['title'] = title_m.group(1).strip()
+
+        if not result['company']:
+            og_site = re.search(r"<meta[^>]+property=['\"]og:site_name['\"][^>]+content=['\"]([^'\"]+)", html)
+            if og_site:
+                result['company'] = og_site.group(1)
+
+        # Fallback: extract company from URL patterns
+        if not result['company']:
+            import re as _re
+            url_lower = url.lower()
+            for domain, name in [
+                ('google.com/about/careers', 'Google'),
+                ('google.com', 'Google'),
+                ('linkedin.com/jobs', 'LinkedIn'),
+                ('linkedin.com', 'LinkedIn'),
+                ('indeed.com', 'Indeed'),
+                ('nvidia.com', 'NVIDIA'),
+                ('microsoft.com', 'Microsoft'),
+                ('apple.com', 'Apple'),
+                ('amazon.com', 'Amazon'),
+                ('meta.com', 'Meta'),
+                ('ibm.com', 'IBM'),
+                ('remoteok.com', 'RemoteOK'),
+                ('weworkremotely.com', 'We Work Remotely'),
+            ]:
+                if domain in url_lower:
+                    result['company'] = name
+                    break
+
+        if not result['description']:
+            og_desc = re.search(r"<meta[^>]+property=['\"]og:description['\"][^>]+content=['\"]([^'\"]+)", html)
+            if og_desc:
+                result['description'] = self.engine._clean_html(og_desc.group(1))
+
+        # Extract from body: look for large text blocks
+        if not result['description'] or len(result['description']) < 200:
+            body_desc = self._extract_body_description(html)
+            if body_desc and len(body_desc) > len(result['description']):
+                result['description'] = body_desc
+
+        return result
+
+    def _extract_jsonld_company(self, jd: dict) -> str:
+        """从JSON-LD提取公司名"""
+        for key in ('hiringOrganization', 'employer', 'organization'):
+            org = jd.get(key, {})
+            if isinstance(org, dict):
+                name = org.get('name', '')
+                if name:
+                    return name
+        return ''
+
+    def _extract_jsonld_location(self, jd: dict) -> str:
+        """从JSON-LD提取地点"""
+        loc = jd.get('jobLocation', {})
+        if not isinstance(loc, dict):
+            loc = jd.get('location', loc)
+        if isinstance(loc, dict):
+            if '@type' in loc:
+                city = loc.get('address', {}).get('addressLocality', '')
+                region = loc.get('address', {}).get('addressRegion', '')
+                country = loc.get('address', {}).get('addressCountry', '')
+                if isinstance(country, dict):
+                    country = country.get('name', '')
+                parts = [p for p in [city, region, country] if p]
+                return ', '.join(parts)
+        return loc.get('name', '') if isinstance(loc, dict) else str(loc)
+
+    def _extract_body_description(self, html: str) -> str:
+        """从页面body中提取较长的文本块作为职位描述"""
+        import re
+        # Remove all script/style
+        cleaned = re.sub(r'<script[^>]*>.*?</script>', '', html, 0, re.DOTALL)
+        cleaned = re.sub(r'<style[^>]*>.*?</style>', '', cleaned, 0, re.DOTALL)
+        # Find large text blocks
+        blocks = re.findall(r'>([^<]{300,})<', cleaned)
+        if not blocks:
+            return ''
+        # Pick the longest
+        blocks.sort(key=len, reverse=True)
+        best = blocks[0]
+        # Skip if looks like nav/footer boilerplate
+        best = best.strip()
+        if len(best) < 200:
+            return ''
+        return self.engine._clean_html(f'<div>{best}</div>')
+
     def generate_cover_letter(self, job: Dict) -> str:
         """生成求职信"""
         return self.analyzer.generate_cover_letter(job)

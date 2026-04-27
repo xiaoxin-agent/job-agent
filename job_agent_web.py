@@ -476,6 +476,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/analyze_apply": self.api_analyze_apply,
             "/api/record_apply": self.api_record_apply,
             "/api/tailor_resume": self.api_tailor_resume,
+            "/api/fetch_job_from_url": self.api_fetch_job_from_url,
             "/api/analyze_skill_gap": self.api_analyze_skill_gap,
             "/api/learn_plan": self.api_learn_plan,
             "/api/learn_plan_progress": self.api_learn_plan_progress,
@@ -841,6 +842,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         html = self._page(t(lang, 'tracked_title'), f"""
         <h1>{t(lang, 'tracked_title')}</h1>
         <div class="section"><div class="tab-bar">{tabs}</div></div>
+        <div class="section section-add-url" style="margin-top:8px;margin-bottom:8px;padding:8px 0;display:flex;gap:8px;align-items:center">
+            <input id="manual-job-url" type="url" placeholder="粘贴职位链接，如 Google Careers / LinkedIn / Indeed…" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+            <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">📤 添加职位</button>
+        </div>
+        <div id="manual-add-status" style="margin-bottom:8px;font-size:14px"></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
         // Skill gap detail popup via event delegation
@@ -1108,6 +1114,66 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var notes = prompt('\u6dfb\u52a0\u5907\u6ce8\uff08\u53ef\u9009\uff09:','')||'';
             fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}})
             .then(function() {{ location.reload(); }});
+        }}
+
+        // ===== Manual URL Job Addition =====
+        async function fetchAndAddJob() {{
+            var url = document.getElementById('manual-job-url').value.trim();
+            if (!url) {{ alert('请粘贴职位链接'); return; }}
+            var btn = document.getElementById('manual-add-btn');
+            var status = document.getElementById('manual-add-status');
+            btn.disabled = true;
+            btn.textContent = '⏳ 解析中...';
+            status.innerHTML = '<span style="color:#888">正在抓取并分析职位信息...</span>';
+            try {{
+                var r = await fetch('/api/fetch_job_from_url', {{
+                    method:'POST', headers:{{'Content-Type':'application/json'}},
+                    body:JSON.stringify({{url:url}})
+                }});
+                var d = await r.json();
+                if (!d.success) {{
+                    status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || '解析失败') + '</span>';
+                    btn.disabled = false;
+                    btn.textContent = '📤 添加职位';
+                    return;
+                }}
+                var job = d.job;
+                status.innerHTML = '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:start">' +
+                    '<div><b>' + escHtml(job.title) + '</b>' +
+                    (job.company ? ' <span style="color:#666">at ' + escHtml(job.company) + '</span>' : '') +
+                    (job.location ? ' <span style="color:#888;font-size:13px">📍 ' + escHtml(job.location) + '</span>' : '') +
+                    '<br><span style="font-size:13px;color:#888">📊 匹配度: ' + (job.match_score || 0) + '%</span></div>' +
+                    '<button onclick="saveFetchedJob(' + JSON.stringify(job).replace(/"/g, '&quot;') + ')" class="btn btn-primary btn-small" style="padding:6px 14px;flex-shrink:0">💾 保存</button></div>' +
+                    '</div>';
+                btn.disabled = false;
+                btn.textContent = '📤 添加职位';
+            }} catch(e) {{
+                status.innerHTML = '<span style="color:#d32f2f">❌ 请求失败: ' + e + '</span>';
+                btn.disabled = false;
+                btn.textContent = '📤 添加职位';
+            }}
+        }}
+
+        function saveFetchedJob(job) {{
+            fetch('/api/save_job', {{
+                method:'POST', headers:{{'Content-Type':'application/json'}},
+                body:JSON.stringify({{job: job}})
+            }})
+            .then(function(r){{return r.json()}})
+            .then(function(d){{
+                if (d.success) {{
+                    document.getElementById('manual-add-status').innerHTML = '<span style="color:#2e7d32">✅ 已保存到跟踪列表，刷新页面查看</span>';
+                    setTimeout(function(){{ location.reload(); }}, 1500);
+                }} else {{
+                    alert('保存失败: ' + (d.error || ''));
+                }}
+            }});
+        }}
+
+        function escHtml(s) {{
+            if (!s) return '';
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }}
 
         // ===== Apply Analysis =====
@@ -2258,6 +2324,34 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": True, "record": result.get("record")})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_fetch_job_from_url(self, data):
+        """接收URL，抓取并分析职位，返回分析结果供前端预览后保存"""
+        try:
+            url = data.get("url", "").strip()
+            if not url:
+                self.send_json({"success": False, "error": "URL不能为空"})
+                return
+            raw = self.agent.fetch_job_from_url(url)
+            if not raw.get("title") or not raw.get("description"):
+                self.send_json({"success": False, "error": "无法从此URL提取职位信息，请确认链接是否正确"})
+                return
+
+            # Run analyze to get match_score etc.
+            job_for_analysis = {
+                "title": raw["title"],
+                "company": raw.get("company", ""),
+                "location": raw.get("location", ""),
+                "description": raw.get("description", ""),
+                "source": raw.get("url", url),
+                "job_type": raw.get("job_type", ""),
+                "url": raw.get("url", url),
+            }
+            analyzed = self.agent.analyzer.analyze_job(job_for_analysis)
+            analyzed.update(raw)
+            self.send_json({"success": True, "job": analyzed})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)})
 
     def api_tailor_resume(self, data):
         """根据职位要求优化简历（通过 DeepSeek API）"""
