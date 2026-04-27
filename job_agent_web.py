@@ -2127,8 +2127,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var el = e.target.closest('.cal-task');
             if (!el || !el.dataset.detail) return;
             try {
-                var d = JSON.parse(atob(el.dataset.detail));
-                if (typeof d === 'string') { d = JSON.parse(d); }
+                try { var jsonBytes = atob(el.dataset.detail); var u8 = new Uint8Array(jsonBytes.length); for (var i = 0; i < jsonBytes.length; i++) { u8[i] = jsonBytes.charCodeAt(i); } var d = JSON.parse(new TextDecoder().decode(u8)); } catch(e) { try { var d = JSON.parse(JSON.parse(decodeURIComponent(atob(el.dataset.detail)))); } catch(e2) { var d = {}; } }
                 document.getElementById('td-title').textContent = d.task;
                 document.getElementById('td-week').textContent = '\U0001f4c5 ' + (_learn_plan_week || '') + ' ' + (d.week || '') + (_learn_plan_suffix || '') + ' \u2014 ' + (d.focus || '');
 
