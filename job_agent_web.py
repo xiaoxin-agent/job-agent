@@ -1964,7 +1964,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
                                                 ) + (
-                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 打开</a>'
+                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 ' + open_label + '</a>'
                                                 ) + '</li>'
                                                 for r in fs.get("resources", [])
                                             )
@@ -1974,12 +1974,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
                                                 ) + (
-                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 打开</a>'
+                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 ' + open_label + '</a>'
                                                 ) + '</li>'
                                                 for r in (fs.get("resources", []) or [])[:1]
                                             )
                                         if items:
-                                            related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + '优先级)</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
+                                            related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + ' ' + priority_label + ')</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
                                     for proj in plan.get("projects", []):
                                         if any(s.lower() in task_text.lower() for s in proj.get("skills",[])):
                                             related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
