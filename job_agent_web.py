@@ -877,7 +877,19 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:15px;line-height:1.6">';
                     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f3af 技能差距分析</h3><button class="skill-gap-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div>';
                     h += details;
-                    h += '<div style="margin-top:12px;text-align:center"><button class="btn btn-small btn-primary learn-plan-btn" data-learn-jobid="' + jobIdGap + '" style="font-size:12px">\U0001f4da 生成学习计划</button></div>';
+                    h += '<div style="margin-top:12px;text-align:center" id="learn-btn-area-' + jobIdGap + '"><button class="btn btn-small btn-primary learn-plan-btn" data-learn-jobid="' + jobIdGap + '" style="font-size:12px">\U0001f4da 加载中...</button></div>';
+                    // Check if plan already exists
+                    fetch('/api/learn_plan?job_id=' + encodeURIComponent(jobIdGap))
+                    .then(function(r){{return r.json()}})
+                    .then(function(d){{
+                        var btnArea = document.getElementById('learn-btn-area-' + jobIdGap);
+                        if (btnArea) {{
+                            var btn = btnArea.querySelector('.learn-plan-btn');
+                            if (btn) {{
+                                btn.textContent = d.plan ? '\U0001f4da \u67e5\u770b\u5b66\u4e60\u8ba1\u5212' : '\U0001f4da \u751f\u6210\u5b66\u4e60\u8ba1\u5212';
+                            }}
+                        }}
+                    }});
                     h += '</div></div>';
                     document.body.insertAdjacentHTML('beforeend', h);
                 }} catch(e) {{}}
@@ -913,7 +925,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 }})
                 .then(function(result){{
                     if (!result || !result.plan) return;
-                    if (btnEl) {{ btnEl.textContent = '\U0001f4da \u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }}
+                    // Use different text: '查看' if plan was already saved, '生成' if freshly generated
+                    if (btnEl) {{
+                        btnEl.textContent = result.isSaved ? '\U0001f4da \u67e5\u770b\u5b66\u4e60\u8ba1\u5212' : '\U0001f4da \u5b66\u4e60\u8ba1\u5212';
+                        btnEl.disabled = false;
+                    }}
                     renderLearnPlanModal(jobId, result.plan, result.progress);
                 }})
                 .catch(function(e){{
