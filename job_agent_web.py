@@ -138,6 +138,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_profile": "👤 Profile",
         "nav_resume": "📄 Resumes",
         "nav_letter": "✉️ Cover Letter",
+        "nav_learn_calendar": "📅 Learn Plan",
         "resume_title": "Resume Library",
         "resume_upload": "Upload Resume",
         "resume_delete": "Delete",
@@ -163,7 +164,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "status": "Status",
         "all": "All",
         "saved": "Saved",
-        "applied": "Applied",
+        "applied": "\u2705 Applied",
         "interviewing": "Interviewing",
         "rejected": "Rejected",
         "offer": "Offer",
@@ -238,6 +239,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_save": "💾 Save",
         "btn_letter": "✉️ Letter",
         "btn_view": "🔗 View Posting",
+        "btn_add_job": "📤 Add Job",
         "saved_text": "✅ Saved",
         "exists_text": "⚠️ Exists",
 
@@ -246,10 +248,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_home": "🏠 首页",
         "nav_dashboard": "📊 仪表盘",
         "nav_search": "🔍 搜索",
-        "nav_tracked": "📋 跟踪",
+        "nav_tracked": "📋 职位跟踪",
         "nav_profile": "👤 画像",
         "nav_resume": "📄 简历库",
         "nav_letter": "✉️ 求职信",
+        "nav_learn_calendar": "📅 学习计划",
         "resume_title": "简历库",
         "resume_upload": "上传简历",
         "resume_delete": "删除",
@@ -350,6 +353,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_save": "💾 保存",
         "btn_letter": "✉️ 求职信",
         "btn_view": "🔗 查看原文",
+        "btn_add_job": "📤 添加职位",
         "saved_text": "✅ 已保存",
         "exists_text": "⚠️ 已存在",
 
@@ -363,6 +367,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_profile": "👤 Profil",
         "nav_resume": "📄 CV",
         "nav_letter": "✉️ Lettre de motivation",
+        "nav_learn_calendar": "📅 Plan d\u0027\u00e9tude",
         "resume_title": "Bibliothèque de CV",
         "resume_upload": "Télécharger un CV",
         "resume_delete": "Supprimer",
@@ -464,6 +469,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_save": "💾 Enregistrer",
         "btn_letter": "✉️ Lettre de motivation",
         "btn_view": "🔗 Voir l'offre",
+        "btn_add_job": "📤 Ajouter un poste",
         "saved_text": "✅ Enregistré",
         "exists_text": "⚠️ Déjà enregistré",
         "btn_letter_generate": "✉️ Générer la lettre",
@@ -923,6 +929,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             tabs += f'<a href="/tracked?status={key}" class="tab {active}">{label} ({cnt})</a>'
 
         btn_view = t(lang, "btn_view")
+        btn_letter = t(lang, "btn_letter")
+        btn_add_job = t(lang, "btn_add_job")
+        applied_text = t(lang, "applied")
         jobs_html = ""
         if not jobs:
             jobs_html = f'<p class="empty">{t(lang, "no_tracked")}</p>'
@@ -946,12 +955,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
-                    <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {j['status'] == 'applied' and 'btn-save' or 'btn-primary'}" id="apply-anal-btn-{j['id']}">{j['status'] == 'applied' and '✅ 已申请' or '📤 申请'}</button>
+                    <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {j['status'] == 'applied' and 'btn-save' or 'btn-primary'}" id="apply-anal-btn-{j['id']}">{j['status'] == 'applied' and applied_text or btn_apply}</button>
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
-                    <button class="btn btn-small cover-letter-btn" data-job-id="{j['id']}" style="font-size:12px">✉ 求职信</button>
+                    <button class="btn btn-small cover-letter-btn" data-job-id="{j['id']}" style="font-size:12px">{btn_letter}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
                 {('<div class="job-resume"><span class="resume-icon">📜</span> <span class="resume-name">'+j['resume_name']+'</span> <span class="resume-actions"><a href="#" class="link-url view-resume-btn" data-job-id="' + j['id'] + '">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">🖊 编辑</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">🎯 优化</button></span></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">📎 关联简历</button></div>'}
@@ -962,11 +971,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div class="section"><div class="tab-bar">{tabs}</div></div>
         <div class="section section-add-url" style="margin-top:8px;margin-bottom:8px;padding:8px 0;display:flex;gap:8px;align-items:center">
             <input id="manual-job-url" type="url" placeholder="粘贴职位链接，如 Google Careers / LinkedIn / Indeed…" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-            <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">📤 添加职位</button>
+            <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">{btn_add_job}</button>
         </div>
         <div id="manual-add-status" style="margin-bottom:8px;font-size:14px"></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
+        var _btn_add_job = {json.dumps(btn_add_job)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
             var closeBtn = e.target.closest('.skill-gap-close-btn');
@@ -1252,7 +1262,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 if (!d.success) {{
                     status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || '解析失败') + '</span>';
                     btn.disabled = false;
-                    btn.textContent = '📤 添加职位';
+                    btn.textContent = _btn_add_job;
                     return;
                 }}
                 var job = d.job;
@@ -1265,11 +1275,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     '<button onclick="saveFetchedJob(' + JSON.stringify(job).replace(/"/g, '&quot;') + ')" class="btn btn-primary btn-small" style="padding:6px 14px;flex-shrink:0">💾 保存</button></div>' +
                     '</div>';
                 btn.disabled = false;
-                btn.textContent = '📤 添加职位';
+                btn.textContent = _btn_add_job;
             }} catch(e) {{
                 status.innerHTML = '<span style="color:#d32f2f">❌ 请求失败: ' + e + '</span>';
                 btn.disabled = false;
-                btn.textContent = '📤 添加职位';
+                btn.textContent = _btn_add_job;
             }}
         }}
 
@@ -3311,7 +3321,7 @@ loadResume();
             ("/profile", t(lang, "nav_profile")),
             ("/letter", t(lang, "nav_letter")),
             ("/resumes", t(lang, "nav_resume")),
-            ("/learn_plan", "\U0001f4c5 \u5b66\u4e60\u8ba1\u5212"),
+            ("/learn_plan", t(lang, "nav_learn_calendar")),
         ]
         # Persist lang in nav links so switching pages doesn't lose language
         qs = f"?lang={lang}" if lang != "zh-CN" else ""
