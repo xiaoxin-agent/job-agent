@@ -415,6 +415,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.api_preview_resume_GET(params)
             return
 
+        # Special GET handlers that need method awareness
+        if path == "/api/learn_plan":
+            self.api_learn_plan(params, method="GET")
+            return
+        if path == "/api/learn_plan_ical":
+            self.api_learn_plan_ical(params)
+            return
+
         handler = routes.get(path)
         if handler:
             handler(params)
@@ -462,6 +470,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/tailor_resume": self.api_tailor_resume,
             "/api/analyze_skill_gap": self.api_analyze_skill_gap,
             "/api/learn_plan": self.api_learn_plan,
+            "/api/learn_plan_progress": self.api_learn_plan_progress,
+            "/api/learn_plan_ical": self.api_learn_plan_ical,
         }
 
         handler = api_routes.get(path)
@@ -875,26 +885,95 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 }}
             }}
         }});
-        function showLearnPlan(jobId) {{
-            var btnEl = document.querySelector('.learn-plan-btn[data-learn-jobid="' + jobId + '"]');
-            if (btnEl) {{ btnEl.textContent = '\u23f3 \u751f\u6210\u4e2d...'; btnEl.disabled = true; }}
-            fetch('/api/learn_plan', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
-            .then(function(r){{return r.json()}})
-            .then(function(d){{
-                if (btnEl) {{ btnEl.textContent = '\U0001f4da \u751f\u6210\u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }}
-                if (!d.success) {{ alert('\u751f\u6210\u5931\u8d25: ' + (d.error || '')); return; }}
+                    function showLearnPlan(jobId) {{
+                var btnEl = document.querySelector('.learn-plan-btn[data-learn-jobid="' + jobId + '"]');
+                if (btnEl) {{ btnEl.textContent = '\u23f3 \u52a0\u8f7d\u4e2d...'; btnEl.disabled = true; }}
+                // First try GET to load saved plan
+                fetch('/api/learn_plan?job_id=' + encodeURIComponent(jobId))
+                .then(function(r){{return r.json()}})
+                .then(function(initial){{
+                    var plan = initial.plan;
+                    var progress = initial.progress || {{}};
+                    var isSaved = initial.saved;
+                    if (!plan) {{
+                        // No saved plan, generate one
+                        return fetch('/api/learn_plan', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
+                        .then(function(r){{return r.json()}})
+                        .then(function(d){{
+                            if (!d.success) {{ alert('\u751f\u6210\u5931\u8d25: ' + (d.error || '')); return null; }}
+                            return {{plan: d.plan, progress: d.progress || {{}}, isSaved: true}};
+                        }});
+                    }}
+                    return {{plan: plan, progress: progress, isSaved: isSaved}};
+                }})
+                .then(function(result){{
+                    if (!result || !result.plan) return;
+                    if (btnEl) {{ btnEl.textContent = '\U0001f4da \u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }}
+                    renderLearnPlanModal(jobId, result.plan, result.progress);
+                }})
+                .catch(function(e){{
+                    if (btnEl) {{ btnEl.textContent = '\U0001f4da \u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }}
+                    alert('\u8bf7\u6c42\u5931\u8d25: ' + e);
+                }});
+            }}
+
+            function toggleLearnTask(jobId, taskId, cb) {{
+                var done = cb.checked;
+                fetch('/api/learn_plan_progress', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, task_id: taskId, done: done}})}})
+                .then(function(r){{return r.json()}})
+                .then(function(d){{
+                    if (!d.success) return;
+                    // Update progress bar
+                    var bar = document.getElementById('learn-progress-bar-' + jobId);
+                    var txt = document.getElementById('learn-progress-txt-' + jobId);
+                    if (bar && d.total > 0) {{ bar.style.width = Math.round(d.done / d.total * 100) + '%'; }}
+                    if (txt) {{ txt.textContent = d.done + '/' + d.total; }}
+                }});
+            }}
+
+            function renderLearnPlanModal(jobId, plan, progress) {{
                 var oldModal = document.getElementById('learn-plan-modal');
                 if (oldModal) oldModal.remove();
-                var plan = d.plan;
+                // Count total tasks
+                var totalTasks = 0;
+                var doneTasks = 0;
+                if (plan.weekly_plan) {{
+                    plan.weekly_plan.forEach(function(w){{
+                        if (w.tasks) {{ w.tasks.forEach(function(t,i){{
+                            var tid = 'w' + w.week + '_t' + i;
+                            totalTasks++;
+                            if (progress[tid] && progress[tid].done) doneTasks++;
+                        }});}}
+                    }});
+                }}
+                var pct = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0;
                 var h = '<div id="learn-plan-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1002;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
-                h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:600px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;line-height:1.6">';
-                h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">\U0001f4da \u5f3a\u5316\u5b66\u4e60\u8ba1\u5212</h3><button class="learn-plan-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">\u00d7</button></div>';
+                h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:630px;width:92%;max-height:88vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;line-height:1.6">';
+                h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+                h += '<h3 style="margin:0;font-size:15px">\U0001f4da \u5f3a\u5316\u5b66\u4e60\u8ba1\u5212</h3>';
+                h += '<button class="learn-plan-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">\u00d7</button></div>';
+
+                // Progress bar
+                if (totalTasks > 0) {{
+                    h += '<div style="margin-bottom:10px">';
+                    h += '<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:2px">';
+                    h += '<span>\u8fdb\u5ea6</span><span id="learn-progress-txt-' + jobId + '">' + doneTasks + '/' + totalTasks + '</span></div>';
+                    h += '<div style="background:#e0e0e0;border-radius:4px;height:8px;overflow:hidden">';
+                    h += '<div id="learn-progress-bar-' + jobId + '" style="background:#4caf50;height:8px;width:' + pct + '%;border-radius:4px;transition:width 0.3s"></div></div></div>';
+                }}
+
+                // Action buttons: ical export
+                h += '<div style="margin-bottom:10px;display:flex;gap:6px">';
+                h += '<a href="/api/learn_plan_ical?job_id=' + encodeURIComponent(jobId) + '" download class="btn btn-small" style="font-size:11px;text-decoration:none">\U0001f4c5 \u5bfc\u51fa\u65e5\u5386</a>';
+                h += '</div>';
+
+                // Focus skills
                 if (plan.focus_skills) {{
-                    h += '<div style="margin-bottom:12px"><b>\U0001f3af \u91cd\u70b9\u6280\u80fd</b></div>';
+                    h += '<div style="margin-bottom:10px"><b>\U0001f3af \u91cd\u70b9\u6280\u80fd</b></div>';
                     plan.focus_skills.forEach(function(s) {{
                         var priColor = s.priority == '\u9ad8' ? '#d32f2f' : s.priority == '\u4e2d' ? '#e65100' : '#1565c0';
                         h += '<div style="background:#f8f9fa;border-radius:6px;padding:8px;margin-bottom:6px">';
-                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + s.skill + '</b> <span style="font-size:11px;color:' + priColor + ';font-weight:500">' + s.priority + '\u4f18\u5148\u7ea7</span></div>';
+                        h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:11px;color:' + priColor + ';font-weight:500">' + (s.priority || '') + '\u4f18\u5148\u7ea7</span></div>';
                         h += '<div style="color:#555;font-size:12px;margin:4px 0">' + (s.reason || '') + '</div>';
                         if (s.resources) {{
                             s.resources.forEach(function(rsc) {{
@@ -904,21 +983,30 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         h += '</div>';
                     }});
                 }}
+
+                // Weekly plan with checkboxes
                 if (plan.weekly_plan) {{
-                    h += '<div style="margin-top:12px"><b>\U0001f4c5 \u6bcf\u5468\u8ba1\u5212</b></div>';
+                    h += '<div style="margin-top:10px"><b>\U0001f4c5 \u6bcf\u5468\u8ba1\u5212</b> <span style="font-size:11px;color:#888">\u2215 \u52fe\u9009\u5df2\u5b8c\u6210\u7684\u4efb\u52a1</span></div>';
                     plan.weekly_plan.forEach(function(w) {{
                         h += '<div style="background:#fff8e1;border-radius:6px;padding:8px;margin-bottom:6px">';
-                        h += '<div style="font-weight:500">\u7b2c' + w.week + '\u5468: ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(~' + (w.estimated_hours || '') + 'h)</span></div>';
+                        h += '<div style="font-weight:500">\u7b2c' + w.week + '\u5468: ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(\uff5e' + (w.estimated_hours || '') + 'h)</span></div>';
                         if (w.tasks) {{
-                            w.tasks.forEach(function(t) {{
-                                h += '<div style="font-size:12px;padding-left:8px">\u2713 ' + t + '</div>';
+                            w.tasks.forEach(function(t, tIdx) {{
+                                var tid = 'w' + w.week + '_t' + tIdx;
+                                var done = progress[tid] && progress[tid].done;
+                                h += '<div style="font-size:12px;padding:2px 0 2px 4px">';
+                                h += '<input type="checkbox" class="learn-task-cb" data-jobid="' + jobId + '" data-taskid="' + tid + '" ' + (done ? 'checked' : '') + ' style="vertical-align:middle;margin-right:4px"> ';
+                                h += '<span style="' + (done ? 'text-decoration:line-through;color:#888' : '') + '">' + t + '</span>';
+                                h += '</div>';
                             }});
                         }}
                         h += '</div>';
                     }});
                 }}
+
+                // Projects
                 if (plan.projects) {{
-                    h += '<div style="margin-top:12px"><b>\U0001f4bb \u7ec3\u4e60\u9879\u76ee</b></div>';
+                    h += '<div style="margin-top:10px"><b>\U0001f4bb \u7ec3\u4e60\u9879\u76ee</b></div>';
                     plan.projects.forEach(function(p) {{
                         h += '<div style="background:#e3f2fd;border-radius:6px;padding:8px;margin-bottom:6px">';
                         h += '<div style="font-weight:500">' + (p.name || '') + '</div>';
@@ -929,16 +1017,29 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         h += '</div>';
                     }});
                 }}
+
+                // Advice
                 if (plan.advice) {{
-                    h += '<div style="margin-top:12px;background:#f3e8ff;border-radius:6px;padding:10px;color:#6a1b9a">';
+                    h += '<div style="margin-top:10px;background:#f3e8ff;border-radius:6px;padding:10px;color:#6a1b9a">';
                     h += '<b>\U0001f4a1 \u5efa\u8bae:</b><br>' + plan.advice;
                     h += '</div>';
                 }}
                 h += '</div></div>';
                 document.body.insertAdjacentHTML('beforeend', h);
-            }})
-            .catch(function(e){{ if (btnEl) {{ btnEl.textContent = '\U0001f4da \u751f\u6210\u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }} alert('\u8bf7\u6c42\u5931\u8d25: ' + e); }});
-        }}
+
+                // Attach checkbox change handlers
+                document.querySelectorAll('.learn-task-cb').forEach(function(cb) {{
+                    cb.addEventListener('change', function() {{
+                        toggleLearnTask(this.getAttribute('data-jobid'), this.getAttribute('data-taskid'), this);
+                        // Toggle strikethrough
+                        var span = this.nextElementSibling;
+                        if (span) {{
+                            if (this.checked) {{ span.style.textDecoration = 'line-through'; span.style.color = '#888'; }}
+                            else {{ span.style.textDecoration = 'none'; span.style.color = ''; }}
+                        }}
+                    }});
+                }});
+            }}
         function closeApplyModal() {{
             var el = document.getElementById('apply-analysis-modal');
             if (el) el.remove();
@@ -1878,8 +1979,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({"success": False, "error": f"分析失败: {str(e)}"}, 500)
 
-    def api_learn_plan(self, data):
-        """根据技能差距生成强化学习计划"""
+    def api_learn_plan(self, data, method="POST"):
+        """根据技能差距生成强化学习计划（POST 生成并保存，GET 获取已保存）"""
         try:
             job_id = data.get("job_id", "")
             if not job_id:
@@ -1890,6 +1991,17 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 self.send_json({"success": False, "error": "找不到该职位"}, 404)
                 return
 
+            # GET: return saved plan if exists
+            if method == "GET":
+                saved = job.get("learn_plan")
+                if saved:
+                    progress = job.get("learn_plan_progress", {})
+                    self.send_json({"success": True, "plan": saved, "progress": progress, "saved": True})
+                    return
+                self.send_json({"success": True, "plan": None, "saved": False})
+                return
+
+            # POST: generate new plan
             job_title = job.get("title", "")
             job_desc = job.get("description", "")
             company = job.get("company", "")
@@ -1974,11 +2086,134 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 content = content[4:].strip()
 
             plan = j.loads(content)
-            self.send_json({"success": True, "plan": plan})
+            # 保存计划到职位数据
+            job["learn_plan"] = plan
+            # 初始化进度：为每个周任务创建 task_id 并初始化为未完成
+            progress = {}
+            if plan.get("weekly_plan"):
+                for w in plan["weekly_plan"]:
+                    week_num = w.get("week", 0)
+                    if w.get("tasks"):
+                        for t_idx, task in enumerate(w["tasks"]):
+                            task_id = f"w{week_num}_t{t_idx}"
+                            progress[task_id] = {"done": False, "text": task, "week": week_num}
+            job["learn_plan_progress"] = progress
+            self.agent.tracker.save()
+            self.send_json({"success": True, "plan": plan, "saved": True})
         except json.JSONDecodeError:
             self.send_json({"success": False, "error": "AI 返回格式异常，请重试"}, 500)
         except Exception as e:
             self.send_json({"success": False, "error": f"生成学习计划失败: {str(e)}"}, 500)
+
+    def api_learn_plan_progress(self, data):
+        """更新学习计划的进度"""
+        try:
+            job_id = data.get("job_id", "")
+            task_id = data.get("task_id", "")  # e.g. "w1_t0"
+            done = data.get("done", True)
+            if not job_id or not task_id:
+                self.send_json({"success": False, "error": "缺少参数"}, 400)
+                return
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+            progress = job.get("learn_plan_progress", {})
+            if task_id in progress:
+                progress[task_id]["done"] = bool(done)
+            else:
+                progress[task_id] = {"done": bool(done), "text": "", "week": 0}
+            job["learn_plan_progress"] = progress
+            # 计算统计
+            total = len(progress)
+            done_count = sum(1 for v in progress.values() if v.get("done"))
+            self.agent.tracker.save()
+            self.send_json({"success": True, "progress": progress, "done": done_count, "total": total})
+        except Exception as e:
+            self.send_json({"success": False, "error": f"更新进度失败: {str(e)}"}, 500)
+
+    def api_learn_plan_ical(self, data):
+        """导出学习计划为 iCal (.ics) 文件"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            job = self.agent.tracker.get_job(job_id)
+            if not job or "learn_plan" not in job:
+                self.send_json({"success": False, "error": "没有已保存的学习计划"}, 404)
+                return
+            plan = job["learn_plan"]
+            progress = job.get("learn_plan_progress", {})
+            title = job.get("title", "学习计划")
+            company = job.get("company", "")
+
+            import uuid
+            now = datetime.datetime.utcnow()
+            lines = []
+            lines.append("BEGIN:VCALENDAR")
+            lines.append("VERSION:2.0")
+            lines.append("PRODID:-//JobAgent//LearnPlan//EN")
+            lines.append("CALSCALE:GREGORIAN")
+            lines.append("METHOD:PUBLISH")
+            lines.append("X-WR-CALNAME:技能强化计划 - " + title)
+            lines.append("X-WR-TIMECONE:UTC")
+
+            base_date = now.date()
+            if plan.get("weekly_plan"):
+                for w in plan["weekly_plan"]:
+                    week_num = w.get("week", 1)
+                    week_start = base_date + datetime.timedelta(days=(week_num - 1) * 7)
+                    focus = w.get("focus", f"第{week_num}周")
+                    # Create a weekly summary event
+                    uid = str(uuid.uuid4())
+                    lines.append("BEGIN:VEVENT")
+                    lines.append(f"UID:{uid}@jobagent")
+                    lines.append(f"DTSTART;VALUE=DATE:{week_start.strftime('%Y%m%d')}")
+                    week_end = week_start + datetime.timedelta(days=6)
+                    lines.append(f"DTEND;VALUE=DATE:{week_end.strftime('%Y%m%d')}")
+                    lines.append(f"SUMMARY:📚 第{week_num}周: {focus}")
+                    desc = f"目标职位: {company} - {title}\
+"
+                    desc += f"重点: {focus}\
+"
+                    est = w.get("estimated_hours", "")
+                    if est:
+                        desc += f"预估: {est}h\
+"
+                    if w.get("tasks"):
+                        desc += "\
+任务:\
+"
+                        for t_idx, task in enumerate(w["tasks"]):
+                            tid = f"w{week_num}_t{t_idx}"
+                            p = progress.get(tid, {})
+                            mark = "✅" if p.get("done") else "⬜"
+                            desc += f"{mark} {task}\
+"
+                    lines.append(f"DESCRIPTION:{desc}")
+                    lines.append("END:VEVENT")
+
+            if plan.get("advice"):
+                uid = str(uuid.uuid4())
+                lines.append("BEGIN:VTODO")
+                lines.append(f"UID:{uid}@jobagent")
+                lines.append(f"SUMMARY:💡 学习建议")
+                lines.append(f"DESCRIPTION:{plan['advice']}")
+                lines.append("STATUS:NEEDS-ACTION")
+                lines.append("END:VTODO")
+
+            lines.append("END:VCALENDAR")
+            ical_content = "\r\n".join(lines)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/calendar; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="learn_plan_{job_id}.ics"')
+            self.send_header("Content-Length", str(len(ical_content.encode())))
+            self.end_headers()
+            self.wfile.write(ical_content.encode())
+        except Exception as e:
+            self.send_json({"success": False, "error": f"导出日历失败: {str(e)}"}, 500)
 
     def _find_job_from_cache(self, job_id: str) -> Optional[Dict]:
         """从搜索缓存中查找职位"""
