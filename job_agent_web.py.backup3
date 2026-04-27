@@ -276,8 +276,6 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "learn_plan_projects": "\U0001f4bb Projects",
         "learn_plan_skills": "Skills",
         "learn_plan_advice": "\U0001f4a1 Advice:",
-        "learn_plan_open": "\U0001f517 Open",
-        "learn_plan_priority_label": " Priority",
         "saved_to_tracker": "✅ Saved to tracker, refresh to see",
         "link_resume_title": "\U0001f4ce Link Resume",
         "btn_assign": "\U0001f517 Assign",
@@ -442,8 +440,6 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "learn_plan_projects": "💻 练习项目",
         "learn_plan_skills": "技能",
         "learn_plan_advice": "💡 建议:",
-        "learn_plan_open": "\U0001f517 \u6253\u5f00",
-        "learn_plan_priority_label": "\u4f18\u5148\u7ea7",
         "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
         "cal_month_names": ["1\u6708", "2\u6708", "3\u6708", "4\u6708", "5\u6708", "6\u6708", "7\u6708", "8\u6708", "9\u6708", "10\u6708", "11\u6708", "12\u6708"],
         "cal_weekday_labels": ["\u65e5", "\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d"],
@@ -615,8 +611,6 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "learn_plan_projects": "\U0001f4bb Projets",
         "learn_plan_skills": "Comp\u00e9tences",
         "learn_plan_advice": "\U0001f4a1 Conseils:",
-        "learn_plan_open": "\U0001f517 Ouvrir",
-        "learn_plan_priority_label": " Priorit\u00e9",
         "saved_to_tracker": "✅ Enregistré, actualisez pour voir",
         "link_resume_title": "\U0001f4ce Lier CV",
         "btn_assign": "\U0001f517 Assigner",
@@ -1344,7 +1338,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 if (plan.focus_skills) {{
                     h += '<div style="margin-bottom:10px"><b>' + _learn_plan_focus + '</b></div>';
                     plan.focus_skills.forEach(function(s) {{
-                        var priColor = s.priority === _learn_plan_priority_high ? '#d32f2f' : s.priority === _learn_plan_priority_mid ? '#e65100' : '#1565c0';
+                        var priColor = s.priority == '\u9ad8' || s.priority == 'High' || s.priority == 'Haute' ? '#d32f2f' : s.priority == '\u4e2d' || s.priority == 'Mid' || s.priority == 'Moyenne' ? '#e65100' : '#1565c0';
                         h += '<div style="background:#f8f9fa;border-radius:6px;padding:8px;margin-bottom:6px">';
                         h += '<div style="display:flex;justify-content:space-between;align-items:center"><b>' + (s.skill || '') + '</b> <span style="font-size:12px;color:' + priColor + ';font-weight:500">' + s.priority + '</span></div>';
                         h += '<div style="color:#555;font-size:14px;margin:4px 0">' + (s.reason || '') + '</div>';
@@ -1840,8 +1834,6 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         cal_title = t(lang, "learn_plan_modal_title")
         cal_empty = t(lang, "learn_plan_empty")
         tasks_completed = t(lang, "tasks_completed")
-        open_label = t(lang, "learn_plan_open")
-        priority_label = t(lang, "learn_plan_priority_label")
         
         # Collect all jobs that have a learn plan
         plan_jobs = []
