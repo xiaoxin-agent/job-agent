@@ -286,6 +286,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "gap_weak": "\u2191 Needs Improvement",
         "gap_suggestions": "\U0001f4a1 Suggestions",
         "exists_text": "⚠️ Exists",
+        "cal_month_names": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+        "cal_weekday_labels": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "cal_modal_resources": "\U0001f4da Recommended Resources",
+        "cal_modal_projects": "\U0001f4a1 Related Projects",
+        "cal_modal_advice": "\U0001f4ad Study Advice"
 
     },
     "zh-CN": {
@@ -436,6 +441,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "learn_plan_skills": "技能",
         "learn_plan_advice": "💡 建议:",
         "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
+        "cal_month_names": ["1\u6708", "2\u6708", "3\u6708", "4\u6708", "5\u6708", "6\u6708", "7\u6708", "8\u6708", "9\u6708", "10\u6708", "11\u6708", "12\u6708"],
+        "cal_weekday_labels": ["\u65e5", "\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d"],
+        "cal_modal_resources": "\U0001f4da \u63a8\u8350\u8d44\u6e90",
+        "cal_modal_projects": "\U0001f4a1 \u76f8\u5173\u9879\u76ee",
+        "cal_modal_advice": "\U0001f4ad \u5b66\u4e60\u5efa\u8bae",
         "link_resume_title": "\U0001f4ce 关联简历",
         "btn_assign": "\U0001f517 关联",
         "upload_new_resume": "\U0001f4e4 上传新简历并关联",
@@ -556,6 +566,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_search": "🚀 Lancer la recherche",
         "btn_search_again": "🚀 Relancer la recherche",
         "btn_save": "💾 Enregistrer",
+        "cal_month_names": ["Janvier", "F\u00e9vrier", "Mars", "Avril", "Mai", "Juin", "Juillet", "Ao\u00fbt", "Septembre", "Octobre", "Novembre", "D\u00e9cembre"],
+        "cal_weekday_labels": ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"],
+        "cal_modal_resources": "\U0001f4da Ressources recommand\u00e9es",
+        "cal_modal_projects": "\U0001f4a1 Projets connexes",
+        "cal_modal_advice": "\U0001f4ad Conseils d'\u00e9tude",
         "btn_letter": "✉️ Lettre de motivation",
         "btn_view": "🔗 Voir l'offre",
         "btn_add_job": "📤 Ajouter un poste",
@@ -1814,7 +1829,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         lang = self._get_lang(params)
         jobs = self.agent.tracker.tracked_jobs
         learn_plan_week = t(lang, "learn_plan_week")
-
+        cal_month_names = t(lang, "cal_month_names")
+        cal_weekday_labels = t(lang, "cal_weekday_labels")
+        cal_modal_resources = t(lang, "cal_modal_resources")
+        cal_modal_projects = t(lang, "cal_modal_projects")
+        cal_modal_advice = t(lang, "cal_modal_advice")
+        week_focus_tpl = t(lang, "week_focus")
+        cal_title = t(lang, "learn_plan_modal_title")
+        cal_empty = t(lang, "learn_plan_empty")
+        
         # Collect all jobs that have a learn plan
         plan_jobs = []
         for j in jobs:
@@ -1823,13 +1846,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 plan_jobs.append(j)
 
         cards = ""
-        month_names = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
-        weekday_labels = ["日", "一", "二", "三", "四", "五", "六"]
+        month_names = cal_month_names
+        weekday_labels = cal_weekday_labels
 
         if not plan_jobs:
             cards = f'''
             <div class="empty-state">
-                <p>暂无学习计划，请先在 <a href="/tracked">跟踪页面</a> 为职位生成学习计划。</p>
+                <p>{cal_empty}</p>
             </div>'''
 
         for j in plan_jobs:
@@ -1996,7 +2019,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     week_calendars += f'''
                     <div class="week-calendar">
                         <div class="week-header">
-                            <div class="week-title">\U0001f4c5 第{week_num}周 · {month_name} · {focus}</div>
+                            <div class="week-title">\U0001f4c5 {week_focus_tpl.format(week_num)} \u00b7 {month_name} \u00b7 {focus}</div>
                             <div class="week-stats">
                                 <span>{w_done}/{w_tasks} 任务完成</span>
                                 <div class="week-progress-bar"><div class="week-progress-fill" style="width:{round(w_done/w_tasks*100) if w_tasks else 0}%;background:{pct_color}"></div></div>
@@ -2166,7 +2189,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
         body = style + f'''
         <div class="container">
-            <h1>\U0001f4c5 学习计划</h1>
+            <h1>\U0001f4c5 {cal_title}</h1>
             {cards}
         </div>''' + modal
 
