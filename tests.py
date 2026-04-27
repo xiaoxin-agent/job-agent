@@ -1006,6 +1006,142 @@ class SkillGapI18nTests(unittest.TestCase):
                 agent.tracker.import_job(j)
 
 
+class LearnCalendarI18nTests(unittest.TestCase):
+    """测试学习日历多语言渲染（弹窗 week/tasks_completed 等 i18n 变量）"""
+
+    def setUp(self):
+        self.agent = TestWebServer._agent
+        if self.agent is None:
+            self.skipTest("Server agent not available (tests run before TestWebServer)")
+        self._saved = list(self.agent.tracker.tracked_jobs)
+        for j in self._saved:
+            self.agent.tracker.delete_job(j["id"])
+
+        # 创建一个带学习计划的测试职位
+        job = self.agent.tracker.add_job("Test Job", "BigCo", "Remote")
+        job = self.agent.tracker.tracked_jobs[0]
+        self.job_id = job["id"]
+
+        plan = {
+            "focus_skills": [
+                {"skill": "Python", "priority": "High", "description": "Deep Python", "resources": []},
+                {"skill": "Docker", "priority": "Mid", "description": "Container skills", "resources": []}
+            ],
+            "weekly_plan": [
+                {"week": 1, "tasks": [{"name": "Python advanced", "advice": "Do it"}, {"name": "Docker basics", "advice": "Read docs"}]},
+                {"week": 2, "tasks": [{"name": "Go practice", "advice": "Build app"}]}
+            ],
+            "practice_projects": [{"title": "Web App", "description": "Build a web app", "difficulty": "Medium"}],
+            "overall_advice": "Keep learning"
+        }
+        job["learn_plan"] = plan
+        progress = {
+            "w1_t0": {"done": True, "text": "Python advanced", "week": 1, "advice": "Do it"},
+            "w1_t1": {"done": False, "text": "Docker basics", "week": 1, "advice": "Read docs"},
+            "w2_t0": {"done": False, "text": "Go practice", "week": 2, "advice": "Build app"}
+        }
+        job["learn_plan_progress"] = progress
+        self.agent.tracker.save()
+
+    def tearDown(self):
+        # 恢复原始数据
+        for j in list(self.agent.tracker.tracked_jobs):
+            self.agent.tracker.delete_job(j["id"])
+        for j in self._saved:
+            self.agent.tracker.import_job(j)
+
+    def _fetch_calendar(self, lang):
+        from urllib.request import urlopen
+        port = TestWebServer.port
+        resp = urlopen(f"http://localhost:{port}/learn_plan?lang={lang}")
+        return resp.read().decode("utf-8")
+
+    def test_en_calendar_vars(self):
+        """EN 模式：_learn_plan_week / __learn_plan_week / tasks_completed 应正确"""
+        html = self._fetch_calendar("en")
+        # __learn_plan_week 来自 body f-string 注入
+        self.assertIn('__learn_plan_week = "Week"', html, "EN 下 __learn_plan_week 应为 Week")
+        self.assertIn('_learn_plan_week = __learn_plan_week', html, "modal 应引用 __learn_plan_week 变量")
+        # tasks_completed 变量
+        self.assertIn('tasks_completed =', html, "应有 tasks_completed 变量")
+        # 弹窗中用 _learn_plan_week 拼接，确认 JS 代码正确引用
+        self.assertIn('_learn_plan_week', html)
+        # 不应包含中文
+        self.assertNotIn("第", html, "EN 页面不应有中文'第'字")
+        self.assertNotIn("周", html, "EN 页面不应有中文'周'字")
+        self.assertNotIn("任务完成", html, "EN 页面不应有中文'任务完成'")
+
+    def test_zh_calendar_vars(self):
+        """中文模式：_learn_plan_week 应为 '第X周' 字符串"""
+        html = self._fetch_calendar("zh-CN")
+        # 检查 __learn_plan_week
+        self.assertIn('__learn_plan_week', html, "中文页应有 __learn_plan_week")
+        # 应有 tasks_completed
+        self.assertIn('tasks_completed', html)
+        # 应有 body 中的 script (__变量)
+        self.assertIn('__learn_plan_week', html)
+        self.assertIn('__cal_modal_resources', html)
+        self.assertIn('__cal_modal_projects', html)
+        self.assertIn('__cal_modal_advice', html)
+
+    def test_fr_calendar_vars(self):
+        """法语模式：_learn_plan_week 应为法语"""
+        html = self._fetch_calendar("fr")
+        self.assertIn('__learn_plan_week', html, "法语页应有 __learn_plan_week")
+        # 法语 tasks_completed
+        self.assertNotIn("任务完成", html, "法语页面不应有中文'任务完成'")
+
+    def test_calendar_js_structure(self):
+        """日历详情弹窗 JS 应正确引用 _learn_plan_week 变量（非 hardcoded 字符串）"""
+        html = self._fetch_calendar("en")
+        # 弹窗 week 赋值应使用变量
+        self.assertIn('_learn_plan_week', html, "弹窗 td-week textContent 应使用 _learn_plan_week 变量")
+        self.assertNotIn("' Week ", html, "不应有独立 hardcoded ' Week '")
+        self.assertNotIn("第undefined周", html, "不应有中文'第undefined周'")
+
+    def test_calendar_week_value_in_detail(self):
+        """data-detail 编码的 JSON 应包含 week 和 focus 字段"""
+        html = self._fetch_calendar("en")
+        import re
+        matches = re.findall(r'data-detail="([^"]+)"', html)
+        self.assertGreater(len(matches), 0, "应有至少一个带 data-detail 的任务")
+        import base64, urllib.parse, json
+        found_week = False
+        found_focus = False
+        for m in matches:
+            try:
+                decoded = urllib.parse.unquote(base64.b64decode(m).decode("utf-8"))
+                data = json.loads(decoded)
+                if "week" in data:
+                    found_week = True
+                if "focus" in data and data["focus"]:
+                    found_focus = True
+            except:
+                pass
+        self.assertTrue(found_week, "data-detail 应包含 week 字段")
+        self.assertTrue(found_focus, "data-detail 应包含 focus 字段")
+
+    def test_calendar_en_month_names(self):
+        """日历月份应为英文"""
+        html = self._fetch_calendar("en")
+        self.assertIn("January", html, "EN 日历应显示 January")
+        self.assertIn("February", html, "EN 日历应显示 February")
+        self.assertNotIn("一月", html, "EN 日历不应有中文一月")
+
+    def test_calendar_zh_month_names(self):
+        """日历月份应为中文"""
+        html = self._fetch_calendar("zh-CN")
+        self.assertIn("一月", html, "中文日历应显示一月")
+        self.assertIn("十二月", html, "中文日历应显示十二月")
+        self.assertNotIn("January", html, "中文日历不应有 January")
+
+    def test_calendar_fr_month_names(self):
+        """日历月份应为法语"""
+        html = self._fetch_calendar("fr")
+        self.assertIn("Janvier", html, "法语日历应显示 Janvier")
+        self.assertIn("Décembre", html, "法语日历应显示 Décembre")
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("🧪 求职Agent 测试套件")
@@ -1024,6 +1160,7 @@ if __name__ == "__main__":
     # Web接口测试
     suite.addTests(loader.loadTestsFromTestCase(TestWebServer))
     suite.addTests(loader.loadTestsFromTestCase(SkillGapI18nTests))
+    suite.addTests(loader.loadTestsFromTestCase(LearnCalendarI18nTests))
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

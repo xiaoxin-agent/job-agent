@@ -2116,11 +2116,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             </div>
         </div>
         <script>
-        var _learn_plan_week = {json.dumps(learn_plan_week, ensure_ascii=False)};
-        var _cal_modal_resources = {json.dumps(cal_modal_resources, ensure_ascii=False)};
-        var _cal_modal_projects = {json.dumps(cal_modal_projects, ensure_ascii=False)};
-        var _cal_modal_advice = {json.dumps(cal_modal_advice, ensure_ascii=False)};
-        // Task detail: click delegation on .cal-task
+        var _learn_plan_week = __learn_plan_week;
+        var _cal_modal_resources = __cal_modal_resources;
+        var _cal_modal_projects = __cal_modal_projects;
+        var _cal_modal_advice = __cal_modal_advice;
+        // Task detail: click delegation on .cal-task        // Task detail: click delegation on .cal-task
         document.addEventListener('click', function(e) {
             var el = e.target.closest('.cal-task');
             if (!el || !el.dataset.detail) return;
@@ -2198,7 +2198,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div class="container">
             <h1>\U0001f4c5 {cal_title}</h1>
             {cards}
-        </div>''' + modal
+                </div>
+        <script>
+        var __cal_modal_resources = {json.dumps(cal_modal_resources, ensure_ascii=False)};
+        var __cal_modal_projects = {json.dumps(cal_modal_projects, ensure_ascii=False)};
+        var __cal_modal_advice = {json.dumps(cal_modal_advice, ensure_ascii=False)};
+        var __learn_plan_week = {json.dumps(learn_plan_week, ensure_ascii=False)};
+        </script>
+        ''' + modal
 
         self._send_html(self._page(t(lang, "learn_plan_title"), body, lang=lang))
 
