@@ -258,6 +258,10 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "Week {}",
         "tasks_completed": "{} tasks completed",
         "saved_to_tracker": "✅ Saved to tracker, refresh to see",
+        "link_resume_title": "\U0001f4ce Link Resume",
+        "btn_assign": "\U0001f517 Assign",
+        "upload_new_resume": "\U0001f4e4 Upload New Resume",
+        "cancel": "Cancel",
         "exists_text": "⚠️ Exists",
 
     },
@@ -390,6 +394,10 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "第{}周",
         "tasks_completed": "{}/{} 任务完成",
         "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
+        "link_resume_title": "\U0001f4ce 关联简历",
+        "btn_assign": "\U0001f517 关联",
+        "upload_new_resume": "\U0001f4e4 上传新简历并关联",
+        "cancel": "取消",
         "exists_text": "⚠️ 已存在",
 
     },
@@ -524,6 +532,10 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "Semaine {}",
         "tasks_completed": "{} tâches terminées",
         "saved_to_tracker": "✅ Enregistré, actualisez pour voir",
+        "link_resume_title": "\U0001f4ce Lier CV",
+        "btn_assign": "\U0001f517 Assigner",
+        "upload_new_resume": "\U0001f4e4 T\u00e9l\u00e9charger un nouveau CV",
+        "cancel": "Annuler",
         "exists_text": "⚠️ Déjà enregistré",
         "btn_letter_generate": "✉️ Générer la lettre",
         "my_profile": "Mon profil",
@@ -1056,6 +1068,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _btn_copy = {json.dumps(btn_copy)};
         var _confirm_delete = {json.dumps(confirm_delete)};
         var _note_prompt = {json.dumps(note_prompt)};
+        var _link_resume_title = {json.dumps(t(lang, 'link_resume_title'))};
+        var _btn_assign = {json.dumps(t(lang, 'btn_assign'))};
+        var _upload_new_resume = {json.dumps(t(lang, 'upload_new_resume'))};
+        var _cancel = {json.dumps(t(lang, 'cancel'))};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
             var closeBtn = e.target.closest('.skill-gap-close-btn');
@@ -1459,7 +1475,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
             // Footer buttons
             h += '<div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid #e0e0e0;flex-shrink:0">';
-            h += '<button class="btn" onclick="closeApplyModal()">\u53d6\u6d88</button>';
+            h += '<button class="btn" onclick="closeApplyModal()">' + _cancel + '</button>';
             var recordBtnId = 'apply-rec-' + jobId;
             h += '<button class="btn btn-primary" id="' + recordBtnId + '">\u2705 \u5df2\u7533\u8bf7</button>';
             h += '</div>';
@@ -1537,18 +1553,18 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var list = data.success ? data.resumes : [];
                 var h = '<div id=\"resume-modal-overlay\" style=\"position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center\">';
                 h += '<div style=\"background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto\">';
-                h += '<h3 style=\"margin-bottom:12px\">\U0001f4ce \u5173\u8054\u7b80\u5386</h3>';
+                h += '<h3 style=\"margin-bottom:12px\">' + _link_resume_title + '</h3>';
                 if (list.length > 0) {{
                     list.forEach(function(r){{
                         h += '<div style=\"display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee\">';
                         h += '<span>\U0001f4c4 ' + r.name + '</span>';
-                        h += '<button onclick=\"assignResume(\\'' + jobId + '\\',\\'' + r.id + '\\')\" class=\"btn btn-small\">\u5173\u8054</button>';
+                        h += '<button onclick=\"assignResume(\\'' + jobId + '\\',\\'' + r.id + '\\')\" class=\"btn btn-small\">' + _btn_assign + '</button>';
                         h += '</div>';
                     }});
                     h += '<hr style=\"margin:12px 0\">';
                 }}
-                h += '<div><button onclick=\"uploadNewResumeAndLink(\\'' + jobId + '\\')\" class=\"btn\" style=\"width:100%\">\U0001f4e4 \u4e0a\u4f20\u65b0\u7b80\u5386\u5e76\u5173\u8054</button></div>';
-                h += '<div style=\"margin-top:12px;text-align:right\"><button onclick=\"closeResumeModal()\" class=\"btn btn-small\">\u53d6\u6d88</button></div>';
+                h += '<div><button onclick=\"uploadNewResumeAndLink(\\'' + jobId + '\\')\" class=\"btn\" style=\"width:100%\">' + _upload_new_resume + '</button></div>';
+                h += '<div style=\"margin-top:12px;text-align:right\"><button onclick=\"closeResumeModal()\" class=\"btn btn-small\">' + _cancel + '</button></div>';
                 h += '</div></div>';
                 document.body.insertAdjacentHTML('beforeend', h);
             }});
@@ -1560,8 +1576,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var d = await r.json();
                 if (d.success) {{ 
                     location.reload();
-                }} else {{ alert('\u5173\u8054\u5931\u8d25: ' + (d.error || '')); }}
-            }} catch(e) {{ alert('\u9519\u8bef: ' + e); }}
+                }} else {{ alert(_parse_failed + ': ' + (d.error || '')); }}
+            }} catch(e) {{ alert(_parse_failed + ': ' + e); }}
         }}
         async function uploadNewResumeAndLink(jobId) {{
             var input = document.createElement('input');
@@ -1579,7 +1595,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 try {{
                     var r1 = await fetch('/api/add_resume_multipart', {{method:'POST', body:formData}});
                     var d1 = await r1.json();
-                    if (!d1.success) {{ alert('\u4e0a\u4f20\u5931\u8d25: ' + (d1.error || '')); document.body.removeChild(input); return; }}
+                    if (!d1.success) {{ alert(_parse_failed + ': ' + (d1.error || '')); document.body.removeChild(input); return; }}
                     var r2 = await fetch('/api/assign_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, resume_id:d1.resume.id}})}});
                     var d2 = await r2.json();
                     if (!d2.success) {{ alert('\u5173\u8054\u5931\u8d25'); document.body.removeChild(input); return; }}
