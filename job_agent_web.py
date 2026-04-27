@@ -1484,8 +1484,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                     detail_uri = urllib.parse.quote(detail_json)
                                     detail_b64 = base64.b64encode(detail_uri.encode()).decode()
                                     disp = task_text[:14] + "..." if len(task_text) > 14 else task_text
+                                    cb_checked = "checked" if is_done else ""
+                                    cb_id = f"cb-{job_id}-{tid}"
                                     tasks_for_day += f'''
-                                    <div class="cal-task {done_cls}" data-detail="{detail_b64}" title="{task_text}">{disp}</div>'''
+                                    <div class="cal-task-row">
+                                        <input type="checkbox" class="cal-task-cb" id="{cb_id}" data-jobid="{job_id}" data-taskid="{tid}" {cb_checked}>
+                                        <div class="cal-task {done_cls}" data-detail="{detail_b64}" title="{task_text}">{disp}</div>
+                                    </div>'''
 
                         week_days += f'''
                         <div class="cal-day">
@@ -1557,7 +1562,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         .cal-day:nth-child(7n) {{ border-right:none; }}
         .cal-day-header {{ font-size:12px; color:#888; margin-bottom:4px; }}
         .cal-day-header.today-dot {{ background:#1a73e8; color:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; }}
-        .cal-task {{ font-size:10px; padding:1px 3px; margin:1px 0; background:#e3f2fd; border-radius:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; }}
+        .cal-task-row {{ display:flex; align-items:center; gap:2px; }}
+        .cal-task-cb {{ margin:0; width:10px; height:10px; cursor:pointer; flex-shrink:0; }}
+        .cal-task {{ font-size:10px; padding:1px 3px; margin:1px 0; background:#e3f2fd; border-radius:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; flex:1; min-width:0; }}
         .cal-task.task-done {{ background:#e8f5e9; text-decoration:line-through; color:#888; }}
         .empty-state {{ text-align:center; padding:60px 20px; color:#888; }}
         .empty-state a {{ color:#1a73e8; }}
@@ -1639,6 +1646,28 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
                 document.getElementById('td-overlay').style.display = 'flex';
             } catch(err) { console.warn('Task detail parse error', err); }
+        });
+
+        // Calendar task checkbox: toggle progress
+        document.addEventListener('change', function(e) {
+            var cb = e.target.closest('.cal-task-cb');
+            if (!cb) return;
+            var jobId = cb.getAttribute('data-jobid');
+            var taskId = cb.getAttribute('data-taskid');
+            if (!jobId || !taskId) return;
+            toggleLearnTask(jobId, taskId, cb);
+            // Toggle strikethrough on sibling .cal-task
+            var row = cb.parentElement;
+            if (row) {
+                var taskEl = row.querySelector('.cal-task');
+                if (taskEl) {
+                    if (cb.checked) {
+                        taskEl.classList.add('task-done');
+                    } else {
+                        taskEl.classList.remove('task-done');
+                    }
+                }
+            }
         });
 
         function closeTaskDetail() {
