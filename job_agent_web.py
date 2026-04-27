@@ -15,6 +15,67 @@ from typing import Dict, Optional
 from job_agent_core import JobAgent
 from job_agent_apply import ApplyManager
 
+# Website-specific company emoji mapping
+COMPANY_EMOJIS = {
+    'google': '\U0001F310',  # 🌐 (globe, Google is a web company)
+    'amazon': '\U0001F4E6',  # 📦 (package, Amazon ships things)
+    'apple': '\U00002764\U0000FE0F',  # ❤️ (Apple = love brand)
+    'microsoft': '\U0001F4BB',  # 💻 (Windows/pc)
+    'meta': '\U0001F30D',  # 🌍 (Meta connects the world)
+    'linkedin': '\U0001F4BC',  # 💼 (professional networking)
+    'indeed': '\U0001F50D',  # 🔍 (job search)
+    'nvidia': '\U0001F9E9',  # 🧩 (GPU/tech pieces)
+    'ibm': '\U0001F4CA',  # 📊 (enterprise/data)
+    'remoteok': '\U0001F30E',  # 🌎 (remote work globe)
+    'greenhouse': '\U0001F331',  # 🌱 (greenhouse = plant)
+    'lever': '\U00002695',  # ⚕️ (lever = cross/medical vibe)
+    'twitter': '\U0001F426',  # 🐦 (Twitter bird)
+    'x': '\U00002754',  # ❔ (X = unknown)
+    'tesla': '\U0001F698',  # 🚘 (car)
+    'netflix': '\U0001F3AC',  # 🎬 (entertainment)
+    'spotify': '\U0001F3B5',  # 🎵 (music)
+    'uber': '\U0001F699',  # 🚙 (ride)
+    'airbnb': '\U0001F3E0',  # 🏠 (home/host)
+    'stripe': '\U0001F4B3',  # 💳 (payments)
+    'square': '\U0001F4B0',  # 💰 (money)
+    'shopify': '\U0001F6CD',  # 🛍️ (shopping)
+    'notion': '\U0001F4DD',  # 📝 (notes)
+    'figma': '\U0001F3A8',  # 🎨 (design)
+    'databricks': '\U0001F4E1',  # 📡 (data transmission)
+    'datadog': '\U0001F436',  # 🐶 (dog)
+    'cloudflare': '\U00002601',  # ☁️ (cloud)
+    'dropbox': '\U0001F4E5',  # 📥 (box/inbox)
+    'slack': '\U0001F4AC',  # 💬 (chat)
+    'github': '\U0001F4BB',  # 💻 (code/development)
+    'gitlab': '\U0001F9F1',  # 🧱 (build)
+    'docker': '\U0001F433',  # 🐳 (whale)
+    'kubernetes': '\U0001F6A2',  # 🚢 (ship/container)
+    'sentry': '\U0001F4E8',  # 📨 (mail/alert)
+    'hashicorp': '\U0001F3F0',  # 🏰 (castle/enterprise)
+    'mongodb': '\U0001F431',  # 🐱 (cat/leaf)
+    'redis': '\U0001F34C',  # 🍌 (yellow/banana)
+    'elastic': '\U0001F50D',  # 🔍 (search)
+    'splunk': '\U0001F50E',  # 🔎 (data search)
+}
+
+
+def get_company_emoji(company_name: str) -> str:
+    """Return the best-matching emoji for a company name.
+    Falls back to \U0001F3E2 (Office Building) when no match."""
+    if not company_name:
+        return '\U0001F3E2'
+    name = company_name.lower().strip()
+    # Try exact match first
+    for key, emoji in COMPANY_EMOJIS.items():
+        if key == name:
+            return emoji
+    # Try substring match (e.g. "Google Cloud" -> "google")
+    for key, emoji in COMPANY_EMOJIS.items():
+        if key in name:
+            return emoji
+    return '\U0001F3E2'
+
+
 PORT = 9999
 
 
@@ -654,6 +715,18 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _sr_h2 = {json.dumps(search_results_h2)};
         var _jl_h2 = {json.dumps(job_list_h2)};
         
+        // Company emoji mapping (from backend)
+        var _companyEmojis = {json.dumps(COMPANY_EMOJIS)};
+        function getCompanyEmoji(name) {{
+            if (!name) return '\U0001F3E2';
+            var n = name.toLowerCase().trim();
+            if (_companyEmojis[n]) return _companyEmojis[n];
+            for (var k in _companyEmojis) {{
+                if (n.indexOf(k) >= 0) return _companyEmojis[k];
+            }}
+            return '\U0001F3E2';
+        }}
+
         var searchData = null;
 
         function renderResults(d) {{
@@ -681,7 +754,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     h += '</div>';
                 h += '<div class="job-score ' + cls + '">' + sc + '%</div></div>';
                 h += '<div class="job-meta">';
-                h += '<span>🏢 ' + (job.company || '') + '</span>';
+                h += '<span>' + getCompanyEmoji(job.company) + ' ' + (job.company || '') + '</span>';
                 h += '<span>📍 ' + (job.location || '') + '</span>';
                 h += '<span>📅 ' + (job.date || '').substring(0, 10) + '</span>';
                 h += '<span>📡 ' + (job.source || '') + '</span></div>';
@@ -817,7 +890,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span class="status-tag status-{j['status']}">{label}</span>
                 </div>
                 <div class="job-meta">
-                    <span>🏢 {j['company']}</span>
+                    <span>{get_company_emoji(j.get('company',''))} {j['company']}</span>
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
                     <span id="skill-gap-{j['id']}">{j.get('skill_gap_html','')}</span>
