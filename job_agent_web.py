@@ -15,65 +15,91 @@ from typing import Dict, Optional
 from job_agent_core import JobAgent
 from job_agent_apply import ApplyManager
 
+# ============================================================
+# Company logo SVGs (inline, no external requests)
+# ============================================================
+
+LOGOS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'logos')
+
+def get_company_logo(company_name: str) -> str:
+    """Return an <img> tag or emoji for the company."""
+    if not company_name:
+        return get_company_emoji(company_name)
+    name = company_name.lower().strip()
+    # Try exact match first, then substring
+    def _read_svg(path):
+        with open(path, 'r') as f:
+            svg = f.read()
+        # Use data URI - replace " with ' and < with %3C, > with %3E
+        import urllib.parse
+        encoded = urllib.parse.quote(svg, safe='')
+        return f'<img src="data:image/svg+xml,{encoded}" style="width:18px;height:18px;vertical-align:middle;margin-right:3px" alt="{company_name}">'
+    svg_path = os.path.join(LOGOS_DIR, f'{name}.svg')
+    if os.path.exists(svg_path):
+        return _read_svg(svg_path)
+    for fname in os.listdir(LOGOS_DIR):
+        base = fname.replace('.svg', '').lower()
+        if base in name:
+            return _read_svg(os.path.join(LOGOS_DIR, fname))
+    return get_company_emoji(company_name)
+
 # Website-specific company emoji mapping
 COMPANY_EMOJIS = {
-    'google': '\U0001F310',  # 🌐 (globe, Google is a web company)
-    'amazon': '\U0001F4E6',  # 📦 (package, Amazon ships things)
-    'apple': '\U00002764\U0000FE0F',  # ❤️ (Apple = love brand)
-    'microsoft': '\U0001F4BB',  # 💻 (Windows/pc)
-    'meta': '\U0001F30D',  # 🌍 (Meta connects the world)
-    'linkedin': '\U0001F4BC',  # 💼 (professional networking)
-    'indeed': '\U0001F50D',  # 🔍 (job search)
-    'nvidia': '\U0001F9E9',  # 🧩 (GPU/tech pieces)
-    'ibm': '\U0001F4CA',  # 📊 (enterprise/data)
-    'remoteok': '\U0001F30E',  # 🌎 (remote work globe)
-    'greenhouse': '\U0001F331',  # 🌱 (greenhouse = plant)
-    'lever': '\U00002695',  # ⚕️ (lever = cross/medical vibe)
-    'twitter': '\U0001F426',  # 🐦 (Twitter bird)
-    'x': '\U00002754',  # ❔ (X = unknown)
-    'tesla': '\U0001F698',  # 🚘 (car)
-    'netflix': '\U0001F3AC',  # 🎬 (entertainment)
-    'spotify': '\U0001F3B5',  # 🎵 (music)
-    'uber': '\U0001F699',  # 🚙 (ride)
-    'airbnb': '\U0001F3E0',  # 🏠 (home/host)
-    'stripe': '\U0001F4B3',  # 💳 (payments)
-    'square': '\U0001F4B0',  # 💰 (money)
-    'shopify': '\U0001F6CD',  # 🛍️ (shopping)
-    'notion': '\U0001F4DD',  # 📝 (notes)
-    'figma': '\U0001F3A8',  # 🎨 (design)
-    'databricks': '\U0001F4E1',  # 📡 (data transmission)
-    'datadog': '\U0001F436',  # 🐶 (dog)
-    'cloudflare': '\U00002601',  # ☁️ (cloud)
-    'dropbox': '\U0001F4E5',  # 📥 (box/inbox)
-    'slack': '\U0001F4AC',  # 💬 (chat)
-    'github': '\U0001F4BB',  # 💻 (code/development)
-    'gitlab': '\U0001F9F1',  # 🧱 (build)
-    'docker': '\U0001F433',  # 🐳 (whale)
-    'kubernetes': '\U0001F6A2',  # 🚢 (ship/container)
-    'sentry': '\U0001F4E8',  # 📨 (mail/alert)
-    'hashicorp': '\U0001F3F0',  # 🏰 (castle/enterprise)
-    'mongodb': '\U0001F431',  # 🐱 (cat/leaf)
-    'redis': '\U0001F34C',  # 🍌 (yellow/banana)
-    'elastic': '\U0001F50D',  # 🔍 (search)
-    'splunk': '\U0001F50E',  # 🔎 (data search)
+    'google': '🔍',  # 🔍 (Google = search)
+    'amazon': '📦',  # 📦 (package)
+    'apple': '❤️',  # ❤️ (love brand)
+    'microsoft': '💻',  # 💻 (Windows/pc)
+    'meta': '🌍',  # 🌍 (Meta connects the world)
+    'linkedin': '💼',  # 💼 (professional networking)
+    'indeed': '🔍',  # 🔍 (job search)
+    'nvidia': '🧩',  # 🧩 (GPU/tech)
+    'ibm': '📊',  # 📊 (enterprise/data)
+    'remoteok': '🌎',  # 🌎 (remote work globe)
+    'greenhouse': '🌱',  # 🌱 (greenhouse = plant)
+    'lever': '⚕',  # ⚕️ (cross/medical)
+    'twitter': '🐦',  # 🐦 (Twitter bird)
+    'x': '❔',  # ❔ (X = unknown)
+    'tesla': '🚘',  # 🚘 (car)
+    'netflix': '🎬',  # 🎬 (entertainment)
+    'spotify': '🎵',  # 🎵 (music)
+    'uber': '🚙',  # 🚙 (ride)
+    'airbnb': '🏠',  # 🏠 (home/host)
+    'stripe': '💳',  # 💳 (payments)
+    'square': '💰',  # 💰 (money)
+    'shopify': '🛍',  # 🛍️ (shopping)
+    'notion': '📝',  # 📝 (notes)
+    'figma': '🎨',  # 🎨 (design)
+    'databricks': '📡',  # 📡 (data)
+    'datadog': '🐶',  # 🐶 (dog)
+    'cloudflare': '☁',  # ☁️ (cloud)
+    'dropbox': '📥',  # 📥 (inbox)
+    'slack': '💬',  # 💬 (chat)
+    'github': '💻',  # 💻 (code)
+    'gitlab': '🧱',  # 🧱 (build)
+    'docker': '🐳',  # 🐳 (whale)
+    'kubernetes': '🚢',  # 🚢 (ship)
+    'sentry': '📨',  # 📨 (alert)
+    'hashicorp': '🏰',  # 🏰 (castle)
+    'mongodb': '🐱',  # 🐱 (cat)
+    'redis': '🍌',  # 🍌 (banana)
+    'elastic': '🔍',  # 🔍 (search)
+    'splunk': '🔎',  # 🔎 (data search)
 }
 
 
 def get_company_emoji(company_name: str) -> str:
     """Return the best-matching emoji for a company name.
-    Falls back to \U0001F3E2 (Office Building) when no match."""
+    Falls back to 🏢 (Office Building) when no match."""
     if not company_name:
-        return '\U0001F3E2'
+        return '🏢'
     name = company_name.lower().strip()
-    # Try exact match first
     for key, emoji in COMPANY_EMOJIS.items():
         if key == name:
             return emoji
-    # Try substring match (e.g. "Google Cloud" -> "google")
     for key, emoji in COMPANY_EMOJIS.items():
         if key in name:
             return emoji
-    return '\U0001F3E2'
+    return '🏢'
 
 
 PORT = 9999
@@ -890,7 +916,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span class="status-tag status-{j['status']}">{label}</span>
                 </div>
                 <div class="job-meta">
-                    <span>{get_company_emoji(j.get('company',''))} {j['company']}</span>
+                    <span>{get_company_logo(j.get('company',''))} {j['company']}</span>
                     <span>📍 {j['location']}</span>
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
                     <span id="skill-gap-{j['id']}">{j.get('skill_gap_html','')}</span>
