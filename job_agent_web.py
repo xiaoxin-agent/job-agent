@@ -261,6 +261,21 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_generate_plan": "📚 Generate Study Plan",
         "btn_view_plan": "📚 View Study Plan",
         "learn_plan_empty": "No study plans yet. Generate one from the <a href='/tracked'>tracked page</a>.",
+        "learn_plan_modal_title": "\U0001f4da Study Plan",
+        "learn_plan_progress": "Progress",
+        "learn_plan_export": "\U0001f4c5 Export Plan",
+        "learn_plan_focus": "\U0001f3af Focus Skills",
+        "learn_plan_priority_high": "High Priority",
+        "learn_plan_priority_mid": "Mid Priority",
+        "learn_plan_priority_low": "Low Priority",
+        "learn_plan_resource_type": "Resource",
+        "learn_plan_weekly": "\U0001f4c5 Weekly Plan",
+        "learn_plan_check_hint": " / Check completed tasks",
+        "learn_plan_week": "Week",
+        "learn_plan_hours": "h",
+        "learn_plan_projects": "\U0001f4bb Projects",
+        "learn_plan_skills": "Skills",
+        "learn_plan_advice": "\U0001f4a1 Advice:",
         "saved_to_tracker": "✅ Saved to tracker, refresh to see",
         "link_resume_title": "\U0001f4ce Link Resume",
         "btn_assign": "\U0001f517 Assign",
@@ -405,6 +420,21 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_generate_plan": "📚 生成学习计划",
         "btn_view_plan": "📚 查看学习计划",
         "learn_plan_empty": "暂无学习计划，请先在 <a href='/tracked'>跟踪页面</a> 为职位生成学习计划。",
+        "learn_plan_modal_title": "📚 强化学习计划",
+        "learn_plan_progress": "进度",
+        "learn_plan_export": "📅 导出计划",
+        "learn_plan_focus": "🎯 重点技能",
+        "learn_plan_priority_high": "高优先级",
+        "learn_plan_priority_mid": "中优先级",
+        "learn_plan_priority_low": "低优先级",
+        "learn_plan_resource_type": "资源",
+        "learn_plan_weekly": "📅 每周计划",
+        "learn_plan_check_hint": "∕ 勾选已完成的任务",
+        "learn_plan_week": "第",
+        "learn_plan_hours": "h",
+        "learn_plan_projects": "💻 练习项目",
+        "learn_plan_skills": "技能",
+        "learn_plan_advice": "💡 建议:",
         "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
         "link_resume_title": "\U0001f4ce 关联简历",
         "btn_assign": "\U0001f517 关联",
@@ -551,6 +581,21 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_generate_plan": "📚 Générer un plan d'étude",
         "btn_view_plan": "📚 Voir le plan d'étude",
         "learn_plan_empty": "Aucun plan d'étude pour le moment. Générez-en un depuis la <a href='/tracked'>page de suivi</a>.",
+        "learn_plan_modal_title": "\U0001f4da Plan d'\u00e9tude",
+        "learn_plan_progress": "Progression",
+        "learn_plan_export": "\U0001f4c5 Exporter le plan",
+        "learn_plan_focus": "\U0001f3af Comp\u00e9tences cl\u00e9s",
+        "learn_plan_priority_high": "Haute priorit\u00e9",
+        "learn_plan_priority_mid": "Priorit\u00e9 moyenne",
+        "learn_plan_priority_low": "Faible priorit\u00e9",
+        "learn_plan_resource_type": "Ressource",
+        "learn_plan_weekly": "\U0001f4c5 Plan hebdomadaire",
+        "learn_plan_check_hint": " / T\u00e2ches termin\u00e9es",
+        "learn_plan_week": "Semaine",
+        "learn_plan_hours": "h",
+        "learn_plan_projects": "\U0001f4bb Projets",
+        "learn_plan_skills": "Comp\u00e9tences",
+        "learn_plan_advice": "\U0001f4a1 Conseils:",
         "saved_to_tracker": "✅ Enregistré, actualisez pour voir",
         "link_resume_title": "\U0001f4ce Lier CV",
         "btn_assign": "\U0001f517 Assigner",
@@ -1033,6 +1078,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         cover_letter_title_short = t(lang, "cover_letter_title_short")
         loading_text = t(lang, "loading")
         gap_modal_title = t(lang, "gap_modal_title")
+        learn_plan_modal_title = t(lang, "learn_plan_modal_title")
+        learn_plan_progress = t(lang, "learn_plan_progress")
+        learn_plan_export = t(lang, "learn_plan_export")
+        learn_plan_focus = t(lang, "learn_plan_focus")
+        learn_plan_priority_high = t(lang, "learn_plan_priority_high")
+        learn_plan_priority_mid = t(lang, "learn_plan_priority_mid")
+        learn_plan_priority_low = t(lang, "learn_plan_priority_low")
+        learn_plan_resource_type = t(lang, "learn_plan_resource_type")
+        learn_plan_weekly = t(lang, "learn_plan_weekly")
+        learn_plan_check_hint = t(lang, "learn_plan_check_hint")
+        learn_plan_week = t(lang, "learn_plan_week")
+        learn_plan_hours = t(lang, "learn_plan_hours")
+        learn_plan_projects = t(lang, "learn_plan_projects")
+        learn_plan_skills = t(lang, "learn_plan_skills")
+        learn_plan_advice = t(lang, "learn_plan_advice")
         btn_generate_plan = t(lang, "btn_generate_plan")
         btn_view_plan = t(lang, "btn_view_plan")
         learn_plan_empty = t(lang, "learn_plan_empty")
@@ -1098,6 +1158,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _btn_generate_plan = {json.dumps(btn_generate_plan)};
         var _btn_view_plan = {json.dumps(btn_view_plan)};
         var _learn_plan_empty = {json.dumps(learn_plan_empty)};
+        var _learn_plan_modal_title = {json.dumps(learn_plan_modal_title)};
+        var _learn_plan_progress_label = {json.dumps(learn_plan_progress)};
+        var _learn_plan_export = {json.dumps(learn_plan_export)};
+        var _learn_plan_focus = {json.dumps(learn_plan_focus)};
+        var _learn_plan_priority_high = {json.dumps(learn_plan_priority_high)};
+        var _learn_plan_priority_mid = {json.dumps(learn_plan_priority_mid)};
+        var _learn_plan_priority_low = {json.dumps(learn_plan_priority_low)};
+        var _learn_plan_resource_type = {json.dumps(learn_plan_resource_type)};
+        var _learn_plan_weekly = {json.dumps(learn_plan_weekly)};
+        var _learn_plan_check_hint = {json.dumps(learn_plan_check_hint)};
+        var _learn_plan_week = {json.dumps(learn_plan_week)};
+        var _learn_plan_hours = {json.dumps(learn_plan_hours)};
+        var _learn_plan_projects = {json.dumps(learn_plan_projects)};
+        var _learn_plan_skills = {json.dumps(learn_plan_skills)};
+        var _learn_plan_advice = {json.dumps(learn_plan_advice)};
         var _confirm_delete = {json.dumps(confirm_delete)};
         var _note_prompt = {json.dumps(note_prompt)};
         var _link_resume_title = {json.dumps(t(lang, 'link_resume_title'))};
@@ -1227,26 +1302,26 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var h = '<div id="learn-plan-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1002;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
                 h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:630px;width:92%;max-height:88vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:15px;line-height:1.6">';
                 h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-                h += '<h3 style="margin:0;font-size:15px">\U0001f4da \u5f3a\u5316\u5b66\u4e60\u8ba1\u5212</h3>';
+                h += '<h3 style="margin:0;font-size:15px">' + _learn_plan_modal_title + '</h3>';
                 h += '<button class="learn-plan-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">\u00d7</button></div>';
 
                 // Progress bar
                 if (totalTasks > 0) {{
                     h += '<div style="margin-bottom:10px">';
                     h += '<div style="display:flex;justify-content:space-between;font-size:13px;color:#666;margin-bottom:2px">';
-                    h += '<span>\u8fdb\u5ea6</span><span id="learn-progress-txt-' + jobId + '">' + doneTasks + '/' + totalTasks + '</span></div>';
+                    h += '<span>_learn_plan_progress_label</span><span id="learn-progress-txt-' + jobId + '">' + doneTasks + '/' + totalTasks + '</span></div>';
                     h += '<div style="background:#e0e0e0;border-radius:4px;height:8px;overflow:hidden">';
                     h += '<div id="learn-progress-bar-' + jobId + '" style="background:#4caf50;height:8px;width:' + pct + '%;border-radius:4px;transition:width 0.3s"></div></div></div>';
                 }}
 
                 // Action buttons: ical export
                 h += '<div style="margin-bottom:10px;display:flex;gap:6px">';
-                h += '<a href="/api/learn_plan_ical?job_id=' + encodeURIComponent(jobId) + '" download class="btn btn-small" style="font-size:11px;text-decoration:none">\U0001f4c5 \u5bfc\u51fa\u8ba1\u5212</a>';
+                h += '<a href="/api/learn_plan_ical?job_id=' + encodeURIComponent(jobId) + '" download class="btn btn-small" style="font-size:11px;text-decoration:none">' + _learn_plan_export + '</a>';
                 h += '</div>';
 
                 // Focus skills
                 if (plan.focus_skills) {{
-                    h += '<div style="margin-bottom:10px"><b>\U0001f3af \u91cd\u70b9\u6280\u80fd</b></div>';
+                    h += '<div style="margin-bottom:10px"><b>' + _learn_plan_focus + '</b></div>';
                     plan.focus_skills.forEach(function(s) {{
                         var priColor = s.priority == '\u9ad8' ? '#d32f2f' : s.priority == '\u4e2d' ? '#e65100' : '#1565c0';
                         h += '<div style="background:#f8f9fa;border-radius:6px;padding:8px;margin-bottom:6px">';
@@ -1256,7 +1331,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                             s.resources.forEach(function(rsc) {{
                                 var rscLink = rsc.url || 'https://www.google.com/search?q=' + encodeURIComponent(rsc.title || s.skill);
                                 var rscUrl = '<a href="' + rscLink + '" target="_blank" style="margin-left:4px;font-size:11px;color:#1a73e8">\U0001f517</a>';
-                                h += '<div style="font-size:11px;margin:2px 0;padding-left:8px">\u2022 <b>[' + (rsc.type || '\u8d44\u6e90') + ']</b> ' + (rsc.title || '') + (rsc.estimated_hours ? ' (' + rsc.estimated_hours + 'h)' : '') + rscUrl + '</div>';
+                                h += '<div style="font-size:11px;margin:2px 0;padding-left:8px">\u2022 <b>[' + (rsc.type || _learn_plan_resource_type) + ']</b> ' + (rsc.title || '') + (rsc.estimated_hours ? ' (' + rsc.estimated_hours + 'h)' : '') + rscUrl + '</div>';
                             }});
                         }}
                         h += '</div>';
@@ -1265,10 +1340,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
                 // Weekly plan with checkboxes
                 if (plan.weekly_plan) {{
-                    h += '<div style="margin-top:10px"><b>\U0001f4c5 \u6bcf\u5468\u8ba1\u5212</b> <span style="font-size:12px;color:#888">\u2215 \u52fe\u9009\u5df2\u5b8c\u6210\u7684\u4efb\u52a1</span></div>';
+                    h += '<div style="margin-top:10px"><b>' + _learn_plan_weekly + '</b> <span style="font-size:12px;color:#888">' + _learn_plan_check_hint + '</span></div>';
                     plan.weekly_plan.forEach(function(w) {{
                         h += '<div style="background:#fff8e1;border-radius:6px;padding:8px;margin-bottom:6px">';
-                        h += '<div style="font-weight:500">\u7b2c' + w.week + '\u5468: ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(\uff5e' + (w.estimated_hours || '') + 'h)</span></div>';
+                        h += '<div style="font-weight:500">\u7b2c' + w.week + '\u5468: ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(\uff5e' + (w.estimated_hours || '') + '' + _learn_plan_hours + ')</span></div>';
                         if (w.tasks) {{
                             w.tasks.forEach(function(t, tIdx) {{
                                 var tid = 'w' + w.week + '_t' + tIdx;
@@ -1287,13 +1362,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
                 // Projects
                 if (plan.projects) {{
-                    h += '<div style="margin-top:10px"><b>\U0001f4bb \u7ec3\u4e60\u9879\u76ee</b></div>';
+                    h += '<div style="margin-top:10px"><b>' + _learn_plan_projects + '</b></div>';
                     plan.projects.forEach(function(p) {{
                         h += '<div style="background:#e3f2fd;border-radius:6px;padding:8px;margin-bottom:6px">';
                         h += '<div style="font-weight:500">' + (p.name || '') + '</div>';
                         h += '<div style="font-size:14px;color:#555">' + (p.description || '') + '</div>';
                         if (p.skills) {{
-                            h += '<div style="font-size:12px;color:#1565c0;margin-top:4px">\u2022 \u6280\u80fd: ' + p.skills.join(', ') + '</div>';
+                            h += '<div style="font-size:12px;color:#1565c0;margin-top:4px">\u2022 ' + _learn_plan_skills + ': ' + p.skills.join(', ') + '</div>';
                         }}
                         h += '</div>';
                     }});
@@ -1302,7 +1377,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 // Advice
                 if (plan.advice) {{
                     h += '<div style="margin-top:10px;background:#f3e8ff;border-radius:6px;padding:10px;color:#6a1b9a">';
-                    h += '<b>\U0001f4a1 \u5efa\u8bae:</b><br>' + plan.advice;
+                    h += '<b>' + _learn_plan_advice + '</b><br>' + plan.advice;
                     h += '</div>';
                 }}
                 h += '</div></div>';
