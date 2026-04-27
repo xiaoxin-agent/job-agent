@@ -1302,6 +1302,165 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         html += self._tracked_resume_modal_html()
         self._send_html(html)
 
+    def handle_learn_calendar_page(self, params):
+        lang = self._get_lang(params)
+        jobs = self.agent.tracker.tracked_jobs
+
+        # Collect all jobs that have a learn plan
+        plan_jobs = []
+        for j in jobs:
+            plan = j.get("learn_plan")
+            if plan:
+                plan_jobs.append(j)
+
+        cards = ""
+        month_names = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
+        weekday_labels = ["日", "一", "二", "三", "四", "五", "六"]
+
+        if not plan_jobs:
+            cards = f'''
+            <div class="empty-state">
+                <p>暂无学习计划，请先在 <a href="/tracked">跟踪页面</a> 为职位生成学习计划。</p>
+            </div>'''
+
+        for j in plan_jobs:
+            plan = j["learn_plan"]
+            progress = j.get("learn_plan_progress", {})
+            job_title = j.get("title", "未知职位")
+            company = j.get("company", "")
+            job_id = j["id"]
+
+            # Calculate progress
+            total_tasks = 0
+            done_tasks = 0
+            if plan.get("weekly_plan"):
+                for w in plan["weekly_plan"]:
+                    if w.get("tasks"):
+                        for t_idx in range(len(w["tasks"])):
+                            tid = f"w{w['week']}_t{t_idx}"
+                            total_tasks += 1
+                            p = progress.get(tid, {})
+                            if p.get("done"):
+                                done_tasks += 1
+            pct = round(done_tasks / total_tasks * 100) if total_tasks > 0 else 0
+            pct_color = "#4caf50" if pct == 100 else "#ff9800" if pct >= 50 else "#f44336"
+
+            # Generate calendar grid for each week in plan
+            import datetime as dt
+            today = dt.date.today()
+            week_calendars = ""
+            if plan.get("weekly_plan"):
+                for w in plan["weekly_plan"]:
+                    week_num = w.get("week", 1)
+                    focus = w.get("focus", f"第{week_num}周")
+                    week_start = today + dt.timedelta(days=(week_num - 1) * 7 - today.weekday())
+                    # Monday start
+                    # Actually, calculate from today's week offset
+                    monday = today - dt.timedelta(days=today.weekday()) + dt.timedelta(weeks=week_num - 1)
+
+                    # Build week grid
+                    week_days = ""
+                    for d in range(7):
+                        day_date = monday + dt.timedelta(days=d)
+                        day_str = str(day_date.day)
+                        is_today = "today-dot" if day_date == today else ""
+                        # Check tasks for this week
+                        tasks_for_day = ""
+                        if w.get("tasks"):
+                            for t_idx, task in enumerate(w["tasks"]):
+                                tid = f"w{week_num}_t{t_idx}"
+                                p = progress.get(tid, {})
+                                is_done = p.get("done", False)
+                                done_cls = "task-done" if is_done else ""
+                                # Distribute tasks roughly across week days (for display)
+                                day_idx = t_idx % 7
+                                if day_idx == d:
+                                    tasks_for_day += f'<div class="cal-task {done_cls}" title="{task}">{task[:20]}</div>'
+
+                        week_days += f'''
+                        <div class="cal-day">
+                            <div class="cal-day-header {is_today}">{day_str}</div>
+                            {tasks_for_day}
+                        </div>'''
+
+                    # Calculate week progress
+                    w_tasks = len(w.get("tasks", []))
+                    w_done = 0
+                    if w.get("tasks"):
+                        for t_idx in range(len(w["tasks"])):
+                            tid = f"w{week_num}_t{t_idx}"
+                            if progress.get(tid, {}).get("done"):
+                                w_done += 1
+
+                    # Month header
+                    month_name = month_names[monday.month - 1]
+                    week_calendars += f'''
+                    <div class="week-calendar">
+                        <div class="week-header">
+                            <div class="week-title">\U0001f4c5 第{week_num}周 · {month_name} · {focus}</div>
+                            <div class="week-stats">
+                                <span>{w_done}/{w_tasks} 任务完成</span>
+                                <div class="week-progress-bar"><div class="week-progress-fill" style="width:{round(w_done/w_tasks*100) if w_tasks else 0}%;background:{pct_color}"></div></div>
+                            </div>
+                        </div>
+                        <div class="cal-grid">
+                            {"".join(f'<div class="cal-day-header-label">{l}</div>' for l in weekday_labels)}
+                            {week_days}
+                        </div>
+                    </div>'''
+
+            cards += f'''
+            <div class="cal-job-card">
+                <div class="cal-job-header">
+                    <div>
+                        <h2>{job_title}</h2>
+                        <div class="cal-company">{company}</div>
+                    </div>
+                    <div class="cal-overall-progress">
+                        <div class="cal-progress-circle" style="--pct:{pct};--color:{pct_color}">
+                            <span>{pct}%</span>
+                        </div>
+                        <div style="font-size:11px;color:#888">{done_tasks}/{total_tasks}</div>
+                    </div>
+                </div>
+                {week_calendars}
+            </div>'''
+
+        style = f'''
+        <style>
+        .cal-job-card {{ background:#fff; border-radius:10px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }}
+        .cal-job-header {{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }}
+        .cal-job-header h2 {{ margin:0; font-size:16px; }}
+        .cal-company {{ color:#888; font-size:12px; }}
+        .cal-overall-progress {{ text-align:center; }}
+        .cal-progress-circle {{ width:48px; height:48px; border-radius:50%; background:conic-gradient(var(--color) 0% var(--pct), #e0e0e0 var(--pct) 100%); display:flex; align-items:center; justify-content:center; }}
+        .cal-progress-circle span {{ background:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:var(--color); }}
+        .week-calendar {{ margin-bottom:20px; border:1px solid #eee; border-radius:8px; overflow:hidden; }}
+        .week-header {{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:#f8f9fa; border-bottom:1px solid #eee; }}
+        .week-title {{ font-weight:500; font-size:13px; }}
+        .week-stats {{ display:flex; align-items:center; gap:8px; font-size:11px; color:#888; }}
+        .week-progress-bar {{ width:60px; height:6px; background:#e0e0e0; border-radius:3px; overflow:hidden; }}
+        .week-progress-fill {{ height:6px; border-radius:3px; transition:width 0.3s; }}
+        .cal-grid {{ display:grid; grid-template-columns:repeat(7, 1fr); gap:0; }}
+        .cal-day-header-label {{ text-align:center; padding:4px 0; font-size:11px; color:#888; background:#fafafa; }}
+        .cal-day {{ min-height:70px; border-right:1px solid #f0f0f0; border-bottom:1px solid #f0f0f0; padding:4px; }}
+        .cal-day:nth-child(7n) {{ border-right:none; }}
+        .cal-day-header {{ font-size:11px; color:#888; margin-bottom:4px; }}
+        .cal-day-header.today-dot {{ background:#1a73e8; color:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; }}
+        .cal-task {{ font-size:10px; padding:1px 3px; margin:1px 0; background:#e3f2fd; border-radius:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; }}
+        .cal-task.task-done {{ background:#e8f5e9; text-decoration:line-through; color:#888; }}
+        .empty-state {{ text-align:center; padding:60px 20px; color:#888; }}
+        .empty-state a {{ color:#1a73e8; }}
+        </style>'''
+
+        body = style + f'''
+        <div class="container">
+            <h1>\U0001f4c5 学习日历</h1>
+            {cards}
+        </div>'''
+
+        self._send_html(self._page(t(lang, "tracked_title"), body, lang=lang))
+
     def handle_profile_page(self, params):
         lang = self._get_lang(params)
         p = self.agent.profile.profile
@@ -2582,6 +2741,7 @@ loadResume();
             ("/profile", t(lang, "nav_profile")),
             ("/letter", t(lang, "nav_letter")),
             ("/resumes", t(lang, "nav_resume")),
+            ("/learn_calendar", "\U0001f4c5 \u5b66\u4e60\u65e5\u5386"),
         ]
         # Persist lang in nav links so switching pages doesn't lose language
         qs = f"?lang={lang}" if lang != "zh-CN" else ""
