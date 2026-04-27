@@ -1166,7 +1166,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     document.getElementById('manual-add-status').innerHTML = '<span style="color:#2e7d32">✅ 已保存到跟踪列表，刷新页面查看</span>';
                     setTimeout(function(){{ location.reload(); }}, 1500);
                 }} else {{
-                    alert('保存失败: ' + (d.error || ''));
+                    alert(d.error || '保存失败');
+                    if (d.error && d.error.indexOf('已保存') >= 0) {{
+                        setTimeout(function(){{ location.reload(); }}, 1000);
+                    }}
                 }}
             }});
         }}
@@ -1934,15 +1937,16 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_save_job(self, data):
         try:
             ok = self.agent.save_job(data.get("job", {}))
-            # Auto-generate cover letter, save into the job record
             if ok:
                 job_data = data.get("job", {})
                 try:
                     letter = self.agent.generate_cover_letter(job_data)
                     self.agent.tracker.update_cover_letter(job_data.get("title",""), job_data.get("company",""), letter)
                 except Exception:
-                    pass  # Cover letter generation failure is non-fatal
-            self.send_json({"success": ok})
+                    pass
+                self.send_json({"success": True})
+            else:
+                self.send_json({"success": False, "error": "该职位已保存，请勿重复添加"})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
