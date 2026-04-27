@@ -1393,9 +1393,45 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                     # Build task detail: collect related resources from focus_skills
                                     related_res_html = ""
                                     related_proj_html = ""
+                                    matched_any = False
+                                    matched_res = []  # Track matched skills + their resources
                                     for fs in plan.get("focus_skills", []):
                                         sk = fs.get("skill", "").lower()
-                                        if sk and (sk in task_text.lower() or any(w in task_text.lower() for w in sk.split()[:3])):
+                                        task_lower = task_text.lower()
+                                        import re as _re
+                                        match_skill = False
+                                        # 1. Extract meaningful keywords from skill name
+                                        sk_keys = [k.strip() for k in _re.split(r'[/,、（）()\s]', sk) if len(k.strip()) > 2]
+                                        for kw in sk_keys:
+                                            if kw in task_lower:
+                                                match_skill = True
+                                                break
+                                        if not match_skill:
+                                            # 2. Check if any resource title shares keywords with task text
+                                            for r in fs.get("resources", []):
+                                                rt = r.get("title","").lower()
+                                                rt_keys = [k.strip() for k in _re.split(r'[/,、（）()\s]', rt) if len(k.strip()) > 3]
+                                                for rk in rt_keys:
+                                                    if rk in task_lower:
+                                                        match_skill = True
+                                                        break
+                                                for tc in task_lower.split():
+                                                    if len(tc) > 3 and tc in rt:
+                                                        match_skill = True
+                                                        break
+                                                if match_skill:
+                                                    break
+                                        if match_skill:
+                                            matched_any = True
+                                        matched_res.append((match_skill, fs))
+                                    # Render: if any skill matched, show only matched skills (all resources).
+                                    # If NO skill matched, show ALL skills but only 1 resource each (fallback).
+                                    for is_match, fs in matched_res:
+                                        sk = fs.get("skill", "")
+                                        if matched_any:
+                                            # Precision mode: skip unmatched skills entirely
+                                            if not is_match:
+                                                continue
                                             items = "".join(
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
@@ -1404,8 +1440,18 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                                 ) + '</li>'
                                                 for r in fs.get("resources", [])
                                             )
-                                            if items:
-                                                related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + '优先级)</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
+                                        else:
+                                            # Fallback mode: no skill matched, show 1 resource per skill
+                                            items = "".join(
+                                                '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
+                                                    ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
+                                                ) + (
+                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 打开</a>'
+                                                ) + '</li>'
+                                                for r in (fs.get("resources", []) or [])[:1]
+                                            )
+                                        if items:
+                                            related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + '优先级)</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
                                     for proj in plan.get("projects", []):
                                         if any(s.lower() in task_text.lower() for s in proj.get("skills",[])):
                                             related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
