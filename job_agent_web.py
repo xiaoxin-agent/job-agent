@@ -427,6 +427,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         if path == "/api/learn_plan_ical":
             self.api_learn_plan_ical(params)
             return
+        if path == "/api/get_cover_letter":
+            self.api_get_cover_letter(params)
+            return
 
         handler = routes.get(path)
         if handler:
@@ -477,6 +480,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/learn_plan": self.api_learn_plan,
             "/api/learn_plan_progress": self.api_learn_plan_progress,
             "/api/learn_plan_ical": self.api_learn_plan_ical,
+            "/api/save_cover_letter": self.api_save_cover_letter,
         }
 
         handler = api_routes.get(path)
@@ -839,6 +843,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
+                    <button class="btn btn-small cover-letter-btn" data-job-id="{j['id']}" style="font-size:12px">✉ 求职信</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
                 {('<div class="job-resume">📄 '+j['resume_name']+' <a href="#" class="link-url view-resume-btn" data-job-id="'+j['id']+'" style="display:inline">👁 预览</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank" style="display:inline">🖊 编辑</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">🎯 优化</button></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">📎 关联简历</button></div>'}
@@ -1648,6 +1653,91 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             } catch(err) { console.warn('Task detail parse error', err); }
         });
 
+        // Cover letter modal: click delegation
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.cover-letter-btn');
+            if (!btn) return;
+            var jobId = btn.getAttribute('data-job-id');
+            showCoverLetterModal(jobId);
+        });
+
+        function showCoverLetterModal(jobId) {
+            // Remove old modal if any
+            var old = document.getElementById('cover-letter-modal');
+            if (old) old.remove();
+
+            var modal = document.createElement('div');
+            modal.id = 'cover-letter-modal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1002;display:flex;align-items:center;justify-content:center';
+            modal.onclick = function(ev) { if (ev.target === this) this.remove(); };
+
+            var inner = document.createElement('div');
+            inner.style.cssText = 'background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);border-radius:12px;padding:20px;max-width:600px;width:90%;max-height:80vh;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:14px;line-height:1.6;display:flex;flex-direction:column';
+
+            inner.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;font-size:15px">✉ 求职信</h3><button class="cl-close-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">×</button></div><textarea class="cl-textarea" style="width:100%;min-height:300px;flex:1;border:1px solid #ddd;border-radius:6px;padding:10px;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit" readonly>加载中...</textarea><div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="cl-save-btn btn btn-small btn-primary" style="font-size:12px">💾 保存</button><button class="cl-regenerate-btn btn btn-small" style="font-size:12px">🔄 重新生成</button><button class="cl-copy-btn btn btn-small" style="font-size:12px">📋 复制</button></div>';
+
+            modal.appendChild(inner);
+            document.body.appendChild(modal);
+
+            var textarea = inner.querySelector('.cl-textarea');
+            var saveBtn = inner.querySelector('.cl-save-btn');
+            var regenBtn = inner.querySelector('.cl-regenerate-btn');
+            var copyBtn = inner.querySelector('.cl-copy-btn');
+            var closeBtn = inner.querySelector('.cl-close-btn');
+
+            closeBtn.onclick = function() { modal.remove(); };
+
+            // Load cover letter
+            function loadLetter(isRegen) {
+                var url = '/api/get_cover_letter?job_id=' + encodeURIComponent(jobId);
+                if (isRegen) url += '&regen=1';
+                fetch(url)
+                .then(function(r){ return r.json(); })
+                .then(function(d) {
+                    if (d.success && d.letter) {
+                        textarea.value = d.letter;
+                        textarea.readOnly = false;
+                    } else {
+                        textarea.value = '(生成失败: ' + (d.error || '') + ')';
+                    }
+                })
+                .catch(function(e) {
+                    textarea.value = '请求失败: ' + e;
+                });
+            }
+            loadLetter(false);
+
+            saveBtn.onclick = function() {
+                fetch('/api/save_cover_letter', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({job_id: jobId, letter: textarea.value})
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(d) {
+                    if (d.success) {
+                        saveBtn.textContent = '✅ 已保存';
+                        setTimeout(function(){ saveBtn.textContent = '💾 保存'; }, 2000);
+                    } else {
+                        alert('保存失败: ' + (d.error || ''));
+                    }
+                });
+            };
+
+            regenBtn.onclick = function() {
+                textarea.value = '正在重新生成...';
+                textarea.readOnly = true;
+                loadLetter(true);
+            };
+
+            copyBtn.onclick = function() {
+                navigator.clipboard.writeText(textarea.value).then(function() {
+                    copyBtn.textContent = '✅ 已复制';
+                    setTimeout(function(){ copyBtn.textContent = '📋 复制'; }, 2000);
+                });
+            };
+        }
+
         // Calendar task checkbox: click handler (stops prop to .cal-task detail popup)
         document.addEventListener('click', function(e) {
             var cb = e.target.closest('.cal-task-cb');
@@ -1791,6 +1881,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     def api_save_job(self, data):
         try:
             ok = self.agent.save_job(data.get("job", {}))
+            # Auto-generate cover letter, save into the job record
+            if ok:
+                job_data = data.get("job", {})
+                try:
+                    letter = self.agent.generate_cover_letter(job_data)
+                    self.agent.tracker.update_cover_letter(job_data.get("title",""), job_data.get("company",""), letter)
+                except Exception:
+                    pass  # Cover letter generation failure is non-fatal
             self.send_json({"success": ok})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
@@ -1823,6 +1921,35 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         try:
             letter = self.agent.generate_cover_letter(data.get("job", {}))
             self.send_json({"success": True, "letter": letter})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_get_cover_letter(self, data):
+        try:
+            job_id = data.get("job_id", "")
+            regen = data.get("regen", "") == "1"
+            letter = ""
+            for j in self.agent.tracker.tracked_jobs:
+                if j["id"] == job_id:
+                    letter = j.get("cover_letter", "") if not regen else ""
+                    break
+            if not letter:
+                # Generate on demand (or regenerate)
+                for j in self.agent.tracker.tracked_jobs:
+                    if j["id"] == job_id:
+                        letter = self.agent.generate_cover_letter(j)
+                        self.agent.tracker.update_cover_letter_by_id(job_id, letter)
+                        break
+            self.send_json({"success": True, "letter": letter})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_save_cover_letter(self, data):
+        try:
+            job_id = data.get("job_id", "")
+            letter = data.get("letter", "")
+            ok = self.agent.tracker.update_cover_letter_by_id(job_id, letter)
+            self.send_json({"success": ok})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 

@@ -970,6 +970,26 @@ class JobTracker:
         self.save()
         return True
     
+    def update_cover_letter(self, title: str, company: str, letter: str) -> bool:
+        """保存/更新职位的求职信（通过 title+company 匹配）"""
+        for job in self.tracked_jobs:
+            if job["title"] == title and job["company"] == company:
+                job["cover_letter"] = letter
+                job["last_updated"] = datetime.datetime.now().isoformat()
+                self.save()
+                return True
+        return False
+
+    def update_cover_letter_by_id(self, job_id: str, letter: str) -> bool:
+        """通过 job_id 保存/更新求职信"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id:
+                job["cover_letter"] = letter
+                job["last_updated"] = datetime.datetime.now().isoformat()
+                self.save()
+                return True
+        return False
+
     def update_status(self, job_id: str, status: str, notes: str = ""):
         """更新申请状态"""
         for job in self.tracked_jobs:
