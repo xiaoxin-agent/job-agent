@@ -818,7 +818,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             label = labels.get(j["status"], j["status"])
             jobs_html += f"""
             <div class="job-card">
-                <div class="job-header">
+                <div class="job-header" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">
                     <div class="job-title">{j['title']}{' <span class="job-type-tag">'+j['job_type']+'</span>' if j.get('job_type') else ''}</div>
                     <span class="status-tag status-{j['status']}">{label}</span>
                 </div>
@@ -828,7 +828,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>📊 {j.get('match_score',0)}% 匹配</span>
                     <span id="skill-gap-{j['id']}">{j.get('skill_gap_html','')}</span>
                 </div>
-                <div class="job-desc-toggle" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">
+                <div class="job-desc-toggle">
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
                     <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
                 </div>
@@ -1648,26 +1648,30 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             } catch(err) { console.warn('Task detail parse error', err); }
         });
 
-        // Calendar task checkbox: toggle progress
+        // Calendar task checkbox: click handler (stops prop to .cal-task detail popup)
+        document.addEventListener('click', function(e) {
+            var cb = e.target.closest('.cal-task-cb');
+            if (!cb) return;
+            e.stopPropagation();
+        });
+        // Calendar task checkbox: toggle progress and strikethrough
         document.addEventListener('change', function(e) {
             var cb = e.target.closest('.cal-task-cb');
             if (!cb) return;
             var jobId = cb.getAttribute('data-jobid');
             var taskId = cb.getAttribute('data-taskid');
             if (!jobId || !taskId) return;
-            toggleLearnTask(jobId, taskId, cb);
-            // Toggle strikethrough on sibling .cal-task
+            // Toggle visual strikethrough
             var row = cb.parentElement;
-            if (row) {
-                var taskEl = row.querySelector('.cal-task');
-                if (taskEl) {
-                    if (cb.checked) {
-                        taskEl.classList.add('task-done');
-                    } else {
-                        taskEl.classList.remove('task-done');
-                    }
+            var taskEl = row ? row.querySelector('.cal-task') : null;
+            if (taskEl) {
+                if (cb.checked) {
+                    taskEl.classList.add('task-done');
+                } else {
+                    taskEl.classList.remove('task-done');
                 }
             }
+            toggleLearnTask(jobId, taskId, cb);
         });
 
         function closeTaskDetail() {
@@ -3111,7 +3115,7 @@ loadResume();
 
         .job-desc {{ font-size:15px; color:#555; margin-bottom:10px; line-height:1.55; }}
 
-        .job-desc-full {{ font-size:15px; color:#333; margin-bottom:10px; line-height:1.65; white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:12px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
+        .job-desc-full {{ font-size:15px; color:#333; margin-bottom:10px; line-height:1.65; white-space:pre-wrap; max-height:none; overflow-y:visible; padding:12px; background:#f9f9f9; border-radius:4px; border:1px solid #eee; }}
 
         .job-actions {{ display:flex; gap:6px; flex-wrap:wrap; }}
 

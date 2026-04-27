@@ -197,7 +197,7 @@ class JobSearchEngine:
                             "title": job.get("title", ""),
                             "company": job.get("company", ""),
                             "location": job.get("location", ""),
-                            "description": self._clean_html(job.get("description", ""))[:3000],
+                            "description": self._clean_html(job.get("description", "")),
                             "url": job.get("url", ""),
                             "date": job.get("created_at", ""),
                             "source": "GitHub Jobs"
@@ -361,7 +361,7 @@ class JobSearchEngine:
                                 "title": title,
                                 "company": item.get("company", ""),
                                 "location": "Remote",
-                                "description": self._clean_html(desc)[:3000],
+                                "description": self._clean_html(desc),
                                 "url": f"https://remoteok.io/remote-jobs/{item.get('slug', '')}",
                                 "date": item.get("date", ""),
                                 "source": "RemoteOK",
@@ -599,7 +599,7 @@ class JobSearchEngine:
                     if len(result["desc"]) > 100:
                         return result
             # 备选：全文
-            result["desc"] = self._beautify_description(html)[:3000]
+            result["desc"] = self._beautify_description(html)
             return result
         except:
             return result
@@ -663,10 +663,20 @@ class JobSearchEngine:
         return text
 
     def _clean_html(self, text: str) -> str:
-        """清理HTML标签，保留段落结构"""
+        """清理HTML标签，保留段落结构，去除反垃圾追踪文本"""
         if not text:
             return ""
         text = self._fix_mojibake(text)
+        # Remove anti-spam tracking tags common in RemoteOK job postings
+        # e.g. "Please mention the word **EMINENT** and tag RMTczLjcyLjYuMjQ1 ..."
+        text = re.sub(
+            r'Please\s+mention\s+the\s+word\s+\S+\s+and\s+tag\s+\S+.*?(?:\(#\S+\))?\.\s*',
+            '', text, flags=re.IGNORECASE | re.DOTALL
+        )
+        text = re.sub(
+            r'This is a beta feature to avoid spam applicants\..*?(?:\.|$)\s*',
+            '', text, flags=re.IGNORECASE | re.DOTALL
+        )
         # 把<br>、</p>、</li>、</div>等换成换行
         text = re.sub(r'<br\s*/?>', '\n', text)
         text = re.sub(r'</p>', '\n\n', text, flags=re.IGNORECASE)
