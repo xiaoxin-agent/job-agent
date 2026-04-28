@@ -107,7 +107,7 @@ def _search_api(keywords: List[str], locale: str = "en-US",
         try:
             resp = requests.post(
                 WORKDAY_API,
-                json={"limit": min(limit * 3, 100), "offset": 0},
+                json={"limit": min(limit * 3, 20), "offset": 0},  # Workday API max is 20
                 impersonate="chrome120",
                 headers={"Content-Type": "application/json",
                          "Accept": "application/json"},
