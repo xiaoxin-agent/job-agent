@@ -1364,7 +1364,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     h += '<div style="margin-top:10px"><b>' + _learn_plan_weekly + '</b> <span style="font-size:12px;color:#888">' + _learn_plan_check_hint + '</span></div>';
                     plan.weekly_plan.forEach(function(w) {{
                         h += '<div style="background:#fff8e1;border-radius:6px;padding:8px;margin-bottom:6px">';
-                        h += '<div style="font-weight:500">\u7b2c' + w.week + '\u5468: ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(\uff5e' + (w.estimated_hours || '') + '' + _learn_plan_hours + ')</span></div>';
+                        h += '<div style="font-weight:500">' + _learn_plan_week + ' ' + w.week + _learn_plan_suffix + ': ' + (w.focus || '') + ' <span style="color:#888;font-size:11px">(\uff5e' + (w.estimated_hours || '') + '' + _learn_plan_hours + ')</span></div>';
                         if (w.tasks) {{
                             w.tasks.forEach(function(t, tIdx) {{
                                 var tid = 'w' + w.week + '_t' + tIdx;
