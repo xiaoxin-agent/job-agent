@@ -48,7 +48,7 @@ def search(keywords: List[str], location: str = "",
            max_results: int = 10, lang: str = "en") -> List[Dict]:
     """Search Red Hat jobs matching *any* keyword (OR logic)."""
     locale = LANGUAGES.get(lang, "en-US")
-    results = _search_api(keywords, locale, limit=max_results)
+    results = _search_api(keywords, locale, limit=max_results, location=location)
     return results[:max_results]
 
 
@@ -101,7 +101,7 @@ def extract(html: str, url: str = "") -> Dict:
 # ---------------------------------------------------------------------------
 
 def _search_api(keywords: List[str], locale: str = "en-US",
-                limit: int = 20) -> List[Dict]:
+                limit: int = 20, location: str = "") -> List[Dict]:
     """Query Workday search API and filter results."""
     def _do_request():
         try:
@@ -119,12 +119,13 @@ def _search_api(keywords: List[str], locale: str = "en-US",
         except Exception:
             return None
 
-    # Retry once if empty response (Workday API rate-limits)
+    # Retry up to 3 times if empty response (Workday API rate-limits)
     import time
-    data = _do_request()
-    if data is None or not data.get("jobPostings"):
-        time.sleep(1)
+    for attempt in range(3):
         data = _do_request()
+        if data is not None and data.get("jobPostings"):
+            break
+        time.sleep(2 * (attempt + 1))
 
     if data is None:
         return []
@@ -147,6 +148,10 @@ def _search_api(keywords: List[str], locale: str = "en-US",
             title_lower = title.lower()
             if not any(kw.lower() in title_lower for kw in keywords):
                 continue
+
+        # Location search disabled for Red Hat - jobs are global/remote across many cities.
+        # Most Red Hat positions won't match specific city names like Toronto.
+        pass
 
         posted_on = job.get("postedOn", "")
         remote_type = job.get("remoteType", "On-site")
