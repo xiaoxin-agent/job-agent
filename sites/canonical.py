@@ -132,7 +132,7 @@ def extract(html: str, url: str) -> Dict[str, str]:
                         result['location'] = loc['name']
                 desc = data.get('description', '')
                 if desc:
-                    result['description'] = re.sub(r'<[^>]+>', ' ', desc).strip()[:3000]
+                    result['description'] = desc.strip()  # Keep HTML tags for rich display
                 result['job_type'] = data.get('employmentType', 'FULL_TIME').replace('_', '-').title()
                 break
         except (json.JSONDecodeError, AttributeError):

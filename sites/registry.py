@@ -50,6 +50,12 @@ def _ensure_registered():
     # Indeed
     register('indeed.com', 'sites.indeed', priority=5)
 
+    # Canonical / Ubuntu
+    register('canonical.com/careers', 'sites.canonical', priority=10)
+
+    # Red Hat Workday jobs
+    register('redhat.wd5.myworkdayjobs.com', 'sites.redhat', priority=10)
+
     # Generic company domain matchers (lower priority)
     for domain, name in [
         ('nvidia.com', 'NVIDIA'),

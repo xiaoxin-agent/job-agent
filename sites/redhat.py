@@ -66,11 +66,8 @@ def extract(html: str, url: str = "") -> Dict:
             if isinstance(data, dict) and data.get("@type") == "JobPosting":
                 result["title"] = data.get("title") or result["title"]
                 desc = data.get("description") or ""
-                # Clean HTML tags from description
-                if desc:
-                    desc = re.sub(r"<[^>]+>", "", desc)
-                    desc = re.sub(r"\s+", " ", desc).strip()
-                result["description"] = desc
+                # Keep HTML for rich display (clean_html is done at fetch_job_from_url level)
+                result["description"] = desc.strip()
                 loc = data.get("jobLocation", {})
                 if isinstance(loc, dict):
                     addr = loc.get("address", {})

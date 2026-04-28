@@ -2409,7 +2409,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             desc = job_data.get("description", "")
             if url and (len(desc) < 500 or not job_data.get("title")):
                 try:
-                    fetched = self.agent.fetch_job_from_url(url)
+                    fetched = self.agent.fetch_job_from_url(url, keep_html=True)
                     if fetched.get("description"):
                         job_data["description"] = fetched["description"]
                     if fetched.get("title"):

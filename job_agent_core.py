@@ -1362,11 +1362,13 @@ class JobAgent:
         """保存职位到跟踪列表"""
         return self.tracker.add_job(job)
     
-    def fetch_job_from_url(self, url: str) -> Dict:
+    def fetch_job_from_url(self, url: str, keep_html: bool = False) -> Dict:
         """通过URL抓取并解析职位信息，返回 {title, company, location, description, job_type}
         
         Uses a plugin-style site adapter system. Each site has its own extractor
         in sites/<name>.py. Falls back to generic extraction for unrecognized URLs.
+        
+        keep_html=True: 保留描述中的HTML格式标签（用于保存等场景）
         """
         result = {"title": "", "company": "", "location": "", "description": "", "job_type": "", "url": url}
         try:
@@ -1389,8 +1391,8 @@ class JobAgent:
         if adapter is not None:
             extracted = adapter(html, url)
             result.update(extracted)
-            # Clean the description through _clean_html if available
-            if result['description']:
+            # Only clean HTML for display/search; keep raw for save
+            if result['description'] and not keep_html:
                 try:
                     result['description'] = self.engine._clean_html(
                         '<div>' + result['description'] + '</div>'
