@@ -1330,7 +1330,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 if (totalTasks > 0) {{
                     h += '<div style="margin-bottom:10px">';
                     h += '<div style="display:flex;justify-content:space-between;font-size:13px;color:#666;margin-bottom:2px">';
-                    h += '<span>_learn_plan_progress_label</span><span id="learn-progress-txt-' + jobId + '">' + doneTasks + '/' + totalTasks + '</span></div>';
+                    h += '<span>' + _learn_plan_progress_label + '</span><span id="learn-progress-txt-' + jobId + '">' + doneTasks + '/' + totalTasks + '</span></div>';
                     h += '<div style="background:#e0e0e0;border-radius:4px;height:8px;overflow:hidden">';
                     h += '<div id="learn-progress-bar-' + jobId + '" style="background:#4caf50;height:8px;width:' + pct + '%;border-radius:4px;transition:width 0.3s"></div></div></div>';
                 }}
@@ -1889,7 +1889,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if plan.get("weekly_plan"):
                 for w in plan["weekly_plan"]:
                     week_num = w.get("week", 1)
-                    focus = w.get("focus", f"第{week_num}周")
+                    focus = w.get("focus", f"{learn_plan_week}{week_num}{learn_plan_suffix}")
                     week_start = today + dt.timedelta(days=(week_num - 1) * 7 - today.weekday())
                     # Monday start
                     # Actually, calculate from today's week offset
@@ -3157,6 +3157,10 @@ Do NOT use any other language in the output. The entire response must be in {lan
             title = job.get("title", "学习计划")
             company = job.get("company", "")
 
+            lang = self._get_lang(data)
+            learn_plan_week = t(lang, "learn_plan_week")
+            lang_sfx = {"en": "", "zh-CN": "\u5468", "fr": ""}
+            learn_plan_suffix = lang_sfx.get(lang, "")
             import uuid
             now = datetime.datetime.utcnow()
             lines = []
@@ -3173,7 +3177,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
                 for w in plan["weekly_plan"]:
                     week_num = w.get("week", 1)
                     week_start = base_date + datetime.timedelta(days=(week_num - 1) * 7)
-                    focus = w.get("focus", f"第{week_num}周")
+                    focus = w.get("focus", f"{learn_plan_week}{week_num}{learn_plan_suffix}")
                     # Create a weekly summary event
                     uid = str(uuid.uuid4())
                     lines.append("BEGIN:VEVENT")
