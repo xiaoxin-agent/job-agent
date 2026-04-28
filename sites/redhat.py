@@ -103,19 +103,30 @@ def extract(html: str, url: str = "") -> Dict:
 def _search_api(keywords: List[str], locale: str = "en-US",
                 limit: int = 20) -> List[Dict]:
     """Query Workday search API and filter results."""
-    try:
-        resp = requests.post(
-            WORKDAY_API,
-            json={"limit": min(limit * 3, 100), "offset": 0},
-            impersonate="chrome120",
-            headers={"Content-Type": "application/json",
-                     "Accept": "application/json"},
-            timeout=20,
-        )
-        if resp.status_code != 200:
-            return []
-        data = resp.json()
-    except Exception:
+    def _do_request():
+        try:
+            resp = requests.post(
+                WORKDAY_API,
+                json={"limit": min(limit * 3, 100), "offset": 0},
+                impersonate="chrome120",
+                headers={"Content-Type": "application/json",
+                         "Accept": "application/json"},
+                timeout=20,
+            )
+            if resp.status_code != 200:
+                return None
+            return resp.json()
+        except Exception:
+            return None
+
+    # Retry once if empty response (Workday API rate-limits)
+    import time
+    data = _do_request()
+    if data is None or not data.get("jobPostings"):
+        time.sleep(1)
+        data = _do_request()
+
+    if data is None:
         return []
 
     job_postings = data.get("jobPostings", [])
