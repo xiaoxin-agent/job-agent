@@ -2402,15 +2402,34 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
     def api_save_job(self, data):
         try:
-            ok = self.agent.save_job(data.get("job", {}))
+            job_data = data.get("job", {})
+            # 如果职位有URL但描述不完整，尝试抓取完整详情
+            url = job_data.get("url", "")
+            desc = job_data.get("description", "")
+            if url and (len(desc) < 500 or not job_data.get("title")):
+                try:
+                    fetched = self.agent.fetch_job_from_url(url)
+                    if fetched.get("description"):
+                        job_data["description"] = fetched["description"]
+                    if fetched.get("title"):
+                        job_data["title"] = fetched["title"]
+                    if fetched.get("company"):
+                        job_data["company"] = fetched["company"]
+                    if fetched.get("location"):
+                        job_data["location"] = fetched["location"]
+                    if fetched.get("job_type"):
+                        job_data["job_type"] = fetched["job_type"]
+                except Exception:
+                    pass
+
+            ok = self.agent.save_job(job_data)
             if ok:
-                job_data = data.get("job", {})
                 try:
                     letter = self.agent.generate_cover_letter(job_data)
                     self.agent.tracker.update_cover_letter(job_data.get("title",""), job_data.get("company",""), letter)
                 except Exception:
                     pass
-                self.send_json({"success": True})
+                self.send_json({"success": True, "fetched": bool(desc) or None})
             else:
                 self.send_json({"success": False, "error": "该职位已保存，请勿重复添加"})
         except Exception as e:
