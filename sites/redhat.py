@@ -52,6 +52,70 @@ def search(keywords: List[str], location: str = "",
     return results[:max_results]
 
 
+def _format_redhat_description(text: str) -> str:
+    """Convert Red Hat's plain-text JSON-LD description to simple HTML.
+
+    Red Hat's JSON-LD is just continuous text with section headers like:
+      About the Job : ...  What You Will Do? ...  What You Will Bring ? ...
+      The following are considered as a plus: ...  About Red Hat ...
+
+    We split on known header markers, wrap each section in <p>, and
+    give headers <strong> treatment.
+    """
+    section_headers = [
+        "About the Job",
+        "What You Will Do",
+        "What You Will Bring",
+        "The following are considered as a plus",
+        "About Red Hat",
+        "Inclusion at Red Hat",
+        "Equal Opportunity Policy",
+    ]
+    # Build a regex that splits on any section header (case-insensitive, word-boundary)
+    # Using word boundaries to avoid matching "equal opportunity" inside a sentence
+    header_pattern = "(" + "|".join(
+        r"\b" + re.escape(h) + r"\b" for h in section_headers
+    ) + ")"
+    parts = re.split(header_pattern, text, flags=re.IGNORECASE)
+
+    if len(parts) < 2:
+        # No recognizable sections -> wrap whole thing in <p>
+        escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return f"<p>{escaped}</p>"
+
+    html_parts = []
+    i = 0
+    while i < len(parts):
+        part = parts[i].strip()
+        if not part:
+            i += 1
+            continue
+        # Check if this part IS a recognized section header
+        is_header = False
+        for h in section_headers:
+            # Match exactly or with trailing punctuation (:, ?, etc)
+            if part.lower() == h.lower() or \
+               part.lower().startswith(h.lower()) and len(part) <= len(h) + 2:
+                is_header = True
+                break
+        if is_header:
+            if i + 1 < len(parts):
+                body = parts[i + 1].strip()
+                # Escape the header text but keep as <strong>
+                html_parts.append(f"<p><strong>{part}</strong></p>")
+                html_parts.append(f"<p>{body}</p>")
+                i += 2
+            else:
+                html_parts.append(f"<p><strong>{part}</strong></p>")
+                i += 1
+        else:
+            # orphaned text
+            html_parts.append(f"<p>{part}</p>")
+            i += 1
+
+    return "\n".join(html_parts)
+
+
 def extract(html: str, url: str = "") -> Dict:
     """Extract job details from a Red Hat job page JSON-LD."""
     result = {"title": "", "company": "Red Hat", "location": "",
@@ -67,7 +131,7 @@ def extract(html: str, url: str = "") -> Dict:
                 result["title"] = data.get("title") or result["title"]
                 desc = data.get("description") or ""
                 # Keep HTML for rich display (clean_html is done at fetch_job_from_url level)
-                result["description"] = desc.strip()
+                result["description"] = _format_redhat_description(desc.strip())
                 loc = data.get("jobLocation", {})
                 if isinstance(loc, dict):
                     addr = loc.get("address", {})
