@@ -964,8 +964,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="form-row sources-row">
                     <label>{src_label}</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="RemoteOK" checked> RemoteOK</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Indeed"> Indeed</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Canonical" checked> Canonical</label>
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>

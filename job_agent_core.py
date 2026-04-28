@@ -210,99 +210,55 @@ class JobSearchEngine:
         return jobs
     
     def search_indeed(self, location: str, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
-        """从Indeed搜索职位（curl_cffi模拟浏览器Chrome指纹）"""
-        jobs = []
+        """委托 sites.indeed.search 进行 Indeed 搜索"""
         if not keywords:
             keywords = self.profile.get_skill_keywords()[:3]
         elif isinstance(keywords, str):
             keywords = [k.strip() for k in keywords.split() if k.strip()]
-        
-        try:
-            from curl_cffi import requests
-            from urllib.parse import quote
-            
-            kw = quote(" ".join(keywords[:2]))
-            loc = quote(location)
-            
-            urls = [
-                f"https://ca.indeed.com/jobs?q={kw}&l={loc}",
-                f"https://www.indeed.com/jobs?q={kw}&l={loc}",
-            ]
-            
-            for url in urls:
-                if len(jobs) >= max_results:
-                    break
-                print(f"搜索Indeed: {url}")
-                
-                resp = requests.get(url, impersonate='chrome120', timeout=20)
-                if resp.status_code != 200:
-                    print(f"Indeed返回状态码: {resp.status_code}")
-                    continue
-                
-                html = resp.text
-                
-                # 步骤1: 提取所有公司名（data-testid="company-name"）
-                companies = []
-                for m in re.finditer(r'data-testid="company-name"[^>]*>(.*?)<', html, re.DOTALL):
-                    txt = self._clean_html(m.group(1)).strip()
-                    if txt:
-                        companies.append(txt)
-                
-                if not companies:
-                    print("Indeed: 未找到公司名")
-                    continue
-                
-                # 步骤2: 从aria-label提取标题（格式: "full details of JOB TITLE"）
-                titles = re.findall(r'aria-label="full details of ([^"]+)"', html)
-                
-                # 步骤3: 提取地点
-                locs = []
-                for m in re.finditer(r'data-testid="text-location"[^>]*>(.*?)<', html, re.DOTALL):
-                    txt = self._clean_html(m.group(1)).strip()
-                    if txt:
-                        locs.append(txt)
-                
-                # 步骤4: 提取data-jk构造链接
-                jks = re.findall(r'data-jk="([^"]+)"', html)
-                
-                # 步骤5: 组装卡片（按公司数对齐）
-                n = min(len(companies), len(titles), len(jks), max_results)
-                if n == 0:
-                    print(f"Indeed: 解析失败 companies={len(companies)} titles={len(titles)} jks={len(jks)}")
-                    continue
-                
-                for i in range(n):
-                    job_url = f"https://ca.indeed.com/viewjob?jk={jks[i]}"
-                    desc = f"From Indeed - {' '.join(keywords[:2])} in {location}"
-                    job_type_for_indeed = ""
-                    # 尝试抓详情页（逐个抓，超时30秒总体）
-                    try:
-                        detail_info = self.fetch_indeed_job_details(job_url)
-                        if detail_info and detail_info.get("desc"):
-                            desc = detail_info["desc"]
-                            job_type_for_indeed = detail_info.get("job_type", "")
-                    except:
-                        pass
-                    jobs.append(self._format_job({
-                        "title": titles[i] if i < len(titles) else companies[i],
-                        "company": companies[i],
-                        "location": locs[i] if i < len(locs) else location,
-                        "description": desc,
-                        "url": job_url,
-                        "date": "",
-                        "source": "Indeed",
-                        "job_type": job_type_for_indeed
-                    }))
-                
-                if jobs:
-                    break
-        except ImportError:
-            print("Indeed搜索需要curl_cffi库: pip install curl_cffi")
-        except Exception as e:
-            print(f"Indeed 搜索失败: {e}")
-        
-        return jobs
+
+        from sites.indeed import search as indeed_search
+        return indeed_search(keywords, location, max_results)
     
+    def search_canonical(self, location: str, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
+        """委托 sites.canonical.search 进行 Canonical 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.canonical import search as canonical_search
+        return canonical_search(keywords, location, max_results)
+
+    def search_weworkremotely(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.weworkremotely.search 进行 WeWorkRemotely 搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.weworkremotely import search as wwr_search
+        return wwr_search(keywords, location, max_results)
+
+    def search_google_jobs(self, location: str, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
+        """委托 sites.google_jobs.search 进行 Google 搜索聚合"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.google_jobs import search as google_search
+        return google_search(keywords, location, max_results)
+
+    def search_linkedin(self, location: str, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
+        """委托 sites.linkedin_search.search 进行 LinkedIn 搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.linkedin_search import search as linkedin_search
+        return linkedin_search(keywords, location, max_results)
+
     def search_remoteok(self, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
         """搜索RemoteOK"""
         jobs = []
@@ -459,6 +415,10 @@ class JobSearchEngine:
             "GitHub Jobs": lambda: self.search_github_jobs(keywords, location, max_per_source),
             "RemoteOK": lambda: self.search_remoteok(max_per_source, keywords),
             "Indeed": lambda: self.search_indeed(location, max_per_source, keywords),
+            "LinkedIn": lambda: self.search_linkedin(location, max_per_source, keywords),
+            "GoogleJobs": lambda: self.search_google_jobs(location, max_per_source, keywords),
+            "WeWorkRemotely": lambda: self.search_weworkremotely(keywords, location, max_per_source),
+            "Canonical": lambda: self.search_canonical(location, max_per_source, keywords),
         }
         
         all_jobs = []
@@ -548,61 +508,7 @@ class JobSearchEngine:
         
         return text[:3000]
     
-    def fetch_indeed_job_details(self, url: str) -> Dict:
-        """抓取Indeed职位详情页面，返回 {desc, job_type}"""
-        result = {"desc": "", "job_type": ""}
-        try:
-            from curl_cffi import requests
-            resp = requests.get(url, impersonate='chrome120', timeout=15)
-            if resp.status_code != 200:
-                return result
-            html = resp.text
-            
-            # 提取 job_type 从详情页结构化数据
-            import re
-            # Match Full-time-tile / Part-time-tile / Contract-tile etc
-            jt_match = re.search(r'data-testid="([A-Za-z-]+tile)"', html)
-            if jt_match:
-                raw = jt_match.group(1).replace('-tile', '').lower()
-                if 'full' in raw:
-                    result["job_type"] = "Full-Time"
-                elif 'part' in raw:
-                    result["job_type"] = "Part-Time"
-                elif 'contract' in raw:
-                    result["job_type"] = "Contract"
-                elif 'temp' in raw:
-                    result["job_type"] = "Temporary"
-                elif 'intern' in raw:
-                    result["job_type"] = "Internship"
-            
-            # Also extract Remote from og:title or page title
-            title_match = re.search(r'<title>([^<]+)</title>', html)
-            title_text = title_match.group(1) if title_match else ""
-            
-            # Also extract from og:title
-            og_match = re.search(r'<meta[^>]+property="og:title"[^>]+content="([^"]+)"', html)
-            og_title = og_match.group(1) if og_match else ""
-            
-            combined = (title_text + " " + og_title).lower()
-            if 'remote' in combined:
-                result['job_type'] = 'Remote ' + result['job_type'] if result['job_type'] else 'Remote'
-            
-            # 提取描述
-            for pat in [
-                r'id="jobDescriptionText"[^>]*>(.*?)</div>\s*</div>',
-                r'id="jobDescriptionText"[^>]*>(.*?)(?:<div[^>]+id=)',
-                r'class="[^"]*jobsearch-JobComponent-description[^"]*"[^>]*>(.*?)(?:<div[^>]*class="[^"]*jobsearch)',
-            ]:
-                m = re.search(pat, html, re.DOTALL)
-                if m and len(m.group(1)) > 100:
-                    result["desc"] = self._beautify_description(m.group(1))
-                    if len(result["desc"]) > 100:
-                        return result
-            # 备选：全文
-            result["desc"] = self._beautify_description(html)
-            return result
-        except:
-            return result
+
     
     def _format_job(self, raw: Dict) -> Dict:
         """格式化职位数据"""
