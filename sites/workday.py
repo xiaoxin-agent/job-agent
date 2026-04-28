@@ -74,6 +74,22 @@ WORKDAY_COMPANIES: Dict[str, Dict] = {
             "Diversity and Inclusion",
         ],
     },
+    "NVIDIA": {
+        "domain": "nvidia.wd5.myworkdayjobs.com",
+        "site_id": "NVIDIAExternalCareerSite",
+        "company": "NVIDIA",
+        "locale": "en-US",
+        "sections": [
+            "NVIDIA",
+            "What we need to see",
+            "What you'll be doing:",
+            "Ways to stand out from the crowd:",
+            "Minimum Requirements",
+            "Preferred Qualifications",
+            "Qualifications",
+            "Responsibilities",
+        ],
+    },
 }
 
 
@@ -324,3 +340,8 @@ def search_redhat(keywords: List[str] = None, location: str = "",
 def search_suse(keywords: List[str] = None, location: str = "",
                 max_results: int = 10) -> List[Dict]:
     return search("SUSE", keywords, location, max_results)
+
+
+def search_nvidia(keywords: List[str] = None, location: str = "",
+                  max_results: int = 10) -> List[Dict]:
+    return search("NVIDIA", keywords, location, max_results)
