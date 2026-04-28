@@ -38,6 +38,7 @@ def list_available_sites(engine=None):
         "weworkremotely": "sites.weworkremotely.search",
         "wwr": "sites.weworkremotely.search",
         "canonical": "sites.canonical.search",
+        "redhat": "sites.redhat.search",
     }
     if engine:
         # 从 search_all 的 source_map 获取实际注册的源
@@ -89,13 +90,14 @@ def run_search(sites, keywords, location, max_results, output_json=False):
             "weworkremotely": "WeWorkRemotely",
             "wwr": "WeWorkRemotely",
             "canonical": "Canonical",
+            "redhat": "RedHat",
         }
         sources = []
         for s in sites:
             mapped = name_map.get(s.strip().lower(), s.strip())
             sources.append(mapped)
         # 检查是否有非法源
-        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical"}
+        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical", "RedHat"}
         unknown = [s for s in sources if s not in valid]
         if unknown:
             print(f"⚠ 未知搜索源: {unknown}")
