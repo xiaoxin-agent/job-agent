@@ -3404,34 +3404,11 @@ Do NOT use any other language in the output. The entire response must be in {lan
         return ''
 
     def _tracked_resume_modal_html(self, lang: str = "zh-CN") -> str:
-        """返回跟踪页简历弹窗所需的 JS（含 i18n 替换）"""
+        """返回跟踪页简历弹窗所需的 JS（硬编码文本已在 JS 文件中替换为变量引用）"""
         base = os.path.join(os.path.dirname(__file__), 'resume_modal_script.js')
         try:
-            with open(base, 'rb') as _f:
-                js = bytearray(_f.read())
-            # i18n: replace hardcoded text with JS variable references
-            import re
-            # ← = ←, ↑ = ↑
-            
-            # Simple: just do the replacements with UTF-8 encoded strings
-            replacements = [
-                (chr(0x270f) + " 快速编辑", '" + _btn_edit + "'),
-                (chr(0x1f58a) + " 全屏编辑", '" + _btn_fullscreen_edit + "'),
-                (chr(0x1f4c4) + " 简历预览", '" + _resume_preview_title + "'),
-                ("加载中...", '" + _loading_text + "'),
-                ("暂无内容", '" + _no_content + "'),
-                ("加载失败: ", '" + _load_failed + '),
-                ("Markdown 编辑...", 'Markdown " + _md_edit_placeholder + "'),
-                ("取消", '" + _cancel + "'),
-                (chr(0x1f4be) + " 保存", '" + _btn_save + "'),
-            ]
-            for old, new in replacements:
-                old_bytes = old.encode('utf-8')
-                new_bytes = new.encode('utf-8')
-                count = js.count(old_bytes)
-                if count > 0:
-                    js = js.replace(old_bytes, new_bytes)
-            return '<script>\n' + js.decode('utf-8') + '\n</script>'
+            with open(base, 'r', encoding='utf-8') as _f:
+                return '<script>\n' + _f.read() + '\n</script>'
         except Exception:
             return ''
 
