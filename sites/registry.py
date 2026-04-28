@@ -56,6 +56,9 @@ def _ensure_registered():
     # Red Hat Workday jobs
     register('redhat.wd5.myworkdayjobs.com', 'sites.redhat', priority=10)
 
+    # SUSE Workday jobs
+    register('suse.wd3.myworkdayjobs.com', 'sites.suse', priority=10)
+
     # Generic company domain matchers (lower priority)
     for domain, name in [
         ('nvidia.com', 'NVIDIA'),

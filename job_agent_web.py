@@ -966,6 +966,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <label>{src_label}</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Canonical" checked> Canonical</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="RedHat" checked> Red Hat</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="SUSE"> SUSE</label>
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>

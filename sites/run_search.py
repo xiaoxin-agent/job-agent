@@ -91,13 +91,14 @@ def run_search(sites, keywords, location, max_results, output_json=False):
             "wwr": "WeWorkRemotely",
             "canonical": "Canonical",
             "redhat": "RedHat",
+            "suse": "SUSE",
         }
         sources = []
         for s in sites:
             mapped = name_map.get(s.strip().lower(), s.strip())
             sources.append(mapped)
         # 检查是否有非法源
-        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical", "RedHat"}
+        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical", "RedHat", "SUSE"}
         unknown = [s for s in sources if s not in valid]
         if unknown:
             print(f"⚠ 未知搜索源: {unknown}")

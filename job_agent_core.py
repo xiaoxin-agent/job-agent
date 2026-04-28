@@ -239,6 +239,16 @@ class JobSearchEngine:
         from sites.redhat import search as redhat_search
         return redhat_search(keywords, location, max_results)
 
+    def search_suse(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.suse.search 进行 SUSE 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.suse import search as suse_search
+        return suse_search(keywords, location, max_results)
+
     def search_weworkremotely(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
         """委托 sites.weworkremotely.search 进行 WeWorkRemotely 搜索"""
         if not keywords:
@@ -430,6 +440,7 @@ class JobSearchEngine:
             "WeWorkRemotely": lambda: self.search_weworkremotely(keywords, location, max_per_source),
             "Canonical": lambda: self.search_canonical(location, max_per_source, keywords),
             "RedHat": lambda: self.search_redhat(keywords, location, max_per_source),
+            "SUSE": lambda: self.search_suse(keywords, location, max_per_source),
         }
         
         all_jobs = []
