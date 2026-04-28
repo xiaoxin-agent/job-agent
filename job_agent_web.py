@@ -292,7 +292,12 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "cal_weekday_labels": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         "cal_modal_resources": "\U0001f4da Recommended Resources",
         "cal_modal_projects": "\U0001f4a1 Related Projects",
-        "cal_modal_advice": "\U0001f4ad Study Advice"
+        "cal_modal_advice": "\U0001f4ad Study Advice",
+        "btn_fullscreen_edit": "\xf0\x9f\x96\x8a Fullscreen Edit",
+        "resume_preview_title": "\xf0\x9f\x93\x84 Resume Preview",
+        "no_content": "No content yet",
+        "load_failed": "\xe2\x9d\x8c Load failed: ",
+        "md_edit_placeholder": "Edit in Markdown...",
 
     },
     "zh-CN": {
@@ -450,6 +455,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "cal_modal_resources": "\U0001f4da \u63a8\u8350\u8d44\u6e90",
         "cal_modal_projects": "\U0001f4a1 \u76f8\u5173\u9879\u76ee",
         "cal_modal_advice": "\U0001f4ad \u5b66\u4e60\u5efa\u8bae",
+        "btn_fullscreen_edit": "\xf0\x9f\x96\x8a \xe5\x85\xa8\xe5\xb1\x8f\xe7\xbc\x96\xe8\xbe\x91",
+        "resume_preview_title": "\xf0\x9f\x93\x84 \xe7\xae\x80\xe5\x86\x86\xe9\xa2\x84\xe8\xa7\x88",
+        "no_content": "\xe6\x9a\x82\xe6\x97\xa0\xe5\x86\x85\xe5\xae\xb9",
+        "load_failed": "\xe2\x9d\x8c \xe5\x8a\xa0\xe8\xbd\xbd\xe5\xa4\xb1\xe8\xb4\xa5: ",
+        "md_edit_placeholder": "Markdown \xe7\xbc\x96\xe8\xbe\x91...",
         "link_resume_title": "\U0001f4ce 关联简历",
         "btn_assign": "\U0001f517 关联",
         "upload_new_resume": "\U0001f4e4 上传新简历并关联",
@@ -575,6 +585,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "cal_modal_resources": "\U0001f4da Ressources recommand\u00e9es",
         "cal_modal_projects": "\U0001f4a1 Projets connexes",
         "cal_modal_advice": "\U0001f4ad Conseils d'\u00e9tude",
+        "btn_fullscreen_edit": "\xf0\x9f\x96\x8a \xc3\x89dition plein \xc3\xa9cran",
+        "resume_preview_title": "\xf0\x9f\x93\x84 Aper\xc3\xa7u du CV",
+        "no_content": "Pas encore de contenu",
+        "load_failed": "\xe2\x9d\x8c \xc3\x89chec du chargement: ",
+        "md_edit_placeholder": "Modifier en Markdown...",
         "btn_letter": "✉️ Lettre de motivation",
         "btn_view": "🔗 Voir l'offre",
         "btn_add_job": "📤 Ajouter un poste",
@@ -1088,6 +1103,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         btn_add_job = t(lang, "btn_add_job")
         btn_preview = t(lang, "btn_preview")
         btn_edit = t(lang, "btn_edit")
+        btn_fullscreen_edit = t(lang, "btn_fullscreen_edit")
+        resume_preview_title = t(lang, "resume_preview_title")
+        no_content = t(lang, "no_content")
+        load_failed = t(lang, "load_failed")
+        md_edit_placeholder = t(lang, "md_edit_placeholder")
         btn_optimize = t(lang, "btn_optimize")
         btn_link_resume = t(lang, "btn_link_resume")
         match_percent = t(lang, "match_percent")
@@ -1180,6 +1200,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _gap_modal_title = {json.dumps(gap_modal_title, ensure_ascii=False)};
         var _btn_generate_plan = {json.dumps(btn_generate_plan, ensure_ascii=False)};
         var _btn_view_plan = {json.dumps(btn_view_plan, ensure_ascii=False)};
+        var _btn_edit = {json.dumps(btn_edit, ensure_ascii=False)};
+        var _btn_fullscreen_edit = {json.dumps(btn_fullscreen_edit, ensure_ascii=False)};
+        var _resume_preview_title = {json.dumps(resume_preview_title, ensure_ascii=False)};
+        var _no_content = {json.dumps(no_content, ensure_ascii=False)};
+        var _load_failed = {json.dumps(load_failed, ensure_ascii=False)};
+        var _md_edit_placeholder = {json.dumps(md_edit_placeholder, ensure_ascii=False)};
         var _learn_plan_empty = {json.dumps(learn_plan_empty, ensure_ascii=False)};
         var _learn_plan_modal_title = {json.dumps(learn_plan_modal_title, ensure_ascii=False)};
         var _learn_plan_progress_label = {json.dumps(learn_plan_progress, ensure_ascii=False)};
@@ -1825,7 +1851,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         }}
         </script>
         """, lang=lang)
-        html += self._tracked_resume_modal_html()
+        html += self._tracked_resume_modal_html(lang)
         self._send_html(html)
 
     def handle_learn_calendar_page(self, params):
@@ -3377,16 +3403,38 @@ Do NOT use any other language in the output. The entire response must be in {lan
     def _resume_page_script(self):
         return ''
 
-    def _tracked_resume_modal_html(self) -> str:
-        """返回跟踪页简历弹窗所需的 JS"""
+    def _tracked_resume_modal_html(self, lang: str = "zh-CN") -> str:
+        """返回跟踪页简历弹窗所需的 JS（含 i18n 替换）"""
         base = os.path.join(os.path.dirname(__file__), 'resume_modal_script.js')
         try:
-            with open(base, 'r', encoding='utf-8') as _f:
-                return '<script>\n' + _f.read() + '\n</script>'
+            with open(base, 'rb') as _f:
+                js = bytearray(_f.read())
+            # i18n: replace hardcoded text with JS variable references
+            import re
+            # ← = ←, ↑ = ↑
+            
+            # Simple: just do the replacements with UTF-8 encoded strings
+            replacements = [
+                (chr(0x270f) + " 快速编辑", '" + _btn_edit + "'),
+                (chr(0x1f58a) + " 全屏编辑", '" + _btn_fullscreen_edit + "'),
+                (chr(0x1f4c4) + " 简历预览", '" + _resume_preview_title + "'),
+                ("加载中...", '" + _loading_text + "'),
+                ("暂无内容", '" + _no_content + "'),
+                ("加载失败: ", '" + _load_failed + '),
+                ("Markdown 编辑...", 'Markdown " + _md_edit_placeholder + "'),
+                ("取消", '" + _cancel + "'),
+                (chr(0x1f4be) + " 保存", '" + _btn_save + "'),
+            ]
+            for old, new in replacements:
+                old_bytes = old.encode('utf-8')
+                new_bytes = new.encode('utf-8')
+                count = js.count(old_bytes)
+                if count > 0:
+                    js = js.replace(old_bytes, new_bytes)
+            return '<script>\n' + js.decode('utf-8') + '\n</script>'
         except Exception:
             return ''
 
-    
     def handle_resume_view_page(self, params):
         """简历查看/编辑页"""
         job_id = params.get("job_id", "")
