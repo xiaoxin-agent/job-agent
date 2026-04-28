@@ -72,10 +72,12 @@ def _format_redhat_description(text: str) -> str:
         "Equal Opportunity Policy",
     ]
     # Build a regex that splits on any section header (case-insensitive, word-boundary)
-    # Using word boundaries to avoid matching "equal opportunity" inside a sentence
-    header_pattern = "(" + "|".join(
-        r"\b" + re.escape(h) + r"\b" for h in section_headers
-    ) + ")"
+    # Eats trailing punctuation (:, ?, etc) into the header capture so it doesn't
+    # show up as orphaned text in the next part.
+    def _header_re(h: str) -> str:
+        # Match the header followed by optional :, ?, or :space, then trim from the result
+        return rf"\b{re.escape(h)}(?:\s*[:?])?"
+    header_pattern = "(" + "|".join(_header_re(h) for h in section_headers) + ")"
     parts = re.split(header_pattern, text, flags=re.IGNORECASE)
 
     if len(parts) < 2:
@@ -93,15 +95,17 @@ def _format_redhat_description(text: str) -> str:
         # Check if this part IS a recognized section header
         is_header = False
         for h in section_headers:
-            # Match exactly or with trailing punctuation (:, ?, etc)
-            if part.lower() == h.lower() or \
-               part.lower().startswith(h.lower()) and len(part) <= len(h) + 2:
+            # Strip trailing punctuation for comparison
+            clean = part.rstrip(":? ").strip()
+            if clean.lower() == h.lower():
                 is_header = True
+                part = clean  # Use clean version for display
                 break
         if is_header:
             if i + 1 < len(parts):
                 body = parts[i + 1].strip()
-                # Escape the header text but keep as <strong>
+                # body sometimes starts with ': ' or '? ' — strip it
+                body = re.sub(r'^[:?]\s*', '', body)
                 html_parts.append(f"<p><strong>{part}</strong></p>")
                 html_parts.append(f"<p>{body}</p>")
                 i += 2
@@ -109,7 +113,6 @@ def _format_redhat_description(text: str) -> str:
                 html_parts.append(f"<p><strong>{part}</strong></p>")
                 i += 1
         else:
-            # orphaned text
             html_parts.append(f"<p>{part}</p>")
             i += 1
 
