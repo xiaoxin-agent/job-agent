@@ -1110,6 +1110,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         learn_plan_weekly = t(lang, "learn_plan_weekly")
         learn_plan_check_hint = t(lang, "learn_plan_check_hint")
         learn_plan_week = t(lang, "learn_plan_week")
+        lang_sfx = {"en": "", "zh-CN": "\u5468", "fr": ""}
+        learn_plan_suffix = lang_sfx.get(lang, "")
         learn_plan_hours = t(lang, "learn_plan_hours")
         learn_plan_projects = t(lang, "learn_plan_projects")
         learn_plan_skills = t(lang, "learn_plan_skills")
@@ -1190,6 +1192,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _learn_plan_weekly = {json.dumps(learn_plan_weekly, ensure_ascii=False)};
         var _learn_plan_check_hint = {json.dumps(learn_plan_check_hint, ensure_ascii=False)};
         var _learn_plan_week = {json.dumps(learn_plan_week, ensure_ascii=False)};
+        var _learn_plan_suffix = {json.dumps(learn_plan_suffix, ensure_ascii=False)};
         var _learn_plan_hours = {json.dumps(learn_plan_hours, ensure_ascii=False)};
         var _learn_plan_projects = {json.dumps(learn_plan_projects, ensure_ascii=False)};
         var _learn_plan_skills = {json.dumps(learn_plan_skills, ensure_ascii=False)};
