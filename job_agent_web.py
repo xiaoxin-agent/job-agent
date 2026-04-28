@@ -3415,6 +3415,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
     def handle_resume_view_page(self, params):
         """简历查看/编辑页"""
         job_id = params.get("job_id", "")
+        lang = params.get("lang", "zh-CN")
         if not job_id:
             self._send_html('<html><body><p style="padding:40px;color:#888">缺少 job_id</p></body></html>')
             return
@@ -3428,21 +3429,46 @@ Do NOT use any other language in the output. The entire response must be in {lan
             return
         resume_name = job.get("resume_name", "简历")
         resume_id = job["resume_id"]
-        html = self._build_resume_editor_page(job_id, resume_name)
+        i18n = {}
+        for k in ["resume_edit_title", "resume_edit_subtitle", "btn_back", "btn_export_pdf",
+                   "btn_exporting", "md_editor_label", "md_editor_placeholder", "preview_failed",
+                   "toolbar_bold", "toolbar_heading", "toolbar_list", "toolbar_link",
+                   "status_saved", "status_save_failed", "status_save_error",
+                   "status_export_failed", "status_export_error",
+                   "btn_save", "_loading_text", "_load_failed"]:
+            i18n[k] = t(lang, k)
+        html = self._build_resume_editor_page(job_id, resume_name, lang, **i18n)
         self._send_html(html)
 
-    def _build_resume_editor_page(self, job_id: str, resume_name: str) -> str:
-        """
-        Markdown 简历编辑器页面
-        分栏布局：左侧 Markdown 编辑器 + 右侧实时 HTML 预览
-        """
+    def _build_resume_editor_page(self, job_id: str, resume_name: str, lang: str = "zh-CN", **kw) -> str:
+        """Markdown简历编辑器页面 - 分栏布局"""
         import json
+        e_title = kw.get("resume_edit_title", "Edit Resume - ")
+        e_subtitle = kw.get("resume_edit_subtitle", "Job-specific copy")
+        b_back = kw.get("btn_back", "← Back")
+        b_export_pdf = kw.get("btn_export_pdf", "📄 Export PDF")
+        b_exporting = kw.get("btn_exporting", "Generating...")
+        b_save = kw.get("btn_save", "💾 Save")
+        m_label = kw.get("md_editor_label", "Markdown Editor")
+        m_ph = kw.get("md_editor_placeholder", "Edit...")
+        p_fail = kw.get("preview_failed", "Preview failed")
+        tb_bold = kw.get("toolbar_bold", "Bold")
+        tb_heading = kw.get("toolbar_heading", "Heading")
+        tb_list = kw.get("toolbar_list", "List")
+        tb_link = kw.get("toolbar_link", "Link")
+        s_saved = kw.get("status_saved", "✅ Saved")
+        s_save_failed = kw.get("status_save_failed", "❌ Save failed: ")
+        s_save_error = kw.get("status_save_error", "❌ Save error: ")
+        s_exp_fail = kw.get("status_export_failed", "Export failed: ")
+        s_exp_err = kw.get("status_export_error", "Export error: ")
+        loading = kw.get("_loading_text", "Loading...")
+        load_fail = kw.get("_load_failed", "❌ Load failed: ")
         return f"""<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{lang}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>编辑简历 - {resume_name}</title>
+<title>{e_title}{resume_name}</title>
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
 body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; padding:0; display:flex; flex-direction:column; height:100vh; font-size:16px; }}
@@ -3480,32 +3506,42 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-seri
 </head>
 <body>
 <div class="header">
-  <div><h1>📄 {resume_name} <span class="subtitle">（职位专属副本，修改不影响简历库）</span></h1></div>
+  <div><h1>📄 {resume_name} <span class="subtitle">{e_subtitle}</span></h1></div>
   <div>
-    <a href="/tracked" class="btn btn-back">← 返回</a>
-    <button onclick="exportPdf()" class="btn btn-download" id="exportBtn">📄 导出 PDF</button>
-    <button onclick="saveResume()" class="btn btn-save">💾 保存</button>
+    <a href="/tracked?lang={lang}" class="btn btn-back">{b_back}</a>
+    <button onclick="exportPdf()" class="btn btn-download" id="exportBtn">{b_export_pdf}</button>
+    <button onclick="saveResume()" class="btn btn-save">{b_save}</button>
   </div>
 </div>
-<div id="statusMsg" class="status">✅ 已保存</div>
+<div id="statusMsg" class="status">{s_saved}</div>
 <div class="main">
   <div class="editor-pane">
     <div class="editor-toolbar">
-      <span>Markdown 编辑器</span>
+      <span>{m_label}</span>
       <span style="flex:1"></span>
-      <button class="btn-icon" onclick="insertMd('**','**')" title="粗体">B</button>
-      <button class="btn-icon" onclick="insertMd('## ','\n## ')" title="标题">H</button>
-      <button class="btn-icon" onclick="insertMd('\\n- ','\n  ')" title="列表">•</button>
-      <button class="btn-icon" onclick="insertMd('[','](url)')" title="链接">🔗</button>
+      <button class="btn-icon" onclick="insertMd('**','**')" title="{tb_bold}">B</button>
+      <button class="btn-icon" onclick="insertMd('## ','\n## ')" title="{tb_heading}">H</button>
+      <button class="btn-icon" onclick="insertMd('\\n- ','\n  ')" title="{tb_list}">•</button>
+      <button class="btn-icon" onclick="insertMd('[','](url)')" title="{tb_link}">🔗</button>
     </div>
-    <textarea id="editor" spellcheck="false" placeholder="Markdown 格式的简历内容..."></textarea>
+    <textarea id="editor" spellcheck="false" placeholder="{m_ph}"></textarea>
   </div>
-  <div class="preview-pane" id="preview">加载中...</div>
+  <div class="preview-pane" id="preview">{loading}</div>
 </div>
 <script>
 var jobId = {json.dumps(job_id, ensure_ascii=False)};
 var originalMd = "";
 var timer = null;
+var _loading_text = {json.dumps(loading, ensure_ascii=False)};
+var _load_failed = {json.dumps(load_fail, ensure_ascii=False)};
+var _p_fail = {json.dumps(p_fail, ensure_ascii=False)};
+var _s_saved = {json.dumps(s_saved, ensure_ascii=False)};
+var _s_save_failed = {json.dumps(s_save_failed, ensure_ascii=False)};
+var _s_save_error = {json.dumps(s_save_error, ensure_ascii=False)};
+var _s_exp_fail = {json.dumps(s_exp_fail, ensure_ascii=False)};
+var _s_exp_err = {json.dumps(s_exp_err, ensure_ascii=False)};
+var _b_exporting = {json.dumps(b_exporting, ensure_ascii=False)};
+var _b_export_pdf = {json.dumps(b_export_pdf, ensure_ascii=False)};
 
 function insertMd(before, after) {{
   var ta = document.getElementById('editor');
@@ -3528,10 +3564,10 @@ async function loadResume() {{
       document.getElementById('editor').value = originalMd;
       renderPreview(originalMd);
     }} else {{
-      document.getElementById('preview').innerHTML = '<p style="color:red">加载失败: ' + (d.error || '') + '</p>';
+      document.getElementById('preview').innerHTML = '<p style="color:red">' + _load_failed + (d.error || '') + '</p>';
     }}
   }} catch(e) {{
-    document.getElementById('preview').innerHTML = '<p style="color:red">加载出错: ' + e + '</p>';
+    document.getElementById('preview').innerHTML = '<p style="color:red">' + _load_failed + e + '</p>';
   }}
 }}
 
@@ -3542,10 +3578,9 @@ async function renderPreview(text) {{
     if (d.success) {{
       document.getElementById('preview').innerHTML = d.html;
     }} else {{
-      document.getElementById('preview').innerHTML = '<p style="color:red">预览失败</p><pre>' + text + '</pre>';
+      document.getElementById('preview').innerHTML = '<p style="color:red">' + _p_fail + '</p><pre>' + text + '</pre>';
     }}
   }} catch(e) {{
-    // fallback: show raw text
     document.getElementById('preview').innerHTML = '<pre>' + text + '</pre>';
   }}
 }}
@@ -3557,25 +3592,25 @@ async function saveResume() {{
     var d = await resp.json();
     var status = document.getElementById('statusMsg');
     status.className = 'status ' + (d.success ? 'show success' : 'show error');
-    status.textContent = d.success ? '✅ 已保存' : '❌ 保存失败: ' + (d.error || '');
+    status.textContent = d.success ? _s_saved : _s_save_failed + (d.error || '');
     setTimeout(function() {{ status.className = 'status'; }}, 3000);
     if (d.success) originalMd = md;
   }} catch(e) {{
     var status = document.getElementById('statusMsg');
     status.className = 'status show error';
-    status.textContent = '❌ 保存出错: ' + e;
+    status.textContent = _s_save_error + e;
   }}
 }}
 
 async function exportPdf() {{
   var btn = document.getElementById('exportBtn');
   btn.disabled = true;
-  btn.textContent = '生成中...';
+  btn.textContent = _b_exporting;
   try {{
     var resp = await fetch('/api/download_resume_pdf', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
     if (!resp.ok) {{
       var d = await resp.json();
-      alert('导出失败: ' + (d.error || ''));
+      alert(_s_exp_fail + (d.error || ''));
       return;
     }}
     var blob = await resp.blob();
@@ -3587,14 +3622,13 @@ async function exportPdf() {{
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
   }} catch(e) {{
-    alert('导出出错: ' + e);
+    alert(_s_exp_err + e);
   }} finally {{
     btn.disabled = false;
-    btn.textContent = '📄 导出 PDF';
+    btn.textContent = _b_export_pdf;
   }}
 }}
 
-// Ctrl+S to save
 document.addEventListener('keydown', function(e) {{
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {{
     e.preventDefault();
@@ -3602,7 +3636,6 @@ document.addEventListener('keydown', function(e) {{
   }}
 }});
 
-// Auto-preview with debounce
 document.getElementById('editor').addEventListener('input', function() {{
   clearTimeout(timer);
   timer = setTimeout(function() {{
