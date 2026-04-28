@@ -19,21 +19,21 @@
         var h = '<div id="resume-view-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center">';
         h += '<div id="resume-view-card" style="background:#fff;border-radius:12px;padding:0;max-width:700px;width:95%;box-shadow:0 8px 32px rgba(0,0,0,0.2)">';
         h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e0e0e0;flex-shrink:0">';
-        h += '<h3 style="margin:0;font-size:16px">" + _resume_preview_title + "</h3>';
+        h += '<h3 style="margin:0;font-size:16px">' + _resume_preview_title + '</h3>';
         h += '<div>';
-        h += '<button class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px" onclick="toggleResumeMdEdit()">" + _btn_edit + "</button>';
-        h += '<a class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px" href="/resume_view?job_id=' + jobId + '" target="_blank">" + _btn_fullscreen_edit + "</a>';
+        h += '<button class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px" onclick="toggleResumeMdEdit()">' + _btn_edit + '</button>';
+        h += '<a class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px" href="/resume_view?job_id=' + jobId + '" target="_blank">' + _btn_fullscreen_edit + '</a>';
         h += '<button style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1" onclick="resumeViewModalClose()">\u00d7</button>';
         h += '</div></div>';
         h += '<div id="resume-view-content" style="overflow-y:auto;padding:20px;line-height:1.7;font-size:14px">';
-        h += '<div style="text-align:center;padding:40px;color:#999">" + _loading_text + "</div></div>';
+        h += '<div style="text-align:center;padding:40px;color:#999">' + _loading_text + '</div></div>';
         h += '<div id="md-resize-handle" style="height:6px;background:#e0e0e0;cursor:ns-resize;user-select:none;display:none;flex-shrink:0"></div>';
         h += '<div id="resume-view-footer" style="display:none;flex-shrink:0;overflow-y:auto">';
         h += '<div style="padding:10px 20px;border-top:1px solid #e0e0e0">';
-        h += '<textarea id="resume-md-edit" style="width:100%;height:120px;border:1px solid #ddd;border-radius:6px;padding:8px;font-family:monospace;font-size:13px;box-sizing:border-box" placeholder="Markdown " + _md_edit_placeholder + ""></textarea>';
+        h += '<textarea id="resume-md-edit" style="width:100%;height:120px;border:1px solid #ddd;border-radius:6px;padding:8px;font-family:monospace;font-size:13px;box-sizing:border-box" placeholder="Markdown ' + _md_edit_placeholder + '></textarea>';
         h += '<div style="text-align:right;margin-top:6px">';
-        h += '<button class="btn btn-small" style="margin-right:4px" onclick="closeResumeMdEdit()">" + _cancel + "</button>';
-        h += '<button class="btn btn-small btn-save" onclick="saveResumeMdFromModal()">" + _btn_save + "</button>';
+        h += '<button class="btn btn-small" style="margin-right:4px" onclick="closeResumeMdEdit()">' + _cancel + '</button>';
+        h += '<button class="btn btn-small btn-save" onclick="saveResumeMdFromModal()">' + _btn_save + '</button>';
         h += '</div></div></div>';
         document.body.insertAdjacentHTML('beforeend', h);
 
@@ -53,9 +53,9 @@
 
         try {
             var r = await fetch('/api/preview_resume?job_id=' + jobId);
-            document.getElementById('resume-view-content').innerHTML = await r.text() || '<p style="color:#888">" + _no_content + "</p>';
+            document.getElementById('resume-view-content').innerHTML = await r.text() || '<p style="color:#888">' + _no_content + '</p>';
         } catch(e) {
-            document.getElementById('resume-view-content').innerHTML = '<p style="color:red">" + _load_failed + ' + e + '</p>';
+            document.getElementById('resume-view-content').innerHTML = '<p style="color:red">' + _load_failed + e + '</p>';
         }
     };
 })();
@@ -106,7 +106,7 @@ async function saveResumeMdFromModal() {
         var d = await r.json();
         if (d.success) {
             var r2 = await fetch('/api/preview_resume?job_id=' + jid);
-            document.getElementById('resume-view-content').innerHTML = await r2.text() || '<p style="color:#888">" + _no_content + "</p>';
+            document.getElementById('resume-view-content').innerHTML = await r2.text() || '<p style="color:#888">' + _no_content + '</p>';
             alert('\u2705 \u5df2\u4fdd\u5b58');
             document.getElementById('resume-view-footer').style.display = 'none';
             document.getElementById('md-resize-handle').style.display = 'none';
