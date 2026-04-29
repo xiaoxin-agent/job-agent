@@ -1006,9 +1006,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         // Select all / deselect all sources
         function toggleAllSources(checked) {{
             var cbs = document.querySelectorAll('.src-cb');
+            var val = checked ? true : false;
             for (var i = 0; i < cbs.length; i++) {{
-                if (checked) {{ cbs[i].setAttribute('checked', ''); }}
-                else {{ cbs[i].removeAttribute('checked'); }}
+                cbs[i].checked = val;
             }}
         }}
         function getCompanyLogo(name) {{
