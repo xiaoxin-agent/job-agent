@@ -265,12 +265,14 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
                 limit: int = 20, location: str = "") -> List[Dict]:
     """Query Workday search API and filter results."""
     api_url = _build_api_url(company_config)
+    page_limit = min(limit * 3, 20)
+    max_pages = 5  # scatter across multiple pages to find matches
 
-    def _do_request():
+    def _fetch_page(offset: int) -> Optional[Dict]:
         try:
             resp = requests.post(
                 api_url,
-                json={"limit": min(limit * 3, 20), "offset": 0},
+                json={"limit": page_limit, "offset": offset},
                 impersonate="chrome120",
                 headers={"Content-Type": "application/json",
                          "Accept": "application/json"},
@@ -282,49 +284,57 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
         except Exception:
             return None
 
-    for attempt in range(3):
-        data = _do_request()
-        if data is not None and data.get("jobPostings"):
-            break
-        time.sleep(2 * (attempt + 1))
-
-    if data is None:
-        return []
-    job_postings = data.get("jobPostings", [])
-    if not job_postings:
-        return []
-
-    company_name = company_config["company"]
     results = []
-    for job in job_postings:
-        title = job.get("title", "")
-        locations_text = job.get("locationsText", "")
-        external_path = job.get("externalPath", "")
-        detail_url = _build_job_page_url(company_config, external_path) if external_path else ""
+    for page in range(max_pages):
+        offset = page * page_limit
+        data = None
+        for attempt in range(3):
+            data = _fetch_page(offset)
+            if data is not None:
+                break
+            time.sleep(2 * (attempt + 1))
+        if data is None:
+            break
+        job_postings = data.get("jobPostings", [])
+        if not job_postings:
+            break
 
-        # Keyword filter (OR)
-        if keywords:
-            title_lower = title.lower()
-            if not any(kw.lower() in title_lower for kw in keywords):
-                continue
+        company_name = company_config["company"]
+        for job in job_postings:
+            title = job.get("title", "")
+            locations_text = job.get("locationsText", "")
+            external_path = job.get("externalPath", "")
+            detail_url = _build_job_page_url(company_config, external_path) if external_path else ""
 
-        posted_on = job.get("postedOn", "")
+            # Keyword filter (OR)
+            if keywords:
+                title_lower = title.lower()
+                if not any(kw.lower() in title_lower for kw in keywords):
+                    continue
 
-        results.append({
-            "title": title,
-            "company": company_name,
-            "location": locations_text or "Global / Remote",
-            "description": title,
-            "url": detail_url,
-            "source": company_key,
-            "date": posted_on,
-            "job_type": "Full-Time",
-            "remote": "Remote",
-            "departments": [],
-            "salary_min": 0,
-            "salary_max": 0,
-            "currency": "USD",
-        })
+            posted_on = job.get("postedOn", "")
+
+            results.append({
+                "title": title,
+                "company": company_name,
+                "location": locations_text or "Global / Remote",
+                "description": title,
+                "url": detail_url,
+                "source": company_key,
+                "date": posted_on,
+                "job_type": "Full-Time",
+                "remote": "Remote",
+                "departments": [],
+                "salary_min": 0,
+                "salary_max": 0,
+                "currency": "USD",
+            })
+
+            if len(results) >= limit:
+                break
+
+        if len(results) >= limit:
+            break
 
     return results[:limit]
 
