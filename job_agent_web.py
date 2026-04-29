@@ -1055,7 +1055,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 h += '<div class="job-meta">';
                 h += '<span>' + getCompanyLogo(job.company) + ' ' + (job.company || '') + '</span>';
                 h += '<span>📍 ' + (job.location || '') + '</span>';
-                h += '<span>📅 ' + (job.date || '').substring(0, 10) + '</span>';
+                h += '<span>📅 ' + String(job.date || '').substring(0, 10) + '</span>';
                 h += '<span>📡 ' + (job.source || '') + '</span></div>';
                 h += '<div class="job-desc" id="desc-' + i + '">' + shortDesc + '</div>';
                 h += '<div class="job-desc-full" id="fulldesc-' + i + '" style="display:none">' + desc.replace(/\\n/g, '<br>') + '</div>';
