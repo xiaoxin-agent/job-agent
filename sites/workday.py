@@ -265,85 +265,83 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
                 limit: int = 20, location: str = "") -> List[Dict]:
     """Query Workday search API and filter results."""
     api_url = _build_api_url(company_config)
-    page_limit = min(limit * 3, 20)
+    page_size = min(limit * 3, 20)
 
-    # Use searchText if keywords provided — Workday's server-side text search
-    # is much more accurate than client-side filtering.
     search_query = " ".join(keywords).strip() if keywords else ""
 
-    def _fetch_page(offset: int) -> Optional[Dict]:
+    def _fetch(offset: int) -> Optional[Dict]:
         try:
-            payload = {"limit": page_limit, "offset": offset}
+            payload = {"limit": page_size, "offset": offset}
             if search_query:
                 payload["searchText"] = search_query
             resp = requests.post(
-                api_url,
-                json=payload,
+                api_url, json=payload,
                 impersonate="chrome120",
-                headers={"Content-Type": "application/json",
-                         "Accept": "application/json"},
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
                 timeout=20,
             )
-            if resp.status_code != 200:
-                return None
-            return resp.json()
+            return resp.json() if resp.status_code == 200 else None
         except Exception:
             return None
 
-    # Fetch first page with retries
+    # Fetch initial page
     data = None
     for attempt in range(3):
-        data = _fetch_page(0)
+        data = _fetch(0)
         if data is not None:
             break
         time.sleep(2 * (attempt + 1))
-
     if data is None:
         return []
-    job_postings = data.get("jobPostings", [])
 
-    # If searchText was used, trust server-side filtering
-    if not (search_query and len(job_postings) >= limit):
-        # No keywords or too few results: scatter across pages
-        for page in range(1, 5):
-            offset = page * page_limit
-            page_data = None
-            for attempt in range(3):
-                page_data = _fetch_page(offset)
-                if page_data is not None:
-                    break
-                time.sleep(2 * (attempt + 1))
-            if page_data is None:
-                break
-            more = page_data.get("jobPostings", [])
-            if not more:
-                break
-            job_postings.extend(more)
-            if len(job_postings) >= limit * 3:
-                break
+    job_postings = list(data.get("jobPostings", []))
 
+    # Paginate keyword search results — Workday limit is 20/page, but
+    # ASIC-related jobs can span 3+ pages. 3 pages (60 jobs) covers most
+    # location-filtered searches. No keyword = single page of latest jobs.
+    max_pages = 3 if search_query else 0
+    for page in range(1, max_pages + 1):
+        # Collect enough: we want limit * 5 for location filtering headroom
+        if len(job_postings) >= limit * 5:
+            break
+        offset = page * page_size
+        page_data = None
+        for attempt in range(3):
+            page_data = _fetch(offset)
+            if page_data is not None:
+                break
+            time.sleep(2 * (attempt + 1))
+        if page_data is None or not page_data.get("jobPostings"):
+            break
+        job_postings.extend(page_data["jobPostings"])
+
+    # Filter and build results
     company_name = company_config["company"]
     results = []
-    for job in job_postings[:limit * 3]:
+    for job in job_postings:
         title = job.get("title", "")
-        locations_text = job.get("locationsText", "") or ""
+        locations_text = (job.get("locationsText") or "")
         external_path = job.get("externalPath", "")
         detail_url = _build_job_page_url(company_config, external_path) if external_path else ""
 
         # Location filter
         if location and location.lower() not in ("remote", "global"):
-            location_lower = location.lower()
+            loc_lower = location.lower()
             loc_ok = False
-            for loc_part in location_lower.split(","):
-                loc_part = loc_part.strip()
-                if loc_part and loc_part in locations_text.lower():
+            for part in loc_lower.split(","):
+                part = part.strip()
+                if part and part in locations_text.lower():
                     loc_ok = True
                     break
             if not loc_ok:
-                if "remote" not in locations_text.lower():
-                    continue
-
-        posted_on = job.get("postedOn", "")
+                user_w = {w for w in re.split(r"[\s,]+", loc_lower) if len(w) > 2}
+                txt_w = {w for w in re.split(r"[\s,\/]+", locations_text.lower()) if len(w) > 2}
+                if user_w & txt_w:
+                    loc_ok = True
+            if not loc_ok and "remote" in locations_text.lower():
+                loc_ok = True
+            if not loc_ok:
+                continue
 
         results.append({
             "title": title,
@@ -352,7 +350,7 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
             "description": title,
             "url": detail_url,
             "source": company_key,
-            "date": posted_on,
+            "date": job.get("postedOn", ""),
             "job_type": "Full-Time",
             "remote": "Remote",
             "departments": [],
@@ -360,7 +358,6 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
             "salary_max": 0,
             "currency": "USD",
         })
-
         if len(results) >= limit:
             break
 
