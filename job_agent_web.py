@@ -184,6 +184,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "keywords_label": "Keywords",
         "location_label": "Location",
         "sources_label": "Sources",
+        "select_all": "Select All",
         "search_results": "📊 Search Results",
         "jobs_found": "Jobs",
         "high_match": "High Match",
@@ -374,6 +375,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "keywords_label": "关键词",
         "location_label": "地点",
         "sources_label": "来源",
+        "select_all": "全选",
         "search_results": "📊 搜索结果",
         "jobs_found": "职位",
         "high_match": "高匹配",
@@ -565,6 +567,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "keywords_label": "Mots-clés",
         "location_label": "Lieu",
         "sources_label": "Sources",
+        "select_all": "Tout sélectionner",
         "search_results": "📊 Résultats de recherche",
         "jobs_found": "Offres",
         "high_match": "Haute correspondance",
@@ -945,6 +948,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         kw_label = _t('keywords_label')
         loc_label = _t('location_label')
         src_label = _t('sources_label')
+        select_all = _t('select_all')
         jobs_label = _t('jobs_found')
         high_match = _t('high_match')
         avg_match = _t('avg_match')
@@ -964,6 +968,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="form-row sources-row">
                     <label>{src_label}</label>
+                    <label class="source-check select-all-cb"><input type="checkbox" id="selectAllSrc" checked onchange="toggleAllSources(this.checked)"> {select_all}</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Canonical" checked> Canonical</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="RedHat" checked> Red Hat</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="SUSE"> SUSE</label>
@@ -997,6 +1002,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         
         // Company logo/emoji mapping (from backend)
         var _companyLogos = {json.dumps(_build_logo_map(), ensure_ascii=False)};
+        
+        // Select all / deselect all sources
+        function toggleAllSources(checked) {{
+            var cbs = document.querySelectorAll('.src-cb');
+            for (var i = 0; i < cbs.length; i++) {{
+                if (checked) {{ cbs[i].setAttribute('checked', ''); }}
+                else {{ cbs[i].removeAttribute('checked'); }}
+            }}
+        }}
         function getCompanyLogo(name) {{
             if (!name) return '\U0001F3E2';
             var n = name.toLowerCase().trim();
@@ -1073,6 +1087,18 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }}
             return false;
         }}
+
+        // When any individual source changes, update "select all" state
+        document.querySelectorAll('.src-cb').forEach(function(cb) {{
+            cb.addEventListener('change', function() {{
+                var all = document.querySelectorAll('.src-cb');
+                var allChecked = true;
+                for (var i = 0; i < all.length; i++) {{
+                    if (!all[i].checked) {{ allChecked = false; break; }}
+                }}
+                document.getElementById('selectAllSrc').checked = allChecked;
+            }});
+        }});
 
         async function runSearch() {{
             const btn = document.getElementById('searchBtn');
@@ -3974,6 +4000,8 @@ loadResume();
         .sources-row {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }}
 
         .source-check {{ font-size:13px; display:flex; align-items:center; gap:4px; cursor:pointer; }}
+
+        .select-all-cb {{ font-weight:600; margin-right:6px; border-right:1px solid #ddd; padding-right:10px; }}
 
         .empty {{ color:#888; padding:30px; text-align:center; }}
 
