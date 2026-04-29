@@ -62,6 +62,21 @@ def _ensure_registered():
     # NVIDIA Workday jobs
     register('nvidia.wd5.myworkdayjobs.com', 'sites.nvidia', priority=10)
 
+    # Ciena Workday jobs
+    register('ciena.wd5.myworkdayjobs.com', 'sites.ciena', priority=10)
+
+    # BlackBerry Workday jobs
+    register('bb.wd3.myworkdayjobs.com', 'sites.blackberry', priority=10)
+
+    # Alphawave Workday jobs
+    register('alphawave.wd10.myworkdayjobs.com', 'sites.alphawave', priority=10)
+
+    # Solace BambooHR jobs
+    register('solace.bamboohr.com', 'sites.solace', priority=10)
+
+    # Fullscript Lever jobs
+    register('jobs.lever.co/fullscript', 'sites.fullscript', priority=10)
+
     # Generic company domain matchers (lower priority)
     for domain, name in [
         ('nvidia.com', 'NVIDIA'),

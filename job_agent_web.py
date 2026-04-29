@@ -973,6 +973,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <label class="source-check"><input type="checkbox" class="src-cb" value="RedHat" checked> Red Hat</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="SUSE"> SUSE</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="NVIDIA"> NVIDIA</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Ciena"> Ciena</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="BlackBerry"> BlackBerry</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Alphawave"> Alphawave</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Solace"> Solace</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Fullscript"> Fullscript</label>
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>

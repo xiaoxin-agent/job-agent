@@ -259,6 +259,52 @@ class JobSearchEngine:
         from sites.suse import search as suse_search
         return suse_search(keywords, location, max_results)
 
+
+    def search_ciena(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.ciena.search 进行 Ciena 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+        from sites.ciena import search as ciena_search
+        return ciena_search(keywords, location, max_results)
+
+    def search_blackberry(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.blackberry.search 进行 BlackBerry 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+        from sites.blackberry import search as blackberry_search
+        return blackberry_search(keywords, location, max_results)
+
+    def search_alphawave(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.alphawave.search 进行 Alphawave 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+        from sites.alphawave import search as alphawave_search
+        return alphawave_search(keywords, location, max_results)
+
+    def search_solace(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.solace.search 进行 Solace 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+        from sites.solace import search as solace_search
+        return solace_search(keywords, location, max_results)
+
+    def search_fullscript(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.fullscript.search 进行 Fullscript 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+        from sites.fullscript import search as fullscript_search
+        return fullscript_search(keywords, location, max_results)
+
     def search_weworkremotely(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
         """委托 sites.weworkremotely.search 进行 WeWorkRemotely 搜索"""
         if not keywords:
@@ -452,6 +498,11 @@ class JobSearchEngine:
             "RedHat": lambda: self.search_redhat(keywords, location, max_per_source),
             "SUSE": lambda: self.search_suse(keywords, location, max_per_source),
             "NVIDIA": lambda: self.search_nvidia(keywords, location, max_per_source),
+            "Ciena": lambda: self.search_ciena(keywords, location, max_per_source),
+            "BlackBerry": lambda: self.search_blackberry(keywords, location, max_per_source),
+            "Alphawave": lambda: self.search_alphawave(keywords, location, max_per_source),
+            "Solace": lambda: self.search_solace(keywords, location, max_per_source),
+            "Fullscript": lambda: self.search_fullscript(keywords, location, max_per_source),
         }
         
         all_jobs = []

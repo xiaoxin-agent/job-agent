@@ -90,6 +90,51 @@ WORKDAY_COMPANIES: Dict[str, Dict] = {
             "Responsibilities",
         ],
     },
+    "Ciena": {
+        "domain": "ciena.wd5.myworkdayjobs.com",
+        "site_id": "Careers",
+        "company": "Ciena",
+        "locale": "en-US",
+        "sections": [
+            "About the Job",
+            "What You Will Do",
+            "What You Will Bring",
+            "Qualifications",
+            "Requirements",
+            "About Ciena",
+            "Inclusion at Ciena",
+            "Equal Opportunity",
+        ],
+    },
+    "BlackBerry": {
+        "domain": "bb.wd3.myworkdayjobs.com",
+        "site_id": "BlackBerry",
+        "company": "BlackBerry QNX",
+        "locale": "en-US",
+        "sections": [
+            "About the Job",
+            "Qualifications",
+            "Requirements",
+            "About BlackBerry",
+            "Equal Opportunity",
+        ],
+    },
+    "Alphawave": {
+        "domain": "alphawave.wd10.myworkdayjobs.com",
+        "site_id": "Alphawave_External",
+        "company": "Alphawave Semi",
+        "locale": "en-US",
+        "sections": [
+            "About the Role",
+            "Qualifications",
+            "Requirements",
+            "Responsibilities",
+            "What You Will Do",
+            "What You Will Bring",
+            "About Alphawave",
+            "Equal Opportunity",
+        ],
+    },
 }
 
 
@@ -380,3 +425,19 @@ def search_suse(keywords: List[str] = None, location: str = "",
 def search_nvidia(keywords: List[str] = None, location: str = "",
                   max_results: int = 10) -> List[Dict]:
     return search("NVIDIA", keywords, location, max_results)
+
+
+def search_ciena(keywords: List[str] = None, location: str = "",
+                 max_results: int = 10) -> List[Dict]:
+    return search("Ciena", keywords, location, max_results)
+
+
+def search_blackberry(keywords: List[str] = None, location: str = "",
+                      max_results: int = 10) -> List[Dict]:
+    return search("BlackBerry", keywords, location, max_results)
+
+
+def search_alphawave(keywords: List[str] = None, location: str = "",
+                     max_results: int = 10) -> List[Dict]:
+    return search("Alphawave", keywords, location, max_results)
+
