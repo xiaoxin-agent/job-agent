@@ -302,7 +302,7 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
         company_name = company_config["company"]
         for job in job_postings:
             title = job.get("title", "")
-            locations_text = job.get("locationsText", "")
+            locations_text = job.get("locationsText", "") or ""
             external_path = job.get("externalPath", "")
             detail_url = _build_job_page_url(company_config, external_path) if external_path else ""
 
@@ -311,6 +311,24 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
                 title_lower = title.lower()
                 if not any(kw.lower() in title_lower for kw in keywords):
                     continue
+
+            # Location filter: if user specified a location, check whether
+            # the job location contains the city/country name.
+            # Skip strict filtering for global/remote-only postings.
+            if location and location.lower() not in ("remote", "global"):
+                location_lower = location.lower()
+                loc_ok = False
+                for loc_part in location_lower.split(","):
+                    loc_part = loc_part.strip()
+                    if loc_part and loc_part in locations_text.lower():
+                        loc_ok = True
+                        break
+                if not loc_ok:
+                    if "remote" in locations_text.lower():
+                        # Remote jobs are always ok with any location
+                        pass
+                    else:
+                        continue
 
             posted_on = job.get("postedOn", "")
 
