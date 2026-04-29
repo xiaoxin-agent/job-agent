@@ -9,6 +9,8 @@ Returns full job listings with plain-text descriptions.
 from typing import Dict, List, Optional
 import re
 import json
+import time
+from datetime import datetime
 import requests
 
 
@@ -97,6 +99,18 @@ def search(company_key: str, keywords: List[str] = None,
         else:
             desc = title
 
+        created = job.get("createdAt", "")
+        if created:
+            try:
+                ts = int(created)
+                if ts > 1e12:
+                    ts //= 1000  # ms → s
+                date_str = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
+            except (ValueError, OSError):
+                date_str = str(created)
+        else:
+            date_str = ""
+
         jobs.append({
             "title": title,
             "company": company_name,
@@ -104,7 +118,7 @@ def search(company_key: str, keywords: List[str] = None,
             "description": desc,
             "url": detail_url,
             "source": company_key,
-            "date": str(job.get("createdAt", "") or ""),
+            "date": date_str,
             "job_type": commitment or "Full-Time",
             "remote": "",
             "departments": [team] if team else [],
