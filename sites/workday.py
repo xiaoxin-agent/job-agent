@@ -266,13 +266,19 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
     """Query Workday search API and filter results."""
     api_url = _build_api_url(company_config)
     page_limit = min(limit * 3, 20)
-    max_pages = 5  # scatter across multiple pages to find matches
+
+    # Use searchText if keywords provided — Workday's server-side text search
+    # is much more accurate than client-side filtering.
+    search_query = " ".join(keywords).strip() if keywords else ""
 
     def _fetch_page(offset: int) -> Optional[Dict]:
         try:
+            payload = {"limit": page_limit, "offset": offset}
+            if search_query:
+                payload["searchText"] = search_query
             resp = requests.post(
                 api_url,
-                json={"limit": page_limit, "offset": offset},
+                json=payload,
                 impersonate="chrome120",
                 headers={"Content-Type": "application/json",
                          "Accept": "application/json"},
@@ -284,72 +290,76 @@ def _search_api(company_key: str, company_config: Dict, keywords: List[str], loc
         except Exception:
             return None
 
-    results = []
-    for page in range(max_pages):
-        offset = page * page_limit
-        data = None
-        for attempt in range(3):
-            data = _fetch_page(offset)
-            if data is not None:
+    # Fetch first page with retries
+    data = None
+    for attempt in range(3):
+        data = _fetch_page(0)
+        if data is not None:
+            break
+        time.sleep(2 * (attempt + 1))
+
+    if data is None:
+        return []
+    job_postings = data.get("jobPostings", [])
+
+    # If searchText was used, trust server-side filtering
+    if not (search_query and len(job_postings) >= limit):
+        # No keywords or too few results: scatter across pages
+        for page in range(1, 5):
+            offset = page * page_limit
+            page_data = None
+            for attempt in range(3):
+                page_data = _fetch_page(offset)
+                if page_data is not None:
+                    break
+                time.sleep(2 * (attempt + 1))
+            if page_data is None:
                 break
-            time.sleep(2 * (attempt + 1))
-        if data is None:
-            break
-        job_postings = data.get("jobPostings", [])
-        if not job_postings:
-            break
+            more = page_data.get("jobPostings", [])
+            if not more:
+                break
+            job_postings.extend(more)
+            if len(job_postings) >= limit * 3:
+                break
 
-        company_name = company_config["company"]
-        for job in job_postings:
-            title = job.get("title", "")
-            locations_text = job.get("locationsText", "") or ""
-            external_path = job.get("externalPath", "")
-            detail_url = _build_job_page_url(company_config, external_path) if external_path else ""
+    company_name = company_config["company"]
+    results = []
+    for job in job_postings[:limit * 3]:
+        title = job.get("title", "")
+        locations_text = job.get("locationsText", "") or ""
+        external_path = job.get("externalPath", "")
+        detail_url = _build_job_page_url(company_config, external_path) if external_path else ""
 
-            # Keyword filter (OR)
-            if keywords:
-                title_lower = title.lower()
-                if not any(kw.lower() in title_lower for kw in keywords):
+        # Location filter
+        if location and location.lower() not in ("remote", "global"):
+            location_lower = location.lower()
+            loc_ok = False
+            for loc_part in location_lower.split(","):
+                loc_part = loc_part.strip()
+                if loc_part and loc_part in locations_text.lower():
+                    loc_ok = True
+                    break
+            if not loc_ok:
+                if "remote" not in locations_text.lower():
                     continue
 
-            # Location filter: if user specified a location, check whether
-            # the job location contains the city/country name.
-            # Skip strict filtering for global/remote-only postings.
-            if location and location.lower() not in ("remote", "global"):
-                location_lower = location.lower()
-                loc_ok = False
-                for loc_part in location_lower.split(","):
-                    loc_part = loc_part.strip()
-                    if loc_part and loc_part in locations_text.lower():
-                        loc_ok = True
-                        break
-                if not loc_ok:
-                    if "remote" in locations_text.lower():
-                        # Remote jobs are always ok with any location
-                        pass
-                    else:
-                        continue
+        posted_on = job.get("postedOn", "")
 
-            posted_on = job.get("postedOn", "")
-
-            results.append({
-                "title": title,
-                "company": company_name,
-                "location": locations_text or "Global / Remote",
-                "description": title,
-                "url": detail_url,
-                "source": company_key,
-                "date": posted_on,
-                "job_type": "Full-Time",
-                "remote": "Remote",
-                "departments": [],
-                "salary_min": 0,
-                "salary_max": 0,
-                "currency": "USD",
-            })
-
-            if len(results) >= limit:
-                break
+        results.append({
+            "title": title,
+            "company": company_name,
+            "location": locations_text or "Global / Remote",
+            "description": title,
+            "url": detail_url,
+            "source": company_key,
+            "date": posted_on,
+            "job_type": "Full-Time",
+            "remote": "Remote",
+            "departments": [],
+            "salary_min": 0,
+            "salary_max": 0,
+            "currency": "USD",
+        })
 
         if len(results) >= limit:
             break
