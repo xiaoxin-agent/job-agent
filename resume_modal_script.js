@@ -30,7 +30,7 @@
         h += '<div id="md-resize-handle" style="height:6px;background:#e0e0e0;cursor:ns-resize;user-select:none;display:none;flex-shrink:0"></div>';
         h += '<div id="resume-view-footer" style="display:none;flex-shrink:0;overflow-y:auto">';
         h += '<div style="padding:10px 20px;border-top:1px solid #e0e0e0">';
-        h += '<textarea id="resume-md-edit" style="width:100%;height:120px;border:1px solid #ddd;border-radius:6px;padding:8px;font-family:monospace;font-size:13px;box-sizing:border-box" placeholder="Markdown ' + _md_edit_placeholder + '</textarea>';
+        h += '<textarea id="resume-md-edit" style="width:100%;height:120px;border:1px solid #ddd;border-radius:6px;padding:8px;font-family:monospace;font-size:13px;box-sizing:border-box" placeholder="' + _md_edit_placeholder + '"></textarea>';
         h += '<div style="text-align:right;margin-top:6px">';
         h += '<button class="btn btn-small" style="margin-right:4px" onclick="closeResumeMdEdit()">' + _cancel + '</button>';
         h += '<button class="btn btn-small btn-save" onclick="saveResumeMdFromModal()">' + _btn_save + '</button>';

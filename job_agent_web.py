@@ -978,6 +978,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Alphawave"> Alphawave</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Solace"> Solace</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Fullscript"> Fullscript</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Amazon"> Amazon</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Google"> Google</label>
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>

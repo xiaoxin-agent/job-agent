@@ -335,6 +335,26 @@ class JobSearchEngine:
         from sites.linkedin_search import search as linkedin_search
         return linkedin_search(keywords, location, max_results)
 
+    def search_amazon(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.amazon_search.search 进行 Amazon Canada 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.amazon_search import search as amazon_search
+        return amazon_search(keywords, location, max_results)
+
+    def search_google_careers(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.google_careers_search.search 进行 Google Careers 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.google_careers_search import search as google_careers_search
+        return google_careers_search(keywords, location, max_results)
+
     def search_remoteok(self, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
         """搜索RemoteOK"""
         jobs = []
@@ -503,6 +523,8 @@ class JobSearchEngine:
             "Alphawave": lambda: self.search_alphawave(keywords, location, max_per_source),
             "Solace": lambda: self.search_solace(keywords, location, max_per_source),
             "Fullscript": lambda: self.search_fullscript(keywords, location, max_per_source),
+            "Amazon": lambda: self.search_amazon(keywords, location, max_per_source),
+            "Google": lambda: self.search_google_careers(keywords, location, max_per_source),
         }
         
         all_jobs = []

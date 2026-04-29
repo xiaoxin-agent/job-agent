@@ -46,6 +46,8 @@ def list_available_sites(engine=None):
         "alphawave": "sites.alphawave.search",
         "solace": "sites.solace.search",
         "fullscript": "sites.fullscript.search",
+        "amazon": "sites.amazon_search.search",
+        "google": "sites.google_careers_search.search",
     }
     if engine:
         # 从 search_all 的 source_map 获取实际注册的源
@@ -93,7 +95,7 @@ def run_search(sites, keywords, location, max_results, output_json=False):
             "github": "GitHub Jobs",
             "linkedin": "LinkedIn",
             "googlejobs": "GoogleJobs",
-            "google": "GoogleJobs",
+            "gsearch": "GoogleJobs",      # legacy alias
             "weworkremotely": "WeWorkRemotely",
             "wwr": "WeWorkRemotely",
             "canonical": "Canonical",
@@ -105,13 +107,16 @@ def run_search(sites, keywords, location, max_results, output_json=False):
             "alphawave": "Alphawave",
             "solace": "Solace",
             "fullscript": "Fullscript",
+            "amazon": "Amazon",
+            "google": "Google",
+            "googlecareers": "Google",
         }
         sources = []
         for s in sites:
             mapped = name_map.get(s.strip().lower(), s.strip())
             sources.append(mapped)
         # 检查是否有非法源
-        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical", "RedHat", "SUSE", "NVIDIA", "Ciena", "BlackBerry", "Alphawave", "Solace", "Fullscript"}
+        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical", "RedHat", "SUSE", "NVIDIA", "Ciena", "BlackBerry", "Alphawave", "Solace", "Fullscript", "Amazon", "Google"}
         unknown = [s for s in sources if s not in valid]
         if unknown:
             print(f"⚠ 未知搜索源: {unknown}")
@@ -147,11 +152,11 @@ def run_search(sites, keywords, location, max_results, output_json=False):
 
     if not all_jobs:
         print("⚠ 未找到任何职位")
-        return
+        return []
 
     if output_json:
         print(json.dumps(all_jobs, ensure_ascii=False, indent=2))
-        return
+        return all_jobs
 
     print(f"✅ 找到 {len(all_jobs)} 个职位:\n")
     for i, job in enumerate(all_jobs, 1):
@@ -173,6 +178,8 @@ def run_search(sites, keywords, location, max_results, output_json=False):
         if url:
             print(f"      {url}")
         print()
+
+    return all_jobs
 
 
 def main():
