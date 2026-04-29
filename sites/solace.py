@@ -93,8 +93,46 @@ def search(keywords: List[str] = None, location: str = "",
     return jobs[:max_results]
 
 
+def _fetch_detail(job_id: int) -> Dict[str, str]:
+    """Fetch job details from BambooHR /careers/{id}/detail API."""
+    result = {
+        "description": "",
+        "location": "",
+        "job_type": "Full-Time",
+        "title": "",
+    }
+    try:
+        resp = requests.get(
+            f"https://solace.bamboohr.com/careers/{job_id}/detail",
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json",
+                     "Referer": f"https://solace.bamboohr.com/careers/{job_id}"},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return result
+        data = resp.json()
+        job = data.get("result", {}).get("jobOpening", {}) or {}
+        result["title"] = job.get("jobOpeningName", "")
+        desc = job.get("description", "") or ""
+        if desc:
+            result["description"] = desc
+        loc = job.get("location", {}) or {}
+        parts = [p for p in [loc.get("city", ""), loc.get("state", ""), loc.get("addressCountry", "")] if p]
+        result["location"] = ", ".join(parts)
+        result["job_type"] = job.get("employmentStatusLabel", "Full-Time")
+    except Exception:
+        pass
+    return result
+
+
+def _extract_job_id(url: str) -> int:
+    """Extract job ID from BambooHR URL."""
+    m = re.search(r'/careers/(\d+)', url)
+    return int(m.group(1)) if m else 0
+
+
 def extract(html: str, url: str = "") -> Dict[str, str]:
-    """Extract job details from a Solace BambooHR job page."""
+    """Extract job details using BambooHR /careers/{id}/detail API."""
     result = {
         "title": "",
         "company": "Solace",
@@ -103,26 +141,10 @@ def extract(html: str, url: str = "") -> Dict[str, str]:
         "job_type": "Full-Time",
     }
 
-    # Try to extract from JSON-LD
-    try:
-        jsonlds = re.findall(
-            r'<script[^>]+type=[\"\']application/ld\+json[\"\'][^>]*>'
-            r'(.*?)</script>', html, re.DOTALL
-        )
-        for raw in jsonlds:
-            data = json.loads(raw)
-            if isinstance(data, dict) and data.get("@type") == "JobPosting":
-                result["title"] = data.get("title") or result["title"]
-                desc = data.get("description") or ""
-                if desc:
-                    result["description"] = f"<p>{desc.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}</p>"
-                loc = data.get("jobLocation", {})
-                if isinstance(loc, dict):
-                    addr = loc.get("address", {})
-                    parts = [p for p in [addr.get("addressLocality", ""), addr.get("addressRegion", ""), addr.get("addressCountry", "")] if p]
-                    result["location"] = ", ".join(parts)
-                break
-    except Exception:
-        pass
+    job_id = _extract_job_id(url)
+    if not job_id:
+        return result
 
+    detail = _fetch_detail(job_id)
+    result.update({k: v for k, v in detail.items() if v})
     return result
