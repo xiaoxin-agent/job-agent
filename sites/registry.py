@@ -129,4 +129,7 @@ def known_companies() -> Dict[str, str]:
         'weworkremotely.com': 'We Work Remotely',
         'greenhouse.io': 'Greenhouse',
         'lever.co': 'Lever',
+        'telesat.com': 'Telesat',
+        'trendmicro.com': 'Trend Micro',
+        'ranovus.com': 'Ranovus',
     }

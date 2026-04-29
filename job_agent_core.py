@@ -375,6 +375,36 @@ class JobSearchEngine:
         from sites.lever import search_magnetforensics as magnet_search
         return magnet_search(keywords, location, max_results)
 
+    def search_telesat(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.lever.search 进行 Telesat 职位搜索 (Lever)"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.lever import search_telesat as telesat_search
+        return telesat_search(keywords, location, max_results)
+
+    def search_trendmicro(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.workday.search 进行 Trend Micro 职位搜索 (Workday)"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.workday import search_trendmicro as trendmicro_search
+        return trendmicro_search(keywords, location, max_results)
+
+    def search_ranovus(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.ranovus.search 进行 Ranovus 职位搜索 (BambooHR)"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.ranovus import search as ranovus_search
+        return ranovus_search(keywords, location, max_results)
+
     def search_fortinet(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
         """委托 sites.fortinet.search 进行 Fortinet 职位搜索"""
         if not keywords:
@@ -558,6 +588,9 @@ class JobSearchEngine:
             "Mitel": lambda: self.search_mitel(keywords, location, max_per_source),
             "MagnetForensics": lambda: self.search_magnetforensics(keywords, location, max_per_source),
             "Fortinet": lambda: self.search_fortinet(keywords, location, max_per_source),
+            "Telesat": lambda: self.search_telesat(keywords, location, max_per_source),
+            "TrendMicro": lambda: self.search_trendmicro(keywords, location, max_per_source),
+            "Ranovus": lambda: self.search_ranovus(keywords, location, max_per_source),
         }
         
         all_jobs = []

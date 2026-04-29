@@ -50,6 +50,9 @@ def list_available_sites(engine=None):
         "mitel": "sites.mitel.search",
         "magnetforensics": "sites.magnetforensics.search",
         "fortinet": "sites.fortinet.search",
+        "telesat": "sites.telesat.search",
+        "trendmicro": "sites.trendmicro.search",
+        "ranovus": "sites.ranovus.search",
         "google": "sites.google_careers_search.search",
     }
     if engine:
@@ -116,13 +119,16 @@ def run_search(sites, keywords, location, max_results, output_json=False):
             "mitel": "Mitel",
             "magnetforensics": "MagnetForensics",
             "fortinet": "Fortinet",
+            "telesat": "Telesat",
+            "trendmicro": "TrendMicro",
+            "ranovus": "Ranovus",
         }
         sources = []
         for s in sites:
             mapped = name_map.get(s.strip().lower(), s.strip())
             sources.append(mapped)
         # 检查是否有非法源
-        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical", "RedHat", "SUSE", "NVIDIA", "Ciena", "BlackBerry", "Alphawave", "Solace", "Fullscript", "Amazon", "Google", "Mitel", "MagnetForensics", "Fortinet"}
+        valid = {"Indeed", "RemoteOK", "GitHub Jobs", "LinkedIn", "GoogleJobs", "WeWorkRemotely", "Canonical", "RedHat", "SUSE", "NVIDIA", "Ciena", "BlackBerry", "Alphawave", "Solace", "Fullscript", "Amazon", "Google", "Mitel", "MagnetForensics", "Fortinet", "Telesat", "TrendMicro", "Ranovus"}
         unknown = [s for s in sources if s not in valid]
         if unknown:
             print(f"⚠ 未知搜索源: {unknown}")

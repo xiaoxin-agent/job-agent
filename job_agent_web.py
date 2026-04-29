@@ -971,6 +971,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "Mitel": "https://mitel.wd3.myworkdayjobs.com/mitelcareers",
             "MagnetForensics": "https://jobs.lever.co/magnetforensics",
             "Fortinet": "https://edel.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_2001",
+            "Telesat": "https://www.telesat.com/careers/",
+            "TrendMicro": "https://trendmicro.wd3.myworkdayjobs.com/External",
+            "Ranovus": "https://ranovus.bamboohr.com/careers",
         }
 
         def _src_label(value, name):
@@ -1008,6 +1011,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     {_src_label('Mitel', 'Mitel')}
                     {_src_label('MagnetForensics', 'MagnetForensics')}
                     {_src_label('Fortinet', 'Fortinet')}
+                    {_src_label('Telesat', 'Telesat')}
+                    {_src_label('TrendMicro', 'Trend Micro')}
+                    {_src_label('Ranovus', 'Ranovus')}
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>
