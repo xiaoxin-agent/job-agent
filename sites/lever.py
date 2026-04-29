@@ -29,6 +29,7 @@ def add_company(key: str, slug: str, company: str) -> None:
 
 # Register known Lever companies
 add_company("Fullscript", "fullscript", "Fullscript")
+add_company("MagnetForensics", "magnetforensics", "Magnet Forensics")
 
 
 def search(company_key: str, keywords: List[str] = None,
@@ -118,3 +119,8 @@ def search(company_key: str, keywords: List[str] = None,
 def search_fullscript(keywords: List[str] = None, location: str = "",
                       max_results: int = 10) -> List[Dict]:
     return search("Fullscript", keywords, location, max_results)
+
+
+def search_magnetforensics(keywords: List[str] = None, location: str = "",
+                            max_results: int = 10) -> List[Dict]:
+    return search("MagnetForensics", keywords, location, max_results)

@@ -355,6 +355,36 @@ class JobSearchEngine:
         from sites.google_careers_search import search as google_careers_search
         return google_careers_search(keywords, location, max_results)
 
+    def search_mitel(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.workday.search 进行 Mitel 职位搜索 (Workday)"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.workday import search_mitel as mitel_search
+        return mitel_search(keywords, location, max_results)
+
+    def search_magnetforensics(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.lever.search 进行 Magnet Forensics 职位搜索 (Lever)"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.lever import search_magnetforensics as magnet_search
+        return magnet_search(keywords, location, max_results)
+
+    def search_fortinet(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.fortinet.search 进行 Fortinet 职位搜索"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.fortinet import search as fortinet_search
+        return fortinet_search(keywords, location, max_results)
+
     def search_remoteok(self, max_results: int = 5, keywords: List[str] = None) -> List[Dict]:
         """搜索RemoteOK"""
         jobs = []
@@ -525,6 +555,9 @@ class JobSearchEngine:
             "Fullscript": lambda: self.search_fullscript(keywords, location, max_per_source),
             "Amazon": lambda: self.search_amazon(keywords, location, max_per_source),
             "Google": lambda: self.search_google_careers(keywords, location, max_per_source),
+            "Mitel": lambda: self.search_mitel(keywords, location, max_per_source),
+            "MagnetForensics": lambda: self.search_magnetforensics(keywords, location, max_per_source),
+            "Fortinet": lambda: self.search_fortinet(keywords, location, max_per_source),
         }
         
         all_jobs = []

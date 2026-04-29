@@ -135,6 +135,22 @@ WORKDAY_COMPANIES: Dict[str, Dict] = {
             "Equal Opportunity",
         ],
     },
+    "Mitel": {
+        "domain": "mitel.wd3.myworkdayjobs.com",
+        "site_id": "mitelcareers",
+        "company": "Mitel",
+        "locale": "en-US",
+        "sections": [
+            "About the Role",
+            "Qualifications",
+            "Requirements",
+            "Responsibilities",
+            "What You Will Do",
+            "What You Will Bring",
+            "About Mitel",
+            "Equal Opportunity",
+        ],
+    },
 }
 
 
@@ -440,4 +456,9 @@ def search_blackberry(keywords: List[str] = None, location: str = "",
 def search_alphawave(keywords: List[str] = None, location: str = "",
                      max_results: int = 10) -> List[Dict]:
     return search("Alphawave", keywords, location, max_results)
+
+
+def search_mitel(keywords: List[str] = None, location: str = "",
+                  max_results: int = 10) -> List[Dict]:
+    return search("Mitel", keywords, location, max_results)
 

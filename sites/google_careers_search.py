@@ -206,18 +206,10 @@ def search(keywords: List[str], location: str = "", max_results: int = 10) -> Li
         logger.info("Google Careers: no jobs found via embedded data")
         return []
 
-    # Keyword filter
-    if keywords:
-        kw_lower = {k.strip().lower() for k in keywords if k.strip()}
-        filtered = []
-        for j in all_jobs:
-            text = f"{j['title']} {j['description']}".lower()
-            if any(kw in text for kw in kw_lower):
-                filtered.append(j)
-        if filtered:
-            all_jobs = filtered
-
     # Location filter
+    # Note: Google already filters by keywords server-side via the ?q= URL param.
+    # We do NOT re-filter by keyword here — it would drop Canada-located jobs
+    # that match the user's intent but don't have the keyword in descriptions.
     if location and location.lower() not in ("remote", "global"):
         loc_lower = location.lower()
         loc_tokens = {w for w in re.split(r"[\s,\/]+", loc_lower) if len(w) > 2}
@@ -236,6 +228,9 @@ def search(keywords: List[str], location: str = "", max_results: int = 10) -> Li
 
         if filtered:
             all_jobs = filtered
+        else:
+            # No jobs matched location — return nothing rather than all jobs
+            all_jobs = []
 
     return all_jobs[:max_results]
 

@@ -71,6 +71,16 @@ def _ensure_registered():
     # Alphawave Workday jobs
     register('alphawave.wd10.myworkdayjobs.com', 'sites.alphawave', priority=10)
 
+    # Mitel Workday jobs
+    register('mitel.wd3.myworkdayjobs.com', 'sites.mitel', priority=10)
+
+    # Fortinet (generic) jobs
+    register('fortinet.com/corporate/careers', 'sites.fortinet', priority=10)
+    register('edel.fa.us2.oraclecloud.com', 'sites.fortinet', priority=10)
+
+    # Magnet Forensics Lever jobs
+    register('jobs.lever.co/magnetforensics', 'sites.magnetforensics', priority=10)
+
     # Solace BambooHR jobs
     register('solace.bamboohr.com', 'sites.solace', priority=10)
 

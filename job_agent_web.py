@@ -980,6 +980,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Fullscript"> Fullscript</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Amazon"> Amazon</label>
                     <label class="source-check"><input type="checkbox" class="src-cb" value="Google"> Google</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Mitel" checked> Mitel</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="MagnetForensics"> Magnet Forensics</label>
+                    <label class="source-check"><input type="checkbox" class="src-cb" value="Fortinet"> Fortinet</label>
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>
