@@ -132,4 +132,6 @@ def known_companies() -> Dict[str, str]:
         'telesat.com': 'Telesat',
         'trendmicro.com': 'Trend Micro',
         'ranovus.com': 'Ranovus',
+        'nokia.com': 'Nokia',
+        'jobs.nokia.com': 'Nokia',
     }

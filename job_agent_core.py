@@ -405,6 +405,16 @@ class JobSearchEngine:
         from sites.ranovus import search as ranovus_search
         return ranovus_search(keywords, location, max_results)
 
+    def search_nokia(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
+        """委托 sites.nokia.search 进行 Nokia 职位搜索 (Oracle HCM)"""
+        if not keywords:
+            keywords = self.profile.get_skill_keywords()[:3]
+        elif isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split() if k.strip()]
+
+        from sites.nokia import search as nokia_search
+        return nokia_search(keywords, location, max_results)
+
     def search_fortinet(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
         """委托 sites.fortinet.search 进行 Fortinet 职位搜索"""
         if not keywords:
@@ -591,6 +601,7 @@ class JobSearchEngine:
             "Telesat": lambda: self.search_telesat(keywords, location, max_per_source),
             "TrendMicro": lambda: self.search_trendmicro(keywords, location, max_per_source),
             "Ranovus": lambda: self.search_ranovus(keywords, location, max_per_source),
+            "Nokia": lambda: self.search_nokia(keywords, location, max_per_source),
         }
         
         all_jobs = []

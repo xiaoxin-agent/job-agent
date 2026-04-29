@@ -974,6 +974,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "Telesat": "https://www.telesat.com/careers/",
             "TrendMicro": "https://trendmicro.wd3.myworkdayjobs.com/External",
             "Ranovus": "https://ranovus.bamboohr.com/careers",
+            "Nokia": "https://jobs.nokia.com/en/sites/CX_1",
         }
 
         def _src_label(value, name):
@@ -1014,6 +1015,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     {_src_label('Telesat', 'Telesat')}
                     {_src_label('TrendMicro', 'Trend Micro')}
                     {_src_label('Ranovus', 'Ranovus')}
+                    {_src_label('Nokia', 'Nokia')}
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>
