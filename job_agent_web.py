@@ -955,6 +955,31 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         search_results_h2 = _t('search_results')
         job_list_h2 = _t('job_list')
 
+        # Official career page URLs for each source
+        _source_urls = {
+            "Canonical": "https://canonical.com/careers",
+            "RedHat": "https://www.redhat.com/en/jobs",
+            "SUSE": "https://www.suse.com/careers/",
+            "NVIDIA": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+            "Ciena": "https://ciena.wd5.myworkdayjobs.com/Careers",
+            "BlackBerry": "https://bb.wd3.myworkdayjobs.com/BlackBerry",
+            "Alphawave": "https://alphawave.wd10.myworkdayjobs.com/Alphawave_External",
+            "Solace": "https://solace.bamboohr.com/careers",
+            "Fullscript": "https://jobs.lever.co/fullscript",
+            "Amazon": "https://www.amazon.jobs/en-gb/job_categories/software-development",
+            "Google": "https://careers.google.com/jobs/results/",
+            "Mitel": "https://mitel.wd3.myworkdayjobs.com/mitelcareers",
+            "MagnetForensics": "https://jobs.lever.co/magnetforensics",
+            "Fortinet": "https://edel.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_2001",
+        }
+
+        def _src_label(value, name):
+            """Render a source checkbox with external link."""
+            url = _source_urls.get(value, "")
+            checked = ' checked' if value in ('Canonical', 'RedHat', 'Mitel') else ''
+            link = f'<a href="{url}" target="_blank" class="src-link" title="Open {name} careers page">↗</a>' if url else ''
+            return f'<label class="source-check"><input type="checkbox" class="src-cb" value="{value}"{checked}> {name} {link}</label>'
+
         html_body = f"""<h1>{h1_title}</h1>
         <div class="section">
             <div class="search-form">
@@ -969,20 +994,20 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <div class="form-row sources-row">
                     <label>{src_label}</label>
                     <label class="source-check select-all-cb"><input type="checkbox" id="selectAllSrc" checked onchange="toggleAllSources(this.checked)"> {select_all}</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Canonical" checked> Canonical</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="RedHat" checked> Red Hat</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="SUSE"> SUSE</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="NVIDIA"> NVIDIA</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Ciena"> Ciena</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="BlackBerry"> BlackBerry</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Alphawave"> Alphawave</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Solace"> Solace</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Fullscript"> Fullscript</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Amazon"> Amazon</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Google"> Google</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Mitel" checked> Mitel</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="MagnetForensics"> Magnet Forensics</label>
-                    <label class="source-check"><input type="checkbox" class="src-cb" value="Fortinet"> Fortinet</label>
+                    {_src_label('Canonical', 'Canonical')}
+                    {_src_label('RedHat', 'Red Hat')}
+                    {_src_label('SUSE', 'SUSE')}
+                    {_src_label('NVIDIA', 'NVIDIA')}
+                    {_src_label('Ciena', 'Ciena')}
+                    {_src_label('BlackBerry', 'BlackBerry')}
+                    {_src_label('Alphawave', 'Alphawave')}
+                    {_src_label('Solace', 'Solace')}
+                    {_src_label('Fullscript', 'Fullscript')}
+                    {_src_label('Amazon', 'Amazon')}
+                    {_src_label('Google', 'Google')}
+                    {_src_label('Mitel', 'Mitel')}
+                    {_src_label('MagnetForensics', 'MagnetForensics')}
+                    {_src_label('Fortinet', 'Fortinet')}
                 </div>
                 <button onclick="runSearch()" class="btn btn-primary btn-lg" id="searchBtn">{btn_search}</button>
             </div>
@@ -4010,6 +4035,9 @@ loadResume();
         .sources-row {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }}
 
         .source-check {{ font-size:13px; display:flex; align-items:center; gap:4px; cursor:pointer; }}
+
+        .source-check .src-link {{ font-size:11px; text-decoration:none; color:#1a73e8; opacity:0.6; transition:opacity .15s; }}
+        .source-check .src-link:hover {{ opacity:1; text-decoration:underline; }}
 
         .select-all-cb {{ font-weight:600; margin-right:6px; border-right:1px solid #ddd; padding-right:10px; }}
 
