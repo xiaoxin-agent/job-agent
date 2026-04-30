@@ -826,6 +826,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/learn_plan": self.api_learn_plan,
             "/api/learn_plan_progress": self.api_learn_plan_progress,
             "/api/learn_plan_ical": self.api_learn_plan_ical,
+            "/api/quiz_submit": self.api_quiz_submit,
             "/api/save_cover_letter": self.api_save_cover_letter,
         }
 
@@ -2200,7 +2201,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                         "week": week_num,
                                         "resources_html": related_res_html,
                                         "projects_html": related_proj_html,
-                                        "advice_text": task_tip
+                                        "advice_text": task_tip,
+                                        "has_quiz": bool(p.get("quiz", []))
                                     }
                                     detail_json = json.dumps(detail_obj, ensure_ascii=False)
                                     detail_b64 = base64.b64encode(detail_json.encode()).decode()
@@ -2334,6 +2336,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <div class="td-section-title">\U0001f4ad \u5b66\u4e60\u5efa\u8bae</div>
                     <div class="td-advice" id="td-advice"></div>
                 </div>
+                <div class="td-section" id="td-section-quiz" style="display:none">
+                    <div class="td-section-title">\U0001f9ea \u6d4b\u9a8c</div>
+                    <div id="td-quiz-content"></div>
+                    <div id="td-quiz-result" style="margin-top:10px"></div>
+                </div>
                 <input type="hidden" id="td-detail-data" value="">
             </div>
         </div>
@@ -2388,6 +2395,24 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }
             document.getElementById('td-section-advice').children[0].textContent = _cal_modal_advice;
 
+            // Render quiz section if available
+            var qSec = document.getElementById('td-section-quiz');
+            var qContent = document.getElementById('td-quiz-content');
+            var qResult = document.getElementById('td-quiz-result');
+            qResult.innerHTML = '';
+            qSec.style.display = 'none';
+            if (d.has_quiz) {
+                fetch('/api/learn_plan_progress?job_id=' + encodeURIComponent(_td_job_id))
+                .then(function(r){return r.json()})
+                .then(function(data) {
+                    if (!data.success) return;
+                    var p = data.progress && data.progress[_td_task_id];
+                    if (!p || !p.quiz || p.quiz.length === 0) return;
+                    renderQuiz(p.quiz, qContent, qResult, _td_job_id, _td_task_id);
+                    qSec.style.display = '';
+                });
+            }
+
             // Get job/task id from the clicked el's parent row
             var row = el.closest('.cal-task-row');
             var cb = row ? row.querySelector('.cal-task-cb') : null;
@@ -2435,6 +2460,110 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             .then(function(r){return r.json()})
             .then(function(d){ if (d.success) { updateCalendarProgress(_td_job_id); } });
         });
+
+        // Render quiz: randomly pick 5 from 10, display as interactive form
+        function renderQuiz(quiz, container, resultDiv, jobId, taskId) {
+            // Shuffle and pick 5
+            var picked = quiz.slice().sort(function(){return 0.5-Math.random()}).slice(0,5);
+            quiz.forEach(function(q, i) { q._origIdx = i; });
+
+            var html = '<div style="margin-bottom:8px;font-size:13px;color:#666">每次随机提取5题，刷新页面可重新抽题</div>';
+            html += '<form id="quiz-form">';
+            picked.forEach(function(q, idx) {
+                var qid = 'q_' + idx;
+                html += '<div style="margin-bottom:14px;padding:10px;background:#f9f9f9;border-radius:6px;border:1px solid #e0e0e0">';
+                html += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">' + (idx+1) + '. ' + escHtml(q.q) + '</div>';
+                if (q.type === 'choice') {
+                    html += '<input type="hidden" name="' + qid + '_type" value="choice">';
+                    html += '<input type="hidden" name="' + qid + '_answer" value="' + q.answer + '">';
+                    html += '<input type="hidden" name="' + qid + '_orig" value="' + q._origIdx + '">';
+                    q.options.forEach(function(opt, oi) {
+                        var letter = String.fromCharCode(65 + oi);
+                        html += '<label style="display:block;padding:5px 8px;margin:3px 0;border-radius:4px;cursor:pointer;background:#fff;border:1px solid #ddd">';
+                        html += '<input type="radio" name="' + qid + '" value="' + oi + '" style="margin-right:6px">';
+                        html += '<strong>' + letter + '</strong>. ' + escHtml(opt);
+                        html += '</label>';
+                    });
+                } else {
+                    html += '<input type="hidden" name="' + qid + '_type" value="essay">';
+                    html += '<input type="hidden" name="' + qid + '_reference" value="' + escHtml(q.reference || '') + '">';
+                    html += '<input type="hidden" name="' + qid + '_orig" value="' + q._origIdx + '">';
+                    html += '<textarea name="' + qid + '" rows="3" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px" placeholder="请输入你的回答..."></textarea>';
+                    html += '<div style="font-size:12px;color:#888;margin-top:4px">答完后点“提交”可查看参考答案</div>';
+                }
+                html += '</div>';
+            });
+            html += '<div style="display:flex;gap:8px"><button type="button" class="btn btn-primary" onclick="submitQuiz(this.form, resultDiv, \'' + jobId + '\', \'' + taskId + '\')">提交答题</button>';
+            html += '<button type="button" class="btn" onclick="resetQuiz(this.form, resultDiv)">重置</button></div>';
+            html += '</form>';
+            container.innerHTML = html;
+        }
+
+        function submitQuiz(form, resultDiv, jobId, taskId) {
+            var data = new FormData(form);
+            var score = 0;
+            var total = 0;
+            var results = [];
+
+            // Find all question indices from form
+            var inputs = form.querySelectorAll('input[type="hidden"][name$="_type"]');
+            inputs.forEach(function(h) {
+                var prefix = h.name.replace('_type', '');
+                var qtype = h.value;
+                total++;
+                var answerEl = form.querySelector('input[name="' + prefix + '_answer"]');
+                var refEl = form.querySelector('input[name="' + prefix + '_reference"]');
+                var userEl = form.querySelector('[name="' + prefix + '"]');
+                var userVal = userEl ? (userEl.type === 'radio' ? (form.querySelector('[name="' + prefix + '"]:checked') || {}).value : userEl.value.trim()) : '';
+
+                if (qtype === 'choice') {
+                    var correct = answerEl ? parseInt(answerEl.value) : -1;
+                    var isCorrect = (parseInt(userVal) === correct);
+                    if (isCorrect) score++;
+                    results.push({type:'choice', correct: isCorrect, userVal: userVal, correctVal: correct});
+                } else {
+                    var ref = refEl ? refEl.value : '';
+                    results.push({type:'essay', userVal: userVal, reference: ref});
+                }
+            });
+
+            // Render result
+            var html = '<div style="padding:12px;background:#e8f5e9;border-radius:6px;font-size:14px">';
+            var choiceCount = results.filter(function(r){return r.type==='choice'}).length;
+            var essayCount = results.filter(function(r){return r.type==='essay'}).length;
+            html += '<div style="font-weight:600;margin-bottom:8px">答题结果</div>';
+            html += '<div>选择题: ' + results.filter(function(r){return r.type==='choice' && r.correct}).length + '/' + choiceCount + ' 正确</div>';
+            results.forEach(function(r, idx) {
+                if (r.type === 'choice') {
+                    var letters = ['A','B','C','D'];
+                    var correctLetter = letters[r.correctVal] || '?';
+                    var userLetter = letters[r.userVal] || '未选';
+                    html += '<div style="margin-top:6px;padding:6px 10px;background:' + (r.correct ? '#e8f5e9' : '#ffebee') + ';border-radius:4px;font-size:13px">';
+                    html += '<span style="font-weight:600;color:' + (r.correct ? '#2e7d32' : '#c62828') + '">' + (r.correct ? '✓ ' : '✗ ') + '第' + (idx+1) + '题</span>';
+                    html += ' 你选: ' + userLetter + ', 正确: ' + correctLetter;
+                    html += '</div>';
+                } else {
+                    html += '<div style="margin-top:6px;padding:6px 10px;background:#fff8e1;border-radius:4px;font-size:13px">';
+                    html += '<div><strong>第' + (idx+1) + '题 (简答)</strong></div>';
+                    html += '<div style="margin:4px 0"><em>你的回答:</em> ' + escHtml(r.userVal || '未填') + '</div>';
+                    if (r.reference) {
+                        html += '<div style="margin:4px 0;padding:6px;background:#fff;border:1px dashed #ccc;border-radius:4px"><em>参考答案:</em> ' + escHtml(r.reference) + '</div>';
+                    }
+                    html += '</div>';
+                }
+            });
+            html += '</div>';
+            resultDiv.innerHTML = html;
+
+            // Save quiz score to progress
+            fetch('/api/quiz_submit', {method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({job_id: jobId, task_id: taskId, score: score, total: total})});
+        }
+
+        function resetQuiz(form, resultDiv) {
+            form.reset();
+            resultDiv.innerHTML = '';
+        }
 
         // Update all progress indicators for a job without page reload
         function updateCalendarProgress(jobId) {
@@ -3338,6 +3467,9 @@ Do NOT use any other language in the output. The entire response must be in {lan
 4. 每个资源必须包含 type、title、url、estimated_hours 四个字段，url 不能为空
 5. 每周安排 5 个工作日任务（周一至周五），周末不安排任务
 6. 每个任务必须包含 day_of_week 字段（1=周一，2=周二，3=周三，4=周四，5=周五）
+7. 每个任务必须包含 quiz 字段，包含 10 道测试题（8 道选择题 + 2 道简答题），用于检验学习效果
+8. 选择题每题 4 个选项，answer 为正确选项索引（0-3）；简答题需提供参考要点
+9. quiz 的 type 字段："choice" 或 "essay"
 
 ### 输出格式（纯 JSON，不要 markdown 代码块）
 {{
@@ -3354,8 +3486,8 @@ Do NOT use any other language in the output. The entire response must be in {lan
   ],
   "weekly_plan": [
     {{"week": 1, "focus": "Weekly focus topic", "tasks": [
-      {{"name": "周一任务", "day_of_week": 1, "advice": "Detailed learning advice in {lang}"}},
-      {{"name": "周二任务", "day_of_week": 2, "advice": "Detailed learning advice in {lang}"}},
+      {{"name": "周一任务", "day_of_week": 1, "advice": "Detailed learning advice in {lang}", "quiz": [{{"q": "选择题问题", "type": "choice", "options": ["A", "B", "C", "D"], "answer": 0}}]}},
+      {{"name": "周二任务", "day_of_week": 2, "advice": "Detailed learning advice in {lang}", "quiz": [{{"q": "简答题问题", "type": "essay", "reference": "参考答案要点"}}]}},
       {{"name": "周三任务", "day_of_week": 3, "advice": "Detailed learning advice in {lang}"}},
       {{"name": "周四任务", "day_of_week": 4, "advice": "Detailed learning advice in {lang}"}},
       {{"name": "周五任务", "day_of_week": 5, "advice": "Detailed learning advice in {lang}"}}
@@ -3435,7 +3567,8 @@ Do NOT use any other language in the output. The entire response must be in {lan
                                 task_id = f"w{week_num}_d{dow}"
                             else:
                                 task_id = f"w{week_num}_t{t_idx}"
-                            progress[task_id] = {"done": False, "text": task_text, "week": week_num, "advice": task_advice, "day_of_week": dow}
+                            quiz_data = raw.get("quiz", []) if isinstance(raw, dict) else []
+                            progress[task_id] = {"done": False, "text": task_text, "week": week_num, "advice": task_advice, "day_of_week": dow, "quiz": quiz_data}
             job["learn_plan_progress"] = progress
             self.agent.tracker.save()
             self.send_json({"success": True, "plan": plan, "saved": True})
@@ -3618,6 +3751,29 @@ Do NOT use any other language in the output. The entire response must be in {lan
             self.wfile.write(ical_content.encode())
         except Exception as e:
             self.send_json({"success": False, "error": f"导出日历失败: {str(e)}"}, 500)
+
+    def api_quiz_submit(self, data):
+        """保存测验成绩"""
+        try:
+            job_id = data.get("job_id", "")
+            task_id = data.get("task_id", "")
+            score = data.get("score", 0)
+            total = data.get("total", 0)
+            if not job_id or not task_id:
+                self.send_json({"success": False, "error": "缺少参数"}, 400)
+                return
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+            progress = job.get("learn_plan_progress", {})
+            if task_id in progress:
+                progress[task_id]["quiz_score"] = {"score": score, "total": total}
+            job["learn_plan_progress"] = progress
+            self.agent.tracker.save()
+            self.send_json({"success": True, "score": score, "total": total})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
 
     def _find_job_from_cache(self, job_id: str) -> Optional[Dict]:
         """从搜索缓存中查找职位"""
