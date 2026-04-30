@@ -2121,7 +2121,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
                                                 ) + (
-                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 ' + open_label + '</a>'
+                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">' + open_label + '</a>'
                                                 ) + '</li>'
                                                 for r in fs.get("resources", [])
                                             )
@@ -2131,7 +2131,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                                 '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
                                                     ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
                                                 ) + (
-                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">\U0001f517 ' + open_label + '</a>'
+                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">' + open_label + '</a>'
                                                 ) + '</li>'
                                                 for r in (fs.get("resources", []) or [])[:1]
                                             )
@@ -2337,17 +2337,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var jobId = cb.getAttribute('data-jobid');
             var taskId = cb.getAttribute('data-taskid');
             if (!jobId || !taskId) return;
-            // Toggle visual strikethrough
-            var row = cb.parentElement;
-            var taskEl = row ? row.querySelector('.cal-task') : null;
-            if (taskEl) {
-                if (cb.checked) {
-                    taskEl.classList.add('task-done');
-                } else {
-                    taskEl.classList.remove('task-done');
-                }
-            }
-            toggleLearnTask(jobId, taskId, cb);
+            var done = cb.checked;
+            // Save progress then reload page to update server-rendered indicators
+            fetch('/api/learn_plan_progress', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({job_id: jobId, task_id: taskId, done: done})})
+            .then(function(r){return r.json()})
+            .then(function(d){
+                if (!d.success) return;
+                location.reload();
+            });
         });
 
         function closeTaskDetail() {

@@ -5,6 +5,60 @@ Nokia uses Oracle Cloud HCM (Candidate Experience) at:
   https://jobs.nokia.com/en/sites/CX_1
 
 The SPA uses a REST API with a custom finder URL format similar to Fortinet.
+
+
+!! IMPORTANT — Known API Limitation !!
+
+Nokia's Oracle HCM instance (siteNumber=CX_1) has a SERVER-SIDE RESTRICTION:
+the findReqs finder API ALWAYS returns the exact same 25 jobs regardless of
+keyword, locationId, offset, or any other filter parameter.
+
+Confirmed facts (investigated 2026-04-29):
+- 858 total jobs exist in the database (returned as TotalJobsCount)
+- But the API only ever returns the same 25 "default" jobs
+- keyword (e.g. "software") → completely ignored by the API
+- locationId (e.g. Canada=300000000471544) → ignored
+- selectedLocationsFacet → ignored
+- offset=25 (pagination) → returns IDENTICAL 25 jobs, not page 2
+- locationsFacet shows 68 Canada jobs exist, but API won't return them
+
+Why this happens:
+- The SPA uses the same URL format as Fortinet's WORKING instance
+  (/recruitingCEJobRequisitions?onlyData=true&expand=...&finder=findReqs;:findParams:{json})
+- The JavaScript code (main-minimal.js v2601.16.260640537) DOES pass keyword,
+  locationId, offset correctly through P(e,g) param mapping
+- The "24" resource version in mapSearchParamsToRest(e, siteNumber, 24, t) is
+  identical between working (Fortinet CX_2001) and broken (Nokia CX_1) instances
+- The difference is server-side config: Nokia's Oracle Cloud tenant has restricted
+  the API to 25 unfilterable results; Fortinet's tenant allows full access
+
+What the website shows:
+- The SPA page at jobs.nokia.com is 100% JS-rendered — NO server-side data
+- It calls the SAME restricted API and gets the SAME 25 jobs
+- Client-side JS filters by keyword/location (React state)
+- So the website ALSO only displays from these 25 jobs
+- "Many Canada software jobs" would be client-side filtered view of the 25
+
+What we've tried (all failed):
+1. Direct oraclecloud /hcmRestApi/ endpoint
+2. jobs.nokia.com/rest/ proxy
+3. jobs.nokia.com/rest/ without /hcmRestApi/resources/{version}/ prefix
+4. findParams as separate URL query param (not inline finder)
+5. selectedLocationsFacet (SAME) parameter
+6. POST to /action/getRequisitionDetailsForMap (empty result)
+7. All offsets from 0 to 800 (same 25 jobs repeated)
+8. Browser automation not viable (1.3GB disk, and wouldn't bypass server restriction)
+
+Module behavior:
+- Returns the 25 jobs the API does provide
+- Client-side Canada location filter catches ~2 Canada-relevant jobs
+  (HW Test Engineer, Senior Photonics System Test Specialist)
+- This is the BEST we can do with the restricted API
+
+Contrast with Fortinet (sites/fortinet.py):
+- Same Oracle HCM platform
+- siteNumber=CX_2001 (different tenant/instance)
+- keyword, locationId, offset ALL work correctly
 """
 
 from typing import Dict, List, Optional
