@@ -290,7 +290,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "gap_suggestions": "\U0001f4a1 Suggestions",
         "exists_text": "⚠️ Exists",
         "cal_month_names": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-        "cal_weekday_labels": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "cal_weekday_labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "cal_modal_resources": "\U0001f4da Recommended Resources",
         "cal_modal_projects": "\U0001f4a1 Related Projects",
         "cal_modal_advice": "\U0001f4ad Study Advice",
@@ -472,7 +472,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "learn_plan_priority_label": "\u4f18\u5148\u7ea7",
         "saved_to_tracker": "✅ 已保存到跟踪列表，刷新页面查看",
         "cal_month_names": ["1\u6708", "2\u6708", "3\u6708", "4\u6708", "5\u6708", "6\u6708", "7\u6708", "8\u6708", "9\u6708", "10\u6708", "11\u6708", "12\u6708"],
-        "cal_weekday_labels": ["\u65e5", "\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d"],
+        "cal_weekday_labels": ["\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d", "\u65e5"],
         "cal_modal_resources": "\U0001f4da \u63a8\u8350\u8d44\u6e90",
         "cal_modal_projects": "\U0001f4a1 \u76f8\u5173\u9879\u76ee",
         "cal_modal_advice": "\U0001f4ad \u5b66\u4e60\u5efa\u8bae",
@@ -622,7 +622,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_search_again": "🚀 Relancer la recherche",
         "btn_save": "💾 Enregistrer",
         "cal_month_names": ["Janvier", "F\u00e9vrier", "Mars", "Avril", "Mai", "Juin", "Juillet", "Ao\u00fbt", "Septembre", "Octobre", "Novembre", "D\u00e9cembre"],
-        "cal_weekday_labels": ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"],
+        "cal_weekday_labels": ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
         "cal_modal_resources": "\U0001f4da Ressources recommand\u00e9es",
         "cal_modal_projects": "\U0001f4a1 Projets connexes",
         "cal_modal_advice": "\U0001f4ad Conseils d'\u00e9tude",
@@ -771,6 +771,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/get_cover_letter":
             self.api_get_cover_letter(params)
+            return
+        if path == "/api/learn_plan_progress":
+            self.api_learn_plan_progress_GET(params)
             return
 
         handler = routes.get(path)
@@ -2024,14 +2027,17 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             company = j.get("company", "")
             job_id = j["id"]
 
-            # Calculate progress
+            # Calculate progress (support new day_of_week IDs and old index-based IDs)
             total_tasks = 0
             done_tasks = 0
             if plan.get("weekly_plan"):
                 for w in plan["weekly_plan"]:
                     if w.get("tasks"):
-                        for t_idx in range(len(w["tasks"])):
-                            tid = f"w{w['week']}_t{t_idx}"
+                        for t_idx, raw_task in enumerate(w["tasks"]):
+                            if isinstance(raw_task, dict) and raw_task.get("day_of_week"):
+                                tid = f"w{w['week']}_d{raw_task['day_of_week']}"
+                            else:
+                                tid = f"w{w['week']}_t{t_idx}"
                             total_tasks += 1
                             p = progress.get(tid, {})
                             if p.get("done"):
@@ -2058,11 +2064,35 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         day_date = monday + dt.timedelta(days=d)
                         day_str = str(day_date.day)
                         is_today = "today-dot" if day_date == today else ""
-                        # Check tasks for this week
+                        # Check tasks for this week: Mon-Fri only
                         tasks_for_day = ""
+                        _render_cnt = 0
                         if w.get("tasks"):
                             for t_idx, raw_task in enumerate(w["tasks"]):
-                                tid = f"w{week_num}_t{t_idx}"
+                                # Determine this task's day_of_week
+                                if isinstance(raw_task, dict):
+                                    task_dow = raw_task.get("day_of_week")
+                                else:
+                                    task_dow = None
+                                if task_dow is not None:
+                                    # day_of_week is 1=Mon..5=Fri
+                                    # d=0=Mon(monday), 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+                                    # So task_dow=1 should match d=0, task_dow=2→d=1, etc.
+                                    if d >= 5:
+                                        continue
+                                    if (task_dow - 1) != d:
+                                        continue
+                                else:
+                                    if d >= 5:
+                                        continue
+                                    day_idx = t_idx % 5
+                                    if day_idx != d:
+                                        continue
+                                # Build task ID: new format uses day_of_week, old format uses index
+                                if task_dow is not None:
+                                    tid = f"w{week_num}_d{task_dow}"
+                                else:
+                                    tid = f"w{week_num}_t{t_idx}"
                                 p = progress.get(tid, {})
                                 is_done = p.get("done", False)
                                 done_cls = "task-done" if is_done else ""
@@ -2072,74 +2102,97 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                 else:
                                     task_text = raw_task
                                 task_tip = p.get("advice", "") or plan.get("advice", "") or ""
-                                # Distribute tasks roughly across week days (for display)
-                                day_idx = t_idx % 7
-                                if day_idx == d:
-                                    # Build task detail: collect related resources from focus_skills
-                                    related_res_html = ""
-                                    related_proj_html = ""
-                                    matched_any = False
-                                    matched_res = []  # Track matched skills + their resources
-                                    for fs in plan.get("focus_skills", []):
-                                        sk = fs.get("skill", "").lower()
-                                        task_lower = task_text.lower()
-                                        import re as _re
-                                        match_skill = False
-                                        # 1. Extract meaningful keywords from skill name
-                                        sk_keys = [k.strip() for k in _re.split(r'[/,、（）()\s]', sk) if len(k.strip()) > 2]
-                                        for kw in sk_keys:
-                                            if kw in task_lower:
+                                # Build task detail: collect related resources from focus_skills
+                                related_res_html = ""
+                                related_proj_html = ""
+                                matched_any = False
+                                matched_res = []  # Track matched skills + their resources
+                                for fs in plan.get("focus_skills", []):
+                                    sk = fs.get("skill", "").lower()
+                                    task_lower = task_text.lower()
+                                    import re as _re
+                                    match_skill = False
+                                    # Normalize: collapse whitespace/punctuation to spaces, strip
+                                    task_norm = _re.sub(r'[/,、（）()\s\u2014\u2013\-:]', ' ', task_lower).strip()
+                                    sk_norm = _re.sub(r'[/,、（）()\s\u2014\u2013\-:]', ' ', sk).strip()
+                                    # 1. Check overlap: words from task in skill name OR skill keywords in task
+                                    task_words = set(w for w in task_norm.split() if len(w) > 1)
+                                    sk_words = set(w for w in sk_norm.split() if len(w) > 1)
+                                    if task_words & sk_words:
+                                        match_skill = True
+                                    if not match_skill:
+                                        # Substring: any significant task word appears in skill or vice versa
+                                        for tw in task_words:
+                                            if tw in sk_norm or sk_norm in tw:
                                                 match_skill = True
                                                 break
                                         if not match_skill:
-                                            # 2. Check if any resource title shares keywords with task text
-                                            for r in fs.get("resources", []):
-                                                rt = r.get("title","").lower()
-                                                rt_keys = [k.strip() for k in _re.split(r'[/,、（）()\s]', rt) if len(k.strip()) > 3]
-                                                for rk in rt_keys:
-                                                    if rk in task_lower:
-                                                        match_skill = True
-                                                        break
-                                                for tc in task_lower.split():
-                                                    if len(tc) > 3 and tc in rt:
-                                                        match_skill = True
-                                                        break
-                                                if match_skill:
+                                            # Check against common skill keyword patterns (English + Chinese equivalents)
+                                            kw_patterns = [
+                                                (["agent", "ai", "llm"], ["agent", "ai", "llm", "langchain"]),
+                                                (["knowledge graph", "rag", "图谱", "检索", "知识"], ["knowledge", "graph", "rag", "retrieval"]),
+                                                (["devops", "incident", "事件", "故障"], ["devops", "incident", "response"]),
+                                                (["distributed", "分布式", "拓扑", "topology", "依赖"], ["distributed", "topology"]),
+                                                (["aws", "cloud", "云", "云原生"], ["aws", "cloud", "architecture"]),
+                                                (["python", "ml", "framework"], ["python", "ml", "framework"]),
+                                                (["leader", "领导", "collaboration"], ["leader", "collaboration"]),
+                                            ]
+                                            for task_kws, sk_kws in kw_patterns:
+                                                has_task_kw = any(kw in task_lower for kw in task_kws)
+                                                has_sk_kw = any(kw in sk_norm for kw in sk_kws)
+                                                if has_task_kw and has_sk_kw:
+                                                    match_skill = True
                                                     break
-                                        if match_skill:
-                                            matched_any = True
-                                        matched_res.append((match_skill, fs))
-                                    # Render: if any skill matched, show only matched skills (all resources).
-                                    # If NO skill matched, show ALL skills but only 1 resource each (fallback).
-                                    for is_match, fs in matched_res:
-                                        sk = fs.get("skill", "")
-                                        if matched_any:
-                                            # Precision mode: skip unmatched skills entirely
-                                            if not is_match:
-                                                continue
-                                            items = "".join(
-                                                '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
-                                                    ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
-                                                ) + (
-                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">' + open_label + '</a>'
-                                                ) + '</li>'
-                                                for r in fs.get("resources", [])
-                                            )
-                                        else:
-                                            # Fallback mode: no skill matched, show 1 resource per skill
-                                            items = "".join(
-                                                '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
-                                                    ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
-                                                ) + (
-                                                    ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">' + open_label + '</a>'
-                                                ) + '</li>'
-                                                for r in (fs.get("resources", []) or [])[:1]
-                                            )
-                                        if items:
-                                            related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + ' ' + priority_label + ')</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
-                                    for proj in plan.get("projects", []):
-                                        if any(s.lower() in task_text.lower() for s in proj.get("skills",[])):
-                                            related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
+                                    if not match_skill:
+                                        # 2. Check if any resource title keyword is in task text
+                                        for r in fs.get("resources", []):
+                                            rt = r.get("title","").lower()
+                                            rt_words = [w.strip() for w in _re.split(r'[/,、（）()\s\-\u2014\u2013:]', rt) if len(w.strip()) > 3]
+                                            for rw in rt_words:
+                                                if rw in task_lower:
+                                                    match_skill = True
+                                                    break
+                                            if match_skill:
+                                                break
+                                    if match_skill:
+                                        matched_any = True
+                                    matched_res.append((match_skill, fs))
+                                # END of for fs matching loop — now render once
+                                import re as _re_outer
+                                items_shown = 0
+                                for is_match, fs in matched_res:
+                                    sk = fs.get("skill", "")
+                                    if matched_any:
+                                        if not is_match:
+                                            continue
+                                        resources = fs.get("resources", []) or []
+                                        items = "".join(
+                                            '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
+                                                ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
+                                            ) + (
+                                                ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">' + open_label + '</a>'
+                                            ) + '</li>'
+                                            for r in resources[:3]
+                                        )
+                                    else:
+                                        remaining = 3 - items_shown
+                                        if remaining <= 0:
+                                            continue
+                                        resources = fs.get("resources", []) or []
+                                        items = "".join(
+                                            '<li>\U0001f4da <strong>' + r.get("title","") + '</strong>' + (
+                                                ' (' + str(r.get("estimated_hours","")) + 'h)' if r.get("estimated_hours") else ''
+                                            ) + (
+                                                ' <a href="' + (r.get("url","") or 'https://www.google.com/search?q=' + urllib.parse.quote(r.get("title",""))) + '" target="_blank" style="color:#1a73e8;font-size:11px">' + open_label + '</a>'
+                                            ) + '</li>'
+                                            for r in resources[:1]
+                                        )
+                                        items_shown += len(resources[:1]) if resources else 0
+                                    if items:
+                                        related_res_html += '<div class="td-skill-section"><div class="td-skill-name">\U0001f3af ' + fs.get("skill","") + ' (' + fs.get("priority","") + ' ' + priority_label + ')</div>' + fs.get("reason","") + '<ul>' + items + '</ul></div>'
+                                for proj in plan.get("projects", []):
+                                    if any(s.lower() in task_text.lower() for s in proj.get("skills",[])):
+                                        related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
                                     # Store detail data as encoded JSON data attributes
                                     detail_obj = {
                                         "task": task_text,
@@ -2154,24 +2207,28 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                     disp = task_text[:14] + "..." if len(task_text) > 14 else task_text
                                     cb_checked = "checked" if is_done else ""
                                     cb_id = f"cb-{job_id}-{tid}"
-                                    tasks_for_day += f'''
+                                tasks_for_day += f'''
                                     <div class="cal-task-row">
                                         <input type="checkbox" class="cal-task-cb" id="{cb_id}" data-jobid="{job_id}" data-taskid="{tid}" {cb_checked}>
                                         <div class="cal-task {done_cls}" data-detail="{detail_b64}" title="{task_text}">{disp}</div>
                                     </div>'''
 
+                        
                         week_days += f'''
                         <div class="cal-day">
                             <div class="cal-day-header {is_today}">{day_str}</div>
                             {tasks_for_day}
                         </div>'''
 
-                    # Calculate week progress
+                    # Calculate week progress (respect new day_of_week or old index-based IDs)
                     w_tasks = len(w.get("tasks", []))
                     w_done = 0
                     if w.get("tasks"):
-                        for t_idx in range(len(w["tasks"])):
-                            tid = f"w{week_num}_t{t_idx}"
+                        for t_idx, raw_task in enumerate(w["tasks"]):
+                            if isinstance(raw_task, dict) and raw_task.get("day_of_week"):
+                                tid = f"w{week_num}_d{raw_task['day_of_week']}"
+                            else:
+                                tid = f"w{week_num}_t{t_idx}"
                             if progress.get(tid, {}).get("done"):
                                 w_done += 1
 
@@ -2240,7 +2297,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         .td-modal {{ background:#fff; border-radius:12px; max-width:520px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.2); padding:24px; position:relative; }}
         .td-close {{ position:absolute; top:12px; right:16px; font-size:22px; cursor:pointer; color:#999; background:none; border:none; }}
         .td-close:hover {{ color:#333; }}
-        .td-title {{ font-size:17px; font-weight:600; margin-bottom:4px; padding-right:30px; }}
+        .td-title-wrap {{ display:flex; align-items:flex-start; gap:10px; margin-bottom:4px; }}
+        .td-title {{ font-size:17px; font-weight:600; padding-right:30px; }}
         .td-week {{ font-size:14px; color:#888; margin-bottom:16px; }}
         .td-section {{ margin-bottom:16px; }}
         .td-section-title {{ font-size:15px; font-weight:500; color:#555; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; }}
@@ -2259,7 +2317,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         <div class="td-overlay" id="td-overlay" onclick="closeTaskDetail()">
             <div class="td-modal" onclick="event.stopPropagation()">
                 <button class="td-close" onclick="closeTaskDetail()">&times;</button>
-                <div class="td-title" id="td-title"></div>
+                <div class="td-title-wrap" id="td-title-wrap">
+                    <input type="checkbox" id="td-checkbox" style="width:18px;height:18px;cursor:pointer;flex-shrink:0">
+                    <div class="td-title" id="td-title"></div>
+                </div>
                 <div class="td-week" id="td-week"></div>
                 <div class="td-section" id="td-section-resources" style="display:none">
                     <div class="td-section-title">\U0001f4da \u63a8\u8350\u8d44\u6e90</div>
@@ -2273,6 +2334,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <div class="td-section-title">\U0001f4ad \u5b66\u4e60\u5efa\u8bae</div>
                     <div class="td-advice" id="td-advice"></div>
                 </div>
+                <input type="hidden" id="td-detail-data" value="">
             </div>
         </div>
         <script>
@@ -2281,71 +2343,152 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _cal_modal_resources = __cal_modal_resources;
         var _cal_modal_projects = __cal_modal_projects;
         var _cal_modal_advice = __cal_modal_advice;
-        // Task detail: click delegation on .cal-task        // Task detail: click delegation on .cal-task
+
+        // Store current task's job/task id for modal checkbox
+        var _td_job_id = '';
+        var _td_task_id = '';
+
+        // Click on .cal-task div opens detail modal
         document.addEventListener('click', function(e) {
             var el = e.target.closest('.cal-task');
             if (!el || !el.dataset.detail) return;
             try {
-                try { var jsonBytes = atob(el.dataset.detail); var u8 = new Uint8Array(jsonBytes.length); for (var i = 0; i < jsonBytes.length; i++) { u8[i] = jsonBytes.charCodeAt(i); } var d = JSON.parse(new TextDecoder().decode(u8)); } catch(e) { try { var d = JSON.parse(JSON.parse(decodeURIComponent(atob(el.dataset.detail)))); } catch(e2) { var d = {}; } }
-                document.getElementById('td-title').textContent = d.task;
-                document.getElementById('td-week').textContent = '\U0001f4c5 ' + (_learn_plan_week || '') + ' ' + (d.week || '') + (_learn_plan_suffix || '') + ' \u2014 ' + (d.focus || '');
+                var d = JSON.parse(new TextDecoder().decode(new Uint8Array(Array.from(atob(el.dataset.detail), function(c){return c.charCodeAt(0)}))));
+            } catch(e) { try { var d = JSON.parse(JSON.parse(decodeURIComponent(atob(el.dataset.detail)))); } catch(e2) { var d = {}; } }
+            document.getElementById('td-title').textContent = d.task;
+            document.getElementById('td-week').textContent = '\U0001f4c5 ' + (_learn_plan_week || '') + ' ' + (d.week || '') + (_learn_plan_suffix || '') + ' \u2014 ' + (d.focus || '');
 
-                var rDiv = document.getElementById('td-resources');
-                var rSec = document.getElementById('td-section-resources');
-                if (d.resources_html) {
-                    rDiv.innerHTML = d.resources_html;
-                    rSec.style.display = '';
-                } else {
-                    rSec.style.display = 'none';
-                }
-                document.getElementById('td-section-resources').children[0].textContent = _cal_modal_resources;
+            var rDiv = document.getElementById('td-resources');
+            var rSec = document.getElementById('td-section-resources');
+            if (d.resources_html) {
+                rDiv.innerHTML = d.resources_html;
+                rSec.style.display = '';
+            } else {
+                rSec.style.display = 'none';
+            }
+            document.getElementById('td-section-resources').children[0].textContent = _cal_modal_resources;
 
-                var pDiv = document.getElementById('td-projects');
-                var pSec = document.getElementById('td-section-projects');
-                if (d.projects_html) {
-                    pDiv.innerHTML = d.projects_html;
-                    pSec.style.display = '';
-                } else {
-                    pSec.style.display = 'none';
-                }
-                document.getElementById('td-section-projects').children[0].textContent = _cal_modal_projects;
+            var pDiv = document.getElementById('td-projects');
+            var pSec = document.getElementById('td-section-projects');
+            if (d.projects_html) {
+                pDiv.innerHTML = d.projects_html;
+                pSec.style.display = '';
+            } else {
+                pSec.style.display = 'none';
+            }
+            document.getElementById('td-section-projects').children[0].textContent = _cal_modal_projects;
 
-                var aDiv = document.getElementById('td-advice');
-                var aSec = document.getElementById('td-section-advice');
-                if (d.advice_text) {
-                    aDiv.textContent = d.advice_text;
-                    aSec.style.display = '';
-                } else {
-                    aSec.style.display = 'none';
-                }
-                document.getElementById('td-section-advice').children[0].textContent = _cal_modal_advice;
+            var aDiv = document.getElementById('td-advice');
+            var aSec = document.getElementById('td-section-advice');
+            if (d.advice_text) {
+                aDiv.textContent = d.advice_text;
+                aSec.style.display = '';
+            } else {
+                aSec.style.display = 'none';
+            }
+            document.getElementById('td-section-advice').children[0].textContent = _cal_modal_advice;
 
-                document.getElementById('td-overlay').style.display = 'flex';
-            } catch(err) { console.warn('Task detail parse error', err); }
+            // Get job/task id from the clicked el's parent row
+            var row = el.closest('.cal-task-row');
+            var cb = row ? row.querySelector('.cal-task-cb') : null;
+            _td_job_id = cb ? cb.getAttribute('data-jobid') : '';
+            _td_task_id = cb ? cb.getAttribute('data-taskid') : '';
+            document.getElementById('td-checkbox').checked = cb ? cb.checked : false;
+            document.getElementById('td-overlay').style.display = 'flex';
         });
 
-        // Calendar task checkbox: click handler (stops prop to .cal-task detail popup)
-        document.addEventListener('click', function(e) {
-            var cb = e.target.closest('.cal-task-cb');
-            if (!cb) return;
-            e.stopPropagation();
-        });
-        // Calendar task checkbox: toggle progress and strikethrough
+        // Checkbox in modal: save progress and update all indicators in place
         document.addEventListener('change', function(e) {
             var cb = e.target.closest('.cal-task-cb');
-            if (!cb) return;
-            var jobId = cb.getAttribute('data-jobid');
-            var taskId = cb.getAttribute('data-taskid');
-            if (!jobId || !taskId) return;
-            var done = cb.checked;
-            // Save progress then reload page to update server-rendered indicators
-            fetch('/api/learn_plan_progress', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({job_id: jobId, task_id: taskId, done: done})})
+            if (cb) {
+                // Calendar grid checkbox: save silently, update text decoration
+                var jobId = cb.getAttribute('data-jobid');
+                var taskId = cb.getAttribute('data-taskid');
+                var done = cb.checked;
+                var row = cb.parentElement;
+                var taskEl = row ? row.querySelector('.cal-task') : null;
+                if (taskEl) {
+                    if (done) { taskEl.classList.add('task-done'); }
+                    else { taskEl.classList.remove('task-done'); }
+                }
+                fetch('/api/learn_plan_progress', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({job_id: jobId, task_id: taskId, done: done})})
+                .then(function(r){return r.json()})
+                .then(function(d){ if (d.success) { updateCalendarProgress(jobId); } });
+                return;
+            }
+            var modalCb = e.target.closest('#td-checkbox');
+            if (!modalCb) return;
+            if (!_td_job_id || !_td_task_id) return;
+            var done = modalCb.checked;
+            // Sync calendar grid checkbox
+            var gridCb = document.querySelector('.cal-task-cb[data-jobid="' + _td_job_id + '"][data-taskid="' + _td_task_id + '"]');
+            if (gridCb) {
+                gridCb.checked = done;
+                var row2 = gridCb.parentElement;
+                var taskEl2 = row2 ? row2.querySelector('.cal-task') : null;
+                if (taskEl2) {
+                    if (done) { taskEl2.classList.add('task-done'); }
+                    else { taskEl2.classList.remove('task-done'); }
+                }
+            }
+            fetch('/api/learn_plan_progress', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({job_id: _td_job_id, task_id: _td_task_id, done: done})})
             .then(function(r){return r.json()})
-            .then(function(d){
-                if (!d.success) return;
-                location.reload();
-            });
+            .then(function(d){ if (d.success) { updateCalendarProgress(_td_job_id); } });
         });
+
+        // Update all progress indicators for a job without page reload
+        function updateCalendarProgress(jobId) {
+            fetch('/api/learn_plan_progress?job_id=' + encodeURIComponent(jobId))
+            .then(function(r){return r.json()})
+            .then(function(data){
+                if (!data.success) return;
+                var progress = data.progress || {};
+                var cards = document.querySelectorAll('.cal-job-card');
+                cards.forEach(function(card) {
+                    var allTasks = card.querySelectorAll('.cal-task-cb');
+                    var total = 0;
+                    var done = 0;
+                    allTasks.forEach(function(tcb) {
+                        var jid = tcb.getAttribute('data-jobid');
+                        if (jid !== jobId) return;
+                        total++;
+                        var tid = tcb.getAttribute('data-taskid');
+                        if (progress[tid] && progress[tid].done) done++;
+                    });
+                    if (total === 0) return;
+                    // Update overall circle
+                    var pct = Math.round(done / total * 100);
+                    var circle = card.querySelector('.cal-progress-circle');
+                    if (circle) {
+                        circle.style.setProperty('--pct', pct);
+                        var color = pct === 100 ? '#4caf50' : pct >= 50 ? '#ff9800' : '#f44336';
+                        circle.style.setProperty('--color', color);
+                        var span = circle.querySelector('span');
+                        if (span) span.textContent = pct + '%';
+                    }
+                    var statDiv = card.querySelector('.cal-overall-progress div:last-child');
+                    if (statDiv) statDiv.textContent = done + '/' + total;
+                    // Update each week's progress
+                    card.querySelectorAll('.week-calendar').forEach(function(wc) {
+                        var weekCbs = wc.querySelectorAll('.cal-task-cb');
+                        var wTotal = 0;
+                        var wDone = 0;
+                        weekCbs.forEach(function(wcb) {
+                            var jid = wcb.getAttribute('data-jobid');
+                            if (jid !== jobId) return;
+                            wTotal++;
+                            var tid = wcb.getAttribute('data-taskid');
+                            if (progress[tid] && progress[tid].done) wDone++;
+                        });
+                        if (wTotal === 0) return;
+                        var bar = wc.querySelector('.week-progress-fill');
+                        if (bar) bar.style.width = Math.round(wDone / wTotal * 100) + '%';
+                        var stat = wc.querySelector('.week-stats span');
+                        if (stat) stat.textContent = wDone + '/' + wTotal + ' 任务完成';
+                    });
+                });
+            });
+        }
 
         function closeTaskDetail() {
             document.getElementById('td-overlay').style.display = 'none';
@@ -3193,6 +3336,8 @@ Do NOT use any other language in the output. The entire response must be in {lan
 2. 资源可以是慕课网、B站、YouTube、官方文档、GitHub 仓库、Coursera、Udemy 等真实存在的学习平台链接
 3. 实在找不到精确 URL 时，可以用搜索引擎搜索链接，例如 https://www.google.com/search?q=教程名
 4. 每个资源必须包含 type、title、url、estimated_hours 四个字段，url 不能为空
+5. 每周安排 5 个工作日任务（周一至周五），周末不安排任务
+6. 每个任务必须包含 day_of_week 字段（1=周一，2=周二，3=周三，4=周四，5=周五）
 
 ### 输出格式（纯 JSON，不要 markdown 代码块）
 {{
@@ -3208,7 +3353,13 @@ Do NOT use any other language in the output. The entire response must be in {lan
     }}
   ],
   "weekly_plan": [
-    {{"week": 1, "focus": "Weekly focus topic", "tasks": [{{"name": "Concrete task 1", "advice": "Detailed 50-100 word learning advice in {lang} for this task"}}, {{"name": "Concrete task 2", "advice": "Detailed learning advice in {lang}"}}], "estimated_hours": 5}}
+    {{"week": 1, "focus": "Weekly focus topic", "tasks": [
+      {{"name": "周一任务", "day_of_week": 1, "advice": "Detailed learning advice in {lang}"}},
+      {{"name": "周二任务", "day_of_week": 2, "advice": "Detailed learning advice in {lang}"}},
+      {{"name": "周三任务", "day_of_week": 3, "advice": "Detailed learning advice in {lang}"}},
+      {{"name": "周四任务", "day_of_week": 4, "advice": "Detailed learning advice in {lang}"}},
+      {{"name": "周五任务", "day_of_week": 5, "advice": "Detailed learning advice in {lang}"}}
+    ], "estimated_hours": 5}}
   ],
   "projects": [
     {{"name": "项目名", "description": "练习项目简述", "skills": ["涉及的技能"]}}
@@ -3271,14 +3422,20 @@ Do NOT use any other language in the output. The entire response must be in {lan
                     week_num = w.get("week", 0)
                     if w.get("tasks"):
                         for t_idx, raw in enumerate(w["tasks"]):
-                            task_id = f"w{week_num}_t{t_idx}"
                             if isinstance(raw, dict):
                                 task_text = raw.get("name", "")
                                 task_advice = raw.get("advice", "")
+                                dow = raw.get("day_of_week")  # 1=Mon..5=Fri, optional for backward compat
                             else:
                                 task_text = raw
                                 task_advice = ""
-                            progress[task_id] = {"done": False, "text": task_text, "week": week_num, "advice": task_advice}
+                                dow = None
+                            # Use day_of_week in task_id for new plans; fallback to index for old plans
+                            if dow is not None:
+                                task_id = f"w{week_num}_d{dow}"
+                            else:
+                                task_id = f"w{week_num}_t{t_idx}"
+                            progress[task_id] = {"done": False, "text": task_text, "week": week_num, "advice": task_advice, "day_of_week": dow}
             job["learn_plan_progress"] = progress
             self.agent.tracker.save()
             self.send_json({"success": True, "plan": plan, "saved": True})
@@ -3291,7 +3448,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
         """更新学习计划的进度"""
         try:
             job_id = data.get("job_id", "")
-            task_id = data.get("task_id", "")  # e.g. "w1_t0"
+            task_id = data.get("task_id", "")  # e.g. "w1_t0" or "w1_d3"
             done = data.get("done", True)
             if not job_id or not task_id:
                 self.send_json({"success": False, "error": "缺少参数"}, 400)
@@ -3306,13 +3463,55 @@ Do NOT use any other language in the output. The entire response must be in {lan
             else:
                 progress[task_id] = {"done": bool(done), "text": "", "week": 0}
             job["learn_plan_progress"] = progress
-            # 计算统计
-            total = len(progress)
-            done_count = sum(1 for v in progress.values() if v.get("done"))
+            # 计算统计（引用 plan 中的实际任务数量，而非所有 progress key）
+            plan = job.get("learn_plan", {})
+            total = 0
+            done_count = 0
+            if plan.get("weekly_plan"):
+                for w in plan["weekly_plan"]:
+                    if w.get("tasks"):
+                        for t_idx, raw_task in enumerate(w["tasks"]):
+                            if isinstance(raw_task, dict) and raw_task.get("day_of_week"):
+                                pid = f"w{w['week']}_d{raw_task['day_of_week']}"
+                            else:
+                                pid = f"w{w['week']}_t{t_idx}"
+                            total += 1
+                            if progress.get(pid, {}).get("done"):
+                                done_count += 1
             self.agent.tracker.save()
             self.send_json({"success": True, "progress": progress, "done": done_count, "total": total})
         except Exception as e:
             self.send_json({"success": False, "error": f"更新进度失败: {str(e)}"}, 500)
+
+    def api_learn_plan_progress_GET(self, params):
+        """GET: 获取学习计划最新进度（用于 JS 无刷新更新）"""
+        try:
+            job_id = params.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            job = self.agent.tracker.get_job(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "找不到该职位"}, 404)
+                return
+            progress = job.get("learn_plan_progress", {})
+            plan = job.get("learn_plan", {})
+            total = 0
+            done_count = 0
+            if plan.get("weekly_plan"):
+                for w in plan["weekly_plan"]:
+                    if w.get("tasks"):
+                        for t_idx, raw_task in enumerate(w["tasks"]):
+                            if isinstance(raw_task, dict) and raw_task.get("day_of_week"):
+                                pid = f"w{w['week']}_d{raw_task['day_of_week']}"
+                            else:
+                                pid = f"w{w['week']}_t{t_idx}"
+                            total += 1
+                            if progress.get(pid, {}).get("done"):
+                                done_count += 1
+            self.send_json({"success": True, "progress": progress, "done": done_count, "total": total})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_learn_plan_ical(self, data):
         """导出学习计划为 iCal (.ics) 文件"""
@@ -3349,38 +3548,55 @@ Do NOT use any other language in the output. The entire response must be in {lan
             if plan.get("weekly_plan"):
                 for w in plan["weekly_plan"]:
                     week_num = w.get("week", 1)
-                    week_start = base_date + datetime.timedelta(days=(week_num - 1) * 7)
+                    # Calculate Monday of this week
+                    monday = base_date - datetime.timedelta(days=base_date.weekday()) + datetime.timedelta(weeks=week_num - 1)
                     focus = w.get("focus", f"{learn_plan_week}{week_num}{learn_plan_suffix}")
-                    # Create a weekly summary event
-                    uid = str(uuid.uuid4())
-                    lines.append("BEGIN:VEVENT")
-                    lines.append(f"UID:{uid}@jobagent")
-                    lines.append(f"DTSTART;VALUE=DATE:{week_start.strftime('%Y%m%d')}")
-                    week_end = week_start + datetime.timedelta(days=6)
-                    lines.append(f"DTEND;VALUE=DATE:{week_end.strftime('%Y%m%d')}")
-                    lines.append(f"SUMMARY:📚 第{week_num}周: {focus}")
-                    desc = f"目标职位: {company} - {title}\
-"
-                    desc += f"重点: {focus}\
-"
-                    est = w.get("estimated_hours", "")
-                    if est:
-                        desc += f"预估: {est}h\
-"
+                    # Create individual events per task (Mon-Fri)
                     if w.get("tasks"):
-                        desc += "\
-任务:\
-"
                         for t_idx, raw in enumerate(w["tasks"]):
-                            tid = f"w{week_num}_t{t_idx}"
+                            if isinstance(raw, dict):
+                                task_name = raw.get("name", "")
+                                task_dow = raw.get("day_of_week")  # 1=Mon..5=Fri
+                            else:
+                                task_name = raw
+                                task_dow = None
+                            if task_dow is not None:
+                                task_date = monday + datetime.timedelta(days=task_dow - 1)
+                            else:
+                                # Old format: distribute across Mon-Fri
+                                task_date = monday + datetime.timedelta(days=t_idx % 5)
+                            # Skip weekends
+                            if task_date.weekday() >= 5:
+                                continue
+                            tid = f"w{week_num}_t{t_idx}" if task_dow is None else f"w{week_num}_d{task_dow}"
                             p = progress.get(tid, {})
                             mark = "✅" if p.get("done") else "⬜"
-                            if isinstance(raw, dict):
-                                raw = raw.get("name", "")
-                            desc += f"{mark} {raw}\
+                            advice = p.get("advice", "") if isinstance(raw, dict) else ""
+                            uid = str(uuid.uuid4())
+                            lines.append("BEGIN:VEVENT")
+                            lines.append(f"UID:{uid}@jobagent")
+                            lines.append(f"DTSTART;VALUE=DATE:{task_date.strftime('%Y%m%d')}")
+                            lines.append(f"DTEND;VALUE=DATE:{(task_date + datetime.timedelta(days=1)).strftime('%Y%m%d')}")
+                            lines.append(f"SUMMARY:{mark} {task_name}")
+                            desc = f"目标职位: {company} - {title}\
 "
-                    lines.append(f"DESCRIPTION:{desc}")
-                    lines.append("END:VEVENT")
+                            desc += f"第{week_num}周 · {focus}\
+"
+                            if advice:
+                                desc += f"\
+建议: {advice}"
+                            lines.append(f"DESCRIPTION:{desc}")
+                            lines.append("END:VEVENT")
+                    else:
+                        # Fallback: weekly summary event if no tasks
+                        uid = str(uuid.uuid4())
+                        lines.append("BEGIN:VEVENT")
+                        lines.append(f"UID:{uid}@jobagent")
+                        lines.append(f"DTSTART;VALUE=DATE:{monday.strftime('%Y%m%d')}")
+                        week_end = monday + datetime.timedelta(days=6)
+                        lines.append(f"DTEND;VALUE=DATE:{week_end.strftime('%Y%m%d')}")
+                        lines.append(f"SUMMARY:📚 第{week_num}周: {focus}")
+                        lines.append("END:VEVENT")
 
             if plan.get("advice"):
                 uid = str(uuid.uuid4())
