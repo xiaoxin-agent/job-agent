@@ -2318,7 +2318,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
         # Task detail modal (built as string literals to avoid f-string hell)
         modal = '''
-        <div class="td-overlay" id="td-overlay" onclick="closeTaskDetail()">
+        <div class="td-overlay" id="td-overlay" onclick="closeTaskDetail()" style="display: none">
             <div class="td-modal" onclick="event.stopPropagation()">
                 <button class="td-close" onclick="closeTaskDetail()">&times;</button>
                 <div class="td-title-wrap" id="td-title-wrap">
