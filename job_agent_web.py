@@ -3235,7 +3235,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     {"role": "user", "content": user_msg}
                 ],
                 "temperature": 0.6,
-                "max_tokens": 4096,
+                "max_tokens": 32768,
                 "stream": False
             })
 
@@ -3447,6 +3447,35 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             company = job.get("company", "")
             resume_md = self.agent.tracker.get_job_resume_markdown(job_id) or ""
 
+                        # JSON template as plain string — no f-string to avoid brace escaping issues
+            json_template_json = json.dumps({
+                "position": "目标职位名称",
+                "focus_skills": [
+                    {
+                        "skill": "技能名称",
+                        "priority": "High/Mid/Low",
+                        "reason": "Explain why",
+                        "resources": [
+                            {"type": "Course", "title": "资源名", "url": "https://...", "estimated_hours": 10}
+                        ]
+                    }
+                ],
+                "weekly_plan": [
+                    {"week": 1, "focus": "Focus", "tasks": [
+                        {"name": "任务", "day_of_week": 1, "advice": "建议", "quiz": [{"q":"例题","type":"choice","options":["A","B","C","D"],"answer":0},{"q":"?","type":"essay","reference":"答"}]},
+                        {"name": "任务", "day_of_week": 2, "advice": "建议"},
+                        {"name": "任务", "day_of_week": 3, "advice": "建议"},
+                        {"name": "任务", "day_of_week": 4, "advice": "建议"},
+                        {"name": "任务", "day_of_week": 5, "advice": "建议"}
+                    ], "estimated_hours": 5}
+                ],
+                "projects": [
+                    {"name": "项目名", "description": "简述"}
+                ],
+                "total_estimated_weeks": 4,
+                "advice": "总体建议"
+            }, ensure_ascii=False, indent=2)
+
             prompt = f"""You are a senior technical mentor. Create a detailed skill improvement study plan for a job seeker applying to the following position.
 IMPORTANT: Output ALL text content in {lang} language (skill names should remain in English).
 Do NOT use any other language in the output. The entire response must be in {lang}.
@@ -3458,7 +3487,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
 {job_desc}
 
 ### 当前简历
-{resume_md[:3000]}
+{resume_md[:1500]}
 
 ### ⚠️ 重要要求
 1. 每个 focus_skills 必须有至少 2 个推荐资源（resources），且必须提供真实的 url 链接（https 开头）
@@ -3467,39 +3496,12 @@ Do NOT use any other language in the output. The entire response must be in {lan
 4. 每个资源必须包含 type、title、url、estimated_hours 四个字段，url 不能为空
 5. 每周安排 5 个工作日任务（周一至周五），周末不安排任务
 6. 每个任务必须包含 day_of_week 字段（1=周一，2=周二，3=周三，4=周四，5=周五）
-7. 每个任务必须包含 quiz 字段，包含 10 道测试题（8 道选择题 + 2 道简答题），用于检验学习效果
-8. 选择题每题 4 个选项，answer 为正确选项索引（0-3）；简答题需提供参考要点
-9. quiz 的 type 字段："choice" 或 "essay"
+7. 每个任务的 quiz 字段: 10题(8 choice + 2 essay)
+8. choice格式: {{"q":"问题","type":"choice","options":["A","B","C","D"],"answer":0}}
+9. essay格式: {{"q":"问题","type":"essay","reference":"参考要点"}}
 
 ### 输出格式（纯 JSON，不要 markdown 代码块）
-{{
-  "position": "目标职位名称",
-  "focus_skills": [
-    {{
-      "skill": "技能名称",
-      "priority": "High/Mid/Low",
-      "reason": "Explain why this skill is important",
-      "resources": [
-        {{"type": "Course/Book/Project/Doc", "title": "Resource Title", "url": "https://...", "estimated_hours": 10}}
-      ]
-    }}
-  ],
-  "weekly_plan": [
-    {{"week": 1, "focus": "Weekly focus topic", "tasks": [
-      {{"name": "周一任务", "day_of_week": 1, "advice": "Detailed learning advice in {lang}", "quiz": [{{"q": "选择题问题", "type": "choice", "options": ["A", "B", "C", "D"], "answer": 0}}]}},
-      {{"name": "周二任务", "day_of_week": 2, "advice": "Detailed learning advice in {lang}", "quiz": [{{"q": "简答题问题", "type": "essay", "reference": "参考答案要点"}}]}},
-      {{"name": "周三任务", "day_of_week": 3, "advice": "Detailed learning advice in {lang}"}},
-      {{"name": "周四任务", "day_of_week": 4, "advice": "Detailed learning advice in {lang}"}},
-      {{"name": "周五任务", "day_of_week": 5, "advice": "Detailed learning advice in {lang}"}}
-    ], "estimated_hours": 5}}
-  ],
-  "projects": [
-    {{"name": "项目名", "description": "练习项目简述", "skills": ["涉及的技能"]}}
-  ],
-  "total_estimated_weeks": 4,
-  "advice": "总体建议（一段话）"
-}}
-"""
+{json_template_json}"""
 
             import urllib.request
             import json as j
@@ -3522,7 +3524,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
-                "max_tokens": 4096,
+                "max_tokens": 32768,
                 "stream": False
             })
 
@@ -3573,8 +3575,15 @@ Do NOT use any other language in the output. The entire response must be in {lan
             self.agent.tracker.save()
             self.send_json({"success": True, "plan": plan, "saved": True})
         except json.JSONDecodeError:
+            import traceback; traceback.print_exc()
+            try:
+                with open('/tmp/llm_debug.txt', 'w') as _f:
+                    _f.write(content)
+                    _f.write(f"\n---END (len={len(content)})---")
+            except: pass
             self.send_json({"success": False, "error": "AI 返回格式异常，请重试"}, 500)
         except Exception as e:
+            import traceback; traceback.print_exc()
             self.send_json({"success": False, "error": f"生成学习计划失败: {str(e)}"}, 500)
 
     def api_learn_plan_progress(self, data):
