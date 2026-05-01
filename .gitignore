@@ -1,7 +1,11 @@
+# Python
 *.pyc
 __pycache__/
+
+# Runtime logs & PIDs
 *.log
 *.pid
-agent_data/*.json
+
+# Runtime data — not part of source code
+agent_data/
 !agent_data/user_profile.json
-agent_data/resumes/
