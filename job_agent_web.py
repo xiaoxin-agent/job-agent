@@ -777,13 +777,20 @@ class JobAgentHandler(BaseHTTPRequestHandler):
     agent: JobAgent = None
 
     def _get_lang(self, params: Dict) -> str:
-        """获取语言偏好：URL参数 > profile存储 > 默认"""
+        """获取语言偏好：URL参数 > Accept-Language > profile存储 > 默认"""
         lang = params.get("lang", "")
-        if lang in ("en", "zh-CN", "fr"):
+        if lang in LANGUAGES:
             return lang
+        # 从浏览器 Accept-Language 自动检测
+        accept = self.headers.get("Accept-Language", "")
+        for pref in accept.split(","):
+            code = pref.split(";")[0].strip()
+            if code.startswith("zh"): return "zh-CN"
+            if code.startswith("fr"): return "fr"
+            if code.startswith("en"): return "en"
         try:
             stored = self.agent.engine.profile.profile.get("language", "zh-CN")
-            if stored in ("en", "zh-CN", "fr"):
+            if stored in LANGUAGES:
                 return stored
         except:
             pass
@@ -4489,14 +4496,15 @@ loadResume();
         qs = f"?lang={lang}" if lang != "zh-CN" else ""
         for href, text in pages:
             nav_items += f'<a href="{href}{qs}" class="nav-link">{text}</a>'
-        # 语言切换（循环: zh-CN → en → fr → zh-CN）
-        lang_cycle = {"zh-CN": "en", "en": "fr", "fr": "zh-CN"}
-        other = lang_cycle.get(lang, "zh-CN")
+        # 语言切换：下拉选择框
         lang_labels = {"zh-CN": "🇨🇳 中文", "en": "🇬🇧 English", "fr": "🇫🇷 Français"}
-        other_label = lang_labels.get(other, "🇨🇳 中文")
-        lang_switch = f'<a href="?lang={other}" class="nav-link lang-switch" style="margin-left:auto;font-size:12px">{other_label}</a>'
+        lang_options_html = "".join(
+            f'<option value="{k}"{" selected" if k == lang else ""}>{v}</option>'
+            for k, v in lang_labels.items()
+        )
+        lang_switch = f'<select onchange="window.location.href=\'?lang=\'+this.value" class="lang-select" style="margin-left:auto;font-size:12px">{lang_options_html}</select>'
         
-        html_lang = lang if lang in ("en", "zh-CN", "fr") else "zh-CN"
+        html_lang = lang if lang in LANGUAGES else "zh-CN"
         site_name = t(lang, "page_title")
         return f"""<!DOCTYPE html>
         <html lang="{html_lang}">
