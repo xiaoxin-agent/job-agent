@@ -2276,21 +2276,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                                 for proj in plan.get("projects", []):
                                     if any(s.lower() in task_text.lower() for s in proj.get("skills",[])):
                                         related_proj_html += '<div class="td-project-item">\U0001f4a1 <strong>' + proj.get("name","") + '</strong>：' + proj.get("description","") + '</div>'
-                                    # Store detail data as encoded JSON data attributes
-                                    detail_obj = {
-                                        "task": task_text,
-                                        "focus": focus,
-                                        "week": week_num,
-                                        "resources_html": related_res_html,
-                                        "projects_html": related_proj_html,
-                                        "advice_text": task_tip,
-                                        "has_quiz": True
-                                    }
-                                    detail_json = json.dumps(detail_obj, ensure_ascii=False)
-                                    detail_b64 = base64.b64encode(detail_json.encode()).decode()
-                                    disp = task_text[:14] + "..." if len(task_text) > 14 else task_text
-                                    cb_checked = "checked" if is_done else ""
-                                    cb_id = f"cb-{job_id}-{tid}"
+                                # Store detail data as encoded JSON data attributes
+                                detail_obj = {
+                                    "task": task_text,
+                                    "focus": focus,
+                                    "week": week_num,
+                                    "resources_html": related_res_html,
+                                    "projects_html": related_proj_html,
+                                    "advice_text": task_tip,
+                                    "has_quiz": True
+                                }
+                                detail_json = json.dumps(detail_obj, ensure_ascii=False)
+                                detail_b64 = base64.b64encode(detail_json.encode()).decode()
+                                disp = task_text[:14] + "..." if len(task_text) > 14 else task_text
+                                cb_checked = "checked" if is_done else ""
+                                cb_id = f"cb-{job_id}-{tid}"
                                 tasks_for_day += f'''
                                     <div class="cal-task-row">
                                         <input type="checkbox" class="cal-task-cb" id="{cb_id}" data-jobid="{job_id}" data-taskid="{tid}" {cb_checked}>
