@@ -1549,7 +1549,9 @@ class JobAgent:
 
         # LinkedIn requires Playwright (headless browser) — curl gets CAPTCHA'd
         if 'linkedin.com/jobs' in url.lower():
-            html = self._fetch_linkedin_with_playwright(url)
+            # Strip tracking params — LinkedIn redirects to login with them
+            clean_url = re.sub(r'\?.*', '', url).rstrip('/') + '/'
+            html = self._fetch_linkedin_with_playwright(clean_url)
             if not html:
                 return result
         else:
