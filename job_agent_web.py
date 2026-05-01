@@ -4502,7 +4502,7 @@ loadResume();
             f'<option value="{k}"{" selected" if k == lang else ""}>{v}</option>'
             for k, v in lang_labels.items()
         )
-        lang_switch = f'<select onchange="window.location.href=\'?lang=\'+this.value" class="lang-select" style="margin-left:auto;font-size:12px">{lang_options_html}</select>'
+        lang_switch = f'<select onchange="window.location.href=\'?lang=\'+this.value" class="lang-select" style="margin-left:auto;font-size:12px;border:none;background:none;outline:none;cursor:pointer;color:#1a73e8">{lang_options_html}</select>'
         
         html_lang = lang if lang in LANGUAGES else "zh-CN"
         site_name = t(lang, "page_title")
