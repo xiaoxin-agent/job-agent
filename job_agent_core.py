@@ -1540,22 +1540,32 @@ class JobAgent:
         Uses a plugin-style site adapter system. Each site has its own extractor
         in sites/<name>.py. Falls back to generic extraction for unrecognized URLs.
         
+        For LinkedIn, uses Playwright (headless Chromium) because LinkedIn blocks
+        curl/requests-based fetchers with CAPTCHA.
+        
         keep_html=True: 保留描述中的HTML格式标签（用于保存等场景）
         """
         result = {"title": "", "company": "", "location": "", "description": "", "job_type": "", "url": url}
-        try:
-            from curl_cffi import requests
-            resp = requests.get(url, impersonate='chrome120', timeout=20)
-        except:
-            try:
-                resp = requests.get(url, timeout=20)
-            except Exception as e:
+
+        # LinkedIn requires Playwright (headless browser) — curl gets CAPTCHA'd
+        if 'linkedin.com/jobs' in url.lower():
+            html = self._fetch_linkedin_with_playwright(url)
+            if not html:
                 return result
+        else:
+            try:
+                from curl_cffi import requests
+                resp = requests.get(url, impersonate='chrome120', timeout=20)
+            except:
+                try:
+                    resp = requests.get(url, timeout=20)
+                except Exception as e:
+                    return result
 
-        if resp.status_code != 200:
-            return result
+            if resp.status_code != 200:
+                return result
+            html = resp.text
 
-        html = resp.text
 
         # Route to site-specific adapter if available
         from sites.registry import get_adapter
@@ -1585,6 +1595,36 @@ class JobAgent:
             except:
                 pass
         return result
+
+    @staticmethod
+    def _fetch_linkedin_with_playwright(url: str) -> str:
+        """使用 Playwright 渲染 LinkedIn 职位页面，返回 HTML。"""
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            logger.warning("playwright not installed, cannot fetch LinkedIn jobs")
+            return ""
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+                )
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                )
+                context.add_init_script(
+                    """Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"""
+                )
+                page = context.new_page()
+                page.goto(url, wait_until='domcontentloaded', timeout=20000)
+                page.wait_for_timeout(3000)  # Let LinkedIn render
+                html = page.content()
+                browser.close()
+                return html
+        except Exception as e:
+            logger.warning(f"Playwright fetch failed for {url}: {e}")
+            return ""
 
     def _extract_jsonld_company(self, jd: dict) -> str:
         """从JSON-LD提取公司名"""

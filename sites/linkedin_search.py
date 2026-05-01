@@ -1,384 +1,240 @@
 """
-LinkedIn job search via LinkedIn's public job search page.
+LinkedIn job search via DuckDuckGo (site:linkedin.com/jobs).
 
-Uses curl_cffi with impersonation. LinkedIn uses Cloudflare, so success
-depends on the impersonation profile working. Falls back gracefully.
+LinkedIn blocks non-browser traffic directly, but DuckDuckGo indexes
+LinkedIn job listings and can crawl them freely. This is the most
+reliable free method to find LinkedIn jobs without authentication.
 
 Strategy:
-  1. Try direct LinkedIn job search page with curl_cffi
-  2. Extract embedded job data from the page HTML
+  1. Search DuckDuckGo with "site:linkedin.com/jobs" + keywords + location
+  2. Parse organic results (title, URL, snippet with company/location)
+  3. Optionally enrich via linkedin.py extract() when job detail page is visited
 
-Reference search URL:
-  https://www.linkedin.com/jobs/search/?keywords=Cloud+Engineer&location=Toronto
+Reference:
+  https://html.duckduckgo.com/html/?q=site:linkedin.com/jobs+Software+Engineer+Toronto
 """
 
 from typing import List, Dict, Optional
 import re
-import json
 import logging
 from datetime import datetime
-
-from curl_cffi import requests
+from urllib.parse import quote_plus, unquote
 
 logger = logging.getLogger(__name__)
 
 # Headers mimicking a normal browser
-_BASE_HEADERS = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
-    "DNT": "1",
-    "Connection": "keep-alive",
 }
 
-# Try multiple impersonate versions in order
-_IMPERSONATE_VERSIONS = ["chrome124", "chrome123", "chrome120", "chrome110", "safari17_0"]
+# DuckDuckGo HTML endpoint
+_DDG_URL = "https://html.duckduckgo.com/html/"
 
 
 def search(keywords: List[str], location: str = "", max_results: int = 10) -> List[Dict]:
     """
-    Search LinkedIn jobs.
+    Search LinkedIn jobs via DuckDuckGo.
 
     Args:
-        keywords: List of search keywords
-        location: Job location string (e.g. "Toronto", "Remote")
-        max_results: Maximum number of results to return
+        keywords: Search terms (e.g. ["Software Engineer"])
+        location: Location string (e.g. "Toronto")
+        max_results: Max jobs to return
 
     Returns:
-        List of job dicts with keys: title, company, location, description, url, source, date
+        List of job dicts matching the standard format:
+        {title, company, location, description, url, source, date, job_type}
     """
-    query = "+".join(keywords) if keywords else "software"
-    url = _build_search_url(query, location)
-
-    html = _fetch(url)
-    if not html:
+    if not keywords:
         return []
 
-    jobs = _parse_jobs(html, query, location)
-    return jobs[:max_results]
-
-
-def extract(html: str, url: str) -> Dict[str, str]:
-    """
-    Extract job details from a LinkedIn job page HTML.
-    Adapter interface for registry.
-    """
-    import sites.linkedin as linkedin_extract
-    return linkedin_extract.extract(html, url)
-
-
-def _build_search_url(query: str, location: str) -> str:
-    """Build LinkedIn job search URL."""
-    url = "https://www.linkedin.com/jobs/search/"
-    params = {"keywords": query}
+    query = "site:linkedin.com/jobs " + " ".join(keywords)
     if location:
-        params["location"] = location
-    params["trk"] = "public_jobs_jobs-search-bar_search-submit"
-    # We'll send it as a regular URL with query params
-    qs = "&".join(f"{k}={requests.utils.quote(str(v))}" for k, v in params.items())
-    return f"{url}?{qs}"
+        query += " " + location
+
+    results = _search_ddg(query, max_results)
+    return results
 
 
-def _fetch(url: str) -> Optional[str]:
-    """
-    Fetch LinkedIn jobs page. Tries multiple impersonation profiles.
+def _search_ddg(query: str, max_results: int) -> List[Dict]:
+    """Search DuckDuckGo and parse organic results."""
+    import urllib.request
 
-    Returns:
-        HTML text on success, None on failure.
-    """
-    session = requests.Session()
-    session.headers.update(_BASE_HEADERS)
+    url = _DDG_URL + "?q=" + quote_plus(query)
 
-    # First hit homepage to establish cookies
+    req = urllib.request.Request(url, headers=_HEADERS)
+    jobs = []
+
     try:
-        resp = session.get("https://www.linkedin.com/", impersonate="chrome124", timeout=15)
-        logger.debug(f"LinkedIn home: status={resp.status_code}, cookies={len(session.cookies)}")
+        resp = urllib.request.urlopen(req, timeout=15)
+        html = resp.read().decode("utf-8", errors="replace")
     except Exception as e:
-        logger.warning(f"LinkedIn home failed: {e}")
-
-    # Now try the jobs search page with different impersonation profiles
-    for version in _IMPERSONATE_VERSIONS:
-        try:
-            resp = session.get(url, impersonate=version, timeout=20)
-            if resp.status_code == 200:
-                text = resp.text
-
-                # Check for Cloudflare / challenge
-                txt_lower = text.lower()
-                if "challenge" in txt_lower[:3000] or "captcha" in txt_lower[:3000]:
-                    logger.debug(f"LinkedIn blocked with {version} (challenge)")
-                    continue
-
-                # Check if we got actual content (not just login page)
-                # LinkedIn without auth still serves job listings on the search page
-                if len(text) > 50000 and _has_job_data(text):
-                    logger.info(f"LinkedIn search succeeded with {version}")
-                    return text
-
-                logger.debug(f"LinkedIn search with {version}: no job data in response")
-        except Exception as e:
-            logger.debug(f"LinkedIn search with {version} failed: {e}")
-            continue
-
-    return None
-
-
-def _has_job_data(html: str) -> bool:
-    """Check if the HTML contains job listing data."""
-    # Look for LinkedIn's job card structure or JSON data
-    if 'data-tracking-control-name="public_jobs_job-result-card"' in html:
-        return True
-    if '"baseSearchUrl"' in html:
-        return True
-    if 'jobCardViewModel' in html or 'job-search-result-card' in html:
-        return True
-    # Fallback: check for title/company patterns
-    return bool(re.search(r'class="[^"]*job-card[^"]*"', html))
-
-
-def _parse_jobs(html: str, query: str, location: str) -> List[Dict]:
-    """
-    Parse LinkedIn job listing HTML.
-
-    LinkedIn embeds job data in several ways:
-    1. window.__INITIAL_STATE__ JSON (sometimes present)
-    2. JSON-LD script tags
-    3. Job card HTML elements
-    """
-    jobs = []
-
-    # Strategy 1: Try __INITIAL_STATE__ if present
-    jobs = _parse_from_initial_state(html)
-    if jobs:
+        logger.warning(f"DuckDuckGo search failed: {e}")
         return jobs
 
-    # Strategy 2: Try JSON-LD (sometimes on search pages)
-    jobs = _parse_from_jsonld(html)
-    if jobs:
-        return jobs
-
-    # Strategy 3: Parse from inline script data
-    jobs = _parse_from_inline_data(html)
-    if jobs:
-        return jobs
-
-    # Strategy 4: Parse from HTML job cards (fallback)
-    jobs = _parse_from_html(html)
-    return jobs
-
-
-def _parse_from_initial_state(html: str) -> List[Dict]:
-    """Extract jobs from window.__INITIAL_STATE__ JSON blob."""
-    jobs = []
-    m = re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.+?\});', html, re.DOTALL)
-    if not m:
-        return jobs
-
-    try:
-        data = json.loads(m.group(1))
-        # Navigate to job search results
-        # Structure varies; look for common paths
-        for key in ('jobSearch', 'jobs', 'searchResults', 'results'):
-            section = data.get(key, {})
-            if isinstance(section, dict):
-                elements = section.get('elements', section.get('items', section.get('results', [])))
-                if isinstance(elements, list):
-                    for item in elements:
-                        if isinstance(item, dict):
-                            job = _extract_job_from_item(item)
-                            if job:
-                                job['source'] = 'LinkedIn'
-                                jobs.append(job)
-    except (json.JSONDecodeError, AttributeError):
-        pass
-    return jobs
-
-
-def _parse_from_jsonld(html: str) -> List[Dict]:
-    """Extract jobs from JSON-LD script tags."""
-    jobs = []
-    jsonlds = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html, re.DOTALL
+    # Parse result blocks
+    # Each result: <div class="result results_links ..."> ... <div class="links_main links_deep result__body"> ... </div></div></div>
+    blocks = re.findall(
+        r'<div class="result results_links[^>]*>.*?<div class="links_main links_deep result__body">(.*?)</div>\s*</div>\s*</div>',
+        html,
+        re.DOTALL,
     )
-    for raw in jsonlds:
-        try:
-            data = json.loads(raw)
-            items = data if isinstance(data, list) else [data]
-            for item in items:
-                if isinstance(item, dict) and item.get('@type') == 'JobPosting':
-                    job = {
-                        'title': item.get('title', ''),
-                        'company': '',
-                        'location': '',
-                        'description': item.get('description', ''),
-                        'url': item.get('url', ''),
-                        'source': 'LinkedIn',
-                        'date': item.get('datePosted', ''),
-                    }
-                    org = item.get('hiringOrganization', {})
-                    if isinstance(org, dict):
-                        job['company'] = org.get('name', '')
-                    loc = item.get('jobLocation', {})
-                    if isinstance(loc, dict):
-                        addr = loc.get('address', {})
-                        if isinstance(addr, dict):
-                            parts = [p for p in [addr.get('addressLocality', ''),
-                                                  addr.get('addressRegion', ''),
-                                                  addr.get('addressCountry', '')] if p]
-                            job['location'] = ', '.join(parts)
-                    if job['title'] or job['company']:
-                        job['description'] = re.sub(r'<[^>]+>', ' ', job['description']).strip()[:2000]
-                        jobs.append(job)
-        except (json.JSONDecodeError, AttributeError):
-            continue
-    return jobs
 
-
-def _parse_from_inline_data(html: str) -> List[Dict]:
-    """Extract jobs from inline script data attributes."""
-    jobs = []
-
-    # Look for data-delayed-job-cards or similar data attributes
-    cards = re.findall(
-        r'<li[^>]*class=["\'][^"\']*job-result-card[^"\']*["\'][^>]*>(.*?)</li>',
-        html, re.DOTALL
-    )
-    if not cards:
-        cards = re.findall(
-            r'<div[^>]*data-job-id[=][\"\']([^\"\']+)[\"\']',
-            html
-        )
-        if cards:
-            # We have job IDs but not the full data
-            logger.debug(f"Found {len(cards)} job IDs (need full page render)")
-            return jobs
-
-    for card_html in cards[:20]:
-        title = _extract_attr(card_html, 'data-job-title')
-        if not title:
-            title = _extract_text(card_html, 'h3') or _extract_text(card_html, 'a[class*=title]')
-        company = _extract_attr(card_html, 'data-company-name')
-        if not company:
-            company = _extract_text(card_html, 'h4') or _extract_text(card_html, '[class*=company]')
-        location = _extract_text(card_html, '[class*=location]')
-        url_m = re.search(r'href=["\']([^"\']+/jobs/view/\d+[^"\']*)', card_html)
-        url = url_m.group(1) if url_m else ''
-        if url and not url.startswith('http'):
-            url = 'https://www.linkedin.com' + url
-
-        if title:
-            jobs.append({
-                'title': title.strip(),
-                'company': company.strip() if company else '',
-                'location': location.strip() if location else '',
-                'description': '',
-                'url': url,
-                'source': 'LinkedIn',
-                'date': '',
-            })
-
-    return jobs
-
-
-def _parse_from_html(html: str) -> List[Dict]:
-    """Fallback: parse job info from HTML text patterns."""
-    jobs = []
-
-    # Try to find job data in script tags with JSON content
-    scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
-    for script in scripts:
-        if len(script) < 100:
-            continue
-        # Look for JSON with job-related keys
-        for key in ('title', 'company', 'jobTitle'):
-            if key in script[:500]:
-                try:
-                    # Try to extract JSON objects
-                    objs = re.findall(r'\{(?:[^{}]|(?:\{[^{}]*\}))*\}', script)
-                    for obj_str in objs:
-                        if 'title' in obj_str and 'company' in obj_str:
-                            data = json.loads(obj_str)
-                            if isinstance(data, dict) and 'title' in data and 'company' in data:
-                                job = {
-                                    'title': data.get('title', ''),
-                                    'company': data.get('company', '') or '',
-                                    'location': data.get('location', '') or '',
-                                    'description': data.get('description', '') or '',
-                                    'url': data.get('url', '') or '',
-                                    'source': 'LinkedIn',
-                                    'date': data.get('datePosted', '') or '',
-                                }
-                                if job['title'] and job['company']:
-                                    jobs.append(job)
-                except (json.JSONDecodeError, AttributeError):
-                    continue
+    for block in blocks:
+        if len(jobs) >= max_results:
             break
 
+        # Extract title + URL
+        a_match = re.search(
+            r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', block, re.DOTALL
+        )
+        if not a_match:
+            continue
+
+        raw_url = a_match.group(1)
+        title = re.sub(r"<[^>]+>", "", a_match.group(2)).strip()
+
+        # Unobfuscate DuckDuckGo redirect URL
+        job_url = _resolve_ddg_url(raw_url)
+
+        # Skip non-job pages (LinkedIn search pages, not individual postings)
+        if not _looks_like_job_page(job_url, title):
+            continue
+
+        # Extract snippet (often contains company name, location)
+        snippet_match = re.search(
+            r'class="result__snippet"[^>]*>(.*?)</a>', block, re.DOTALL
+        )
+        snippet = ""
+        if snippet_match:
+            snippet = re.sub(r"<[^>]+>", "", snippet_match.group(1)).strip()
+            snippet = _clean_html_entities(snippet)
+
+        # Parse company and location from title and URL
+        company = _extract_company(job_url, title, snippet)
+        location = _extract_location(title, snippet)
+
+        job = {
+            "title": title,
+            "company": company,
+            "location": location,
+            "description": snippet,
+            "url": job_url,
+            "source": "LinkedIn",
+            "date": "",
+            "job_type": "",
+        }
+        jobs.append(job)
+
     return jobs
 
 
-def _extract_attr(html: str, attr: str) -> Optional[str]:
-    """Extract a data-* attribute value from HTML snippet."""
-    m = re.search(rf'{re.escape(attr)}=["\']([^"\']+)["\']', html)
-    return m.group(1) if m else None
+def _resolve_ddg_url(raw_url: str) -> str:
+    """Extract the actual URL from DuckDuckGo's redirect link."""
+    # DDG format: //duckduckgo.com/l/?uddg=https%3A%2F%2F...&rut=...
+    m = re.search(r"uddg=([^&]+)", raw_url)
+    if m:
+        return unquote(m.group(1))
+    # Direct link fallback
+    return raw_url
 
 
-def _extract_text(html: str, selector: str) -> Optional[str]:
-    """Simple text extraction from HTML using tag/class patterns."""
-    # Handle common patterns: <tag>text</tag>, <tag class="...">text</tag>
-    # selector can be: 'h3', 'h4', '[class*=company]', 'a[class*=title]'
-    tag_match = re.match(r'(\w+)', selector)
-    tag = tag_match.group(1) if tag_match else 'div'
-    class_pattern = ''
-    cls_m = re.search(r'class\*=\s*["\']([^"\']+)["\']', selector)
-    if cls_m:
-        class_pattern = rf'[^>]*class=["\'][^"\']*{re.escape(cls_m.group(1))}[^"\']*["\']'
+def _looks_like_job_page(url: str, title: str) -> bool:
+    """Check if a LinkedIn URL looks like an individual job posting."""
+    url_lower = url.lower()
 
-    pattern = rf'<{tag}{class_pattern}[^>]*>([^<]+)</{tag}>'
-    m = re.search(pattern, html)
-    return m.group(1).strip() if m else None
+    # Must be LinkedIn
+    if "linkedin" not in url_lower:
+        return False
+
+    # Skip LinkedIn search pages / company pages
+    skip_patterns = [
+        "linkedin.com/jobs/",
+        "linkedin.com/company/",
+        "linkedin.com/in/",
+        "linkedin.com/search",
+        "linkedin.com/signup",
+        "linkedin.com/login",
+        "linkedin.com/feed",
+    ]
+
+    # Check if it's a search results page (ends with /jobs/ or has /jobs/ without /view/)
+    if "linkedin.com/jobs/view/" in url_lower or "linkedin.com/jobs/collections/" in url_lower:
+        return True
+
+    # Also accept URLs with /jobs/ followed by a specific job ID
+    if re.search(r"linkedin\.com/jobs/\d", url_lower):
+        return True
+
+    # If it has /jobs/ in it and the title looks like a job title, accept it
+    if "linkedin.com/jobs" in url_lower:
+        # Filter out generic "X jobs in Y" titles
+        generic_patterns = [
+            r"jobs in ",
+            r"jobs near ",
+            r"hiring\s*$",
+            r"\d+.*jobs",
+            r"job search",
+            r"top companies",
+            r"find a job",
+        ]
+        for pat in generic_patterns:
+            if re.search(pat, title.lower()):
+                return False
+        return True
+
+    return False
 
 
-def _extract_job_from_item(item: Dict) -> Optional[Dict]:
-    """Extract job info from a parsed JSON item."""
-    if 'title' not in item and 'jobTitle' not in item:
-        return None
+def _extract_company(url: str, title: str, snippet: str) -> str:
+    """Extract company name from LinkedIn URL or snippet."""
+    # Try LinkedIn URL pattern: linkedin.com/jobs/view/1234-at-CompanyName
+    m = re.search(r"linkedin\.com/jobs/view/\d+-at-([^/?&]+)", url.lower())
+    if m:
+        return m.group(1).replace("-", " ").title().strip()
 
-    title = item.get('title', item.get('jobTitle', ''))
-    # Usually these items have nested company info
-    company_data = item.get('company', item.get('hiringOrganization', {}))
-    if isinstance(company_data, dict):
-        company = company_data.get('name', '')
-    elif isinstance(company_data, str):
-        company = company_data
-    else:
-        company = ''
+    # Try from URL: linkedin.com/jobs/company-name/jobs/
+    m = re.search(r"linkedin\.com/jobs/([^/]+)/jobs/?", url.lower())
+    if m:
+        return m.group(1).replace("-", " ").title().strip()
 
-    location_data = item.get('location', item.get('formattedLocation', ''))
-    if isinstance(location_data, dict):
-        location = location_data.get('name', location_data.get('text', ''))
-    else:
-        location = str(location_data)
+    # Try snippet for patterns like "at CompanyName" or "CompanyName is hiring"
+    m = re.search(r"\b(?:at|@)\s+([A-Z][A-Za-z0-9\s.&]+?)(?:\s+is\s+hiring|\s+-\s+|\s+\|)", snippet)
+    if m:
+        return m.group(1).strip()
 
-    url = item.get('url', item.get('jobUrl', item.get('applyUrl', item.get('externalUrl', ''))))
-    if url and not url.startswith('http'):
-        url = 'https://www.linkedin.com' + url
+    return "LinkedIn"
 
-    return {
-        'title': title,
-        'company': company,
-        'location': location,
-        'description': item.get('description', item.get('snippet', '')),
-        'url': url,
-        'source': 'LinkedIn',
-        'date': item.get('datePosted', item.get('postDate', '')),
-    }
+
+def _extract_location(title: str, snippet: str) -> str:
+    """Extract location from title or snippet."""
+    # Many LinkedIn job titles end with "- Location"
+    m = re.search(r"\s+[-–]\s+([A-Za-z\s,]+(?:Ontario|Canada|ON|USA|United States))$", title)
+    if m:
+        return m.group(1).strip()
+
+    # Try snippet for location
+    m = re.search(r"([A-Z][a-z]+(?:\s*,\s*[A-Z]{2})?)\s*[-–]\s*\d", snippet[:200])
+    if m:
+        return m.group(1).strip()
+
+    # Try common location patterns in snippet
+    m = re.search(r"\b(Toronto|Vancouver|Montreal|Ottawa|Calgary|Waterloo|Kitchener|Remote|San Francisco|New York|Seattle|Austin|Boston|Chicago|Los Angeles|Palo Alto|Sunnyvale|Mountain View)[^.,]*", snippet)
+    if m:
+        return m.group(0).strip()
+
+    return ""
+
+
+def _clean_html_entities(text: str) -> str:
+    """Clean HTML entities from text."""
+    text = text.replace("&#x27;", "'")
+    text = text.replace("&#39;", "'")
+    text = text.replace("&amp;", "&")
+    text = text.replace("&lt;", "<")
+    text = text.replace("&gt;", ">")
+    text = text.replace("&quot;", '"')
+    text = text.replace("&#xA0;", " ")
+    text = text.replace("&#160;", " ")
+    return text
