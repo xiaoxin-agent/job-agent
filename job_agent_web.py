@@ -243,6 +243,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_add_job": "📤 Add Job",
         "saved_text": "✅ Saved",
         "btn_preview": "👁 Preview",
+        "btn_download": "📥 Download",
         "btn_edit": "✏ Edit",
         "btn_optimize": "🎯 Optimize",
         "btn_link_resume": "📎 Link Resume",
@@ -451,6 +452,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_add_job": "📤 添加职位",
         "saved_text": "✅ 已保存",
         "btn_preview": "👁 预览",
+        "btn_download": "📥 下载",
         "btn_edit": "✏ 编辑",
         "btn_optimize": "🎯 优化",
         "btn_link_resume": "📎 关联简历",
@@ -688,6 +690,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_add_job": "📤 Ajouter un poste",
         "saved_text": "✅ Enregistré",
         "btn_preview": "👁 Aperçu",
+        "btn_download": "📥 Télécharger",
         "btn_edit": "✏ Modifier",
         "btn_optimize": "🎯 Optimiser",
         "btn_link_resume": "📎 Lier CV",
@@ -4073,6 +4076,8 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
         <script>
         var RESUME_EMPTY = '{t(lang, 'resume_empty')}';
         var RESUME_DELETE = '{t(lang, 'resume_delete')}';
+        var RESUME_PREVIEW = '{t(lang, 'btn_preview')}';
+        var RESUME_DOWNLOAD = '{t(lang, 'btn_download')}';
         async function loadResumes() {{
             var resp = await (await fetch('/api/list_resumes')).json();
             var list = document.getElementById('resume-list');
@@ -4085,8 +4090,8 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
                 h += '<div class="resume-card">';
                 h += '<div><span class="resume-name">\U0001F4C4 ' + r.name + '</span><br><span class="resume-date">' + r.created_at + '</span></div>';
                 h += '<div class="resume-actions">';
-                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-preview-resume">\U0001F441\u200D\U0001F5E8\uFE0F \u9884\u89C8</button>';
-                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-download-resume" style="margin-left:4px">\U0001F4E5 \u4E0B\u8F7D</button>';
+                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-preview-resume">' + RESUME_PREVIEW + '</button>';
+                h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-download-resume" style="margin-left:4px">' + RESUME_DOWNLOAD + '</button>';
                 h += '<button data-resume-id="' + r.id + '" class="btn btn-small btn-delete btn-del-resume" style="margin-left:4px">' + RESUME_DELETE + '</button>';
                 h += '</div></div>';
             }});
