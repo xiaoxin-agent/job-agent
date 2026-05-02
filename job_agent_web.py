@@ -4493,7 +4493,7 @@ loadResume();
             ("/learn_plan", t(lang, "nav_learn_calendar")),
         ]
         # Persist lang in nav links so switching pages doesn't lose language
-        qs = f"?lang={lang}" if lang != "zh-CN" else ""
+        qs = f"?lang={lang}"
         for href, text in pages:
             nav_items += f'<a href="{href}{qs}" class="nav-link">{text}</a>'
         # 语言切换：下拉选择框
