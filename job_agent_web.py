@@ -1442,6 +1442,33 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 if (lpModal) lpModal.remove();
                 return;
             }}
+            // Learn plan regenerate button
+            var regenBtn = e.target.closest('#btn-regen-plan');
+            if (regenBtn) {{
+                var regenModal = regenBtn.closest('#learn-plan-modal');
+                if (!regenModal) return;
+                var jobIdRegen = regenModal.getAttribute('data-learn-jobid');
+                if (!jobIdRegen) return;
+                var confirmMsg = {{'en':'This will discard progress. Regenerate?','zh-CN':'确定重新生成学习计划？（将丢弃当前进度）','fr':'Cela supprimera la progression. Regénérer ?'}}[_lang] || '确定重新生成？';
+                if (!confirm(confirmMsg)) return;
+                var regenBtnEl = document.querySelector('.learn-plan-btn[data-learn-jobid="' + jobIdRegen + '"]');
+                if (regenBtnEl) {{ regenBtnEl.textContent = _loading_text; regenBtnEl.disabled = true; }}
+                regenModal.remove();
+                (function(jid, btnel) {{
+                    fetch('/api/learn_plan', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jid, lang: _lang, regenerate: true}})}})
+                    .then(function(r){{return r.json()}})
+                    .then(function(d){{
+                        if (!d.success) {{ alert(d.error || 'Regenerate failed'); return; }}
+                        if (btnel) {{ btnel.textContent = _btn_view_plan; btnel.disabled = false; }}
+                        renderLearnPlanModal(jid, d.plan, d.progress || {{}}, true);
+                    }})
+                    .catch(function(e){{
+                        if (btnel) {{ btnel.textContent = _btn_view_plan; btnel.disabled = false; }}
+                        alert('Regenerate failed: ' + e);
+                    }});
+                }})(jobIdRegen, regenBtnEl);
+                return;
+            }}
             var gapSpan = e.target.closest('.skill-gap-group');
             if (gapSpan) {{
                 var jobIdGap = gapSpan.getAttribute('data-gap-jobid') || '';
@@ -1509,7 +1536,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         btnEl.textContent = result.isSaved ? _btn_view_plan : _btn_generate_plan;
                         btnEl.disabled = false;
                     }}
-                    renderLearnPlanModal(jobId, result.plan, result.progress);
+                    renderLearnPlanModal(jobId, result.plan, result.progress, result.isSaved);
                 }})
                 .catch(function(e){{
                     if (btnEl) {{ btnEl.textContent = '\U0001f4da \u5b66\u4e60\u8ba1\u5212'; btnEl.disabled = false; }}
@@ -1531,7 +1558,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 }});
             }}
 
-                        function renderLearnPlanModal(jobId, plan, progress) {{
+                        function renderLearnPlanModal(jobId, plan, progress, isSaved) {{
                 var oldModal = document.getElementById('learn-plan-modal');
                 if (oldModal) oldModal.remove();
                 // Count total tasks
@@ -1552,7 +1579,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     }});
                 }}
                 var pct = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0;
-                var h = '<div id="learn-plan-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1002;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
+                var h = '<div id="learn-plan-modal" data-learn-jobid="' + jobId + '" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:1002;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">';
                 h += '<div style="background:#fff;border-radius:10px;padding:20px;max-width:630px;width:92%;max-height:88vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:15px;line-height:1.6">';
                 h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
                 h += '<h3 style="margin:0;font-size:15px">' + _learn_plan_modal_title + '</h3>';
@@ -1567,9 +1594,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     h += '<div id="learn-progress-bar-' + jobId + '" style="background:#4caf50;height:8px;width:' + pct + '%;border-radius:4px;transition:width 0.3s"></div></div></div>';
                 }}
 
-                // Action buttons: ical export
+                // Action buttons: ical export + regenerate
                 h += '<div style="margin-bottom:10px;display:flex;gap:6px">';
                 h += '<a href="/api/learn_plan_ical?job_id=' + encodeURIComponent(jobId) + '" download class="btn btn-small" style="font-size:11px;text-decoration:none">' + _learn_plan_export + '</a>';
+                if (isSaved) {{
+                    h += '<button id="btn-regen-plan" class="btn btn-small" style="font-size:11px;background:#ff9800;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer">' + _btn_regenerate + '</button>';
+                }}
                 h += '</div>';
 
                 // Focus skills
@@ -3586,6 +3616,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 return
 
             # POST: generate new plan
+            regenerate = data.get("regenerate", False)
             job_title = job.get("title", "")
             job_desc = job.get("description", "")
             company = job.get("company", "")
@@ -3607,8 +3638,13 @@ Do NOT use any other language in the output. The entire response must be in {lan
 
 ### ⚠️ 重要要求
 1. 每个 focus_skills 必须有至少 2 个推荐资源（resources），且必须提供真实的 url 链接（https 开头）
-2. 资源可以是慕课网、B站、YouTube、官方文档、GitHub 仓库、Coursera、Udemy 等真实存在的学习平台链接
-3. 实在找不到精确 URL 时，可以用搜索引擎搜索链接，例如 https://www.google.com/search?q=教程名
+2. **不要使用 Coursera 或需要付费/登录才能访问的课程平台链接**（这些链接大部分无法直接访问）。优先使用以下类型的免费资源：
+   - **YouTube 教程**（搜索链接：https://www.youtube.com/results?search_query=xxx+tutorial）
+   - **官方文档**（如 MDN、Python docs、Kubernetes.io 等）
+   - **GitHub 仓库**（如 awesome-xxx 项目）
+   - **免费博客/文章**（如 Medium、Dev.to、掘金、CSDN 等）
+   - **B站/慕课网**（中文用户）
+3. 实在找不到精确 URL 时，直接用 Google 搜索链接：https://www.google.com/search?q=教程名
 4. 每个资源必须包含 type、title、url、estimated_hours 四个字段，url 不能为空
 5. 每周安排 5 个工作日任务（周一至周五），周末不安排任务
 6. 每个任务必须包含 day_of_week 字段（1=周一，2=周二，3=周三，4=周四，5=周五）
@@ -3688,6 +3724,9 @@ Do NOT use any other language in the output. The entire response must be in {lan
             plan = j.loads(content)
             # 保存计划到职位数据
             job["learn_plan"] = plan
+            # 如果是重新生成，清除旧进度
+            if regenerate:
+                job.pop("learn_plan_progress", None)
             # 初始化进度：为每个周任务创建 task_id 并初始化为未完成
             progress = {}
             if plan.get("weekly_plan"):
