@@ -1405,27 +1405,26 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 base_s = s.split("_")[0] if "interviewing" in s else s
                 icon = labels_map.get(base_s, "●")
                 label_text = labels.get(base_s, base_s)
-                t = _fmt_time(h["timestamp"])
-                rows.append(f"<div class='tl-row'><span class='tl-icon'>{icon}</span><span class='tl-status'>{label_text}</span><span class='tl-time'>{t}</span></div>")
+                ft = _fmt_time(h["timestamp"])
+                rows.append(f"<div class='tl-row'><span class='tl-icon'>{icon}</span><span class='tl-status'>{label_text}</span><span class='tl-time'>{ft}</span></div>")
             # 面试详情（含备注）
             if interviews:
                 rows.append("<div class='tl-sep'>" + t(lang, "tl_interview_records") + "</div>")
                 for iv in interviews:
-                    t = _fmt_time(iv["date"])
+                    ft = _fmt_time(iv["date"])
                     note = ("<span class='tl-note'>" + iv["notes"] + "</span>") if iv.get("notes") else ""
                     round_label = t(lang, "tl_round").format(iv['round'])
-                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>{round_label}</span><span class='tl-time'>{t}</span>{note}</div>")
+                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>{round_label}</span><span class='tl-time'>{ft}</span>{note}</div>")
             return "<div class='tl-container'>" + "".join(rows) + "</div>"
 
         def _render_status_timeline(j):
-            """渲染状态变更时间线摘要（如 已申请3天前 → 面试第1轮 1天前 → 面试第2轮 2小时前）。"""
+            """渲染状态变更时间线摘要。"""
             history = j.get("status_history") or []
             interviews = j.get("interviews") or []
             if len(history) < 2 and len(interviews) < 2:
                 return ""
             labels_map = {"saved": "📌", "applied": "📄", "interviewing": "💬", "rejected": "❌", "offer": "🎉"}
             parts = []
-            # 从 status_history 取状态变更（interviewing 只取第一次）
             seen = set()
             for h in history:
                 s = h.get("status", "")
@@ -1434,17 +1433,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     seen.add(base_s)
                     icon = labels_map.get(base_s, "●")
                     label_text = labels.get(base_s, base_s)
-                    t = _fmt_time(h["timestamp"])
-                    parts.append(icon + " " + label_text + (" " + t if t else ""))
-            # 如果有多轮面试，追加后续轮次
+                    ft = _fmt_time(h["timestamp"])
+                    parts.append(icon + " " + label_text + (" " + ft if ft else ""))
             if len(interviews) > 1:
                 for iv in interviews[1:]:
                     icon = labels_map["interviewing"]
-                    t = _fmt_time(iv["date"])
+                    ft = _fmt_time(iv["date"])
                     note = (" \"" + iv["notes"] + "\"") if iv.get("notes") else ""
                     round_label = t(lang, "tl_round").format(iv['round'])
-                    parts.append(f"{icon} {round_label}{note}{' '+t if t else ''}")
-            # 只显示最后 4 段
+                    parts.append(f"{icon} {round_label}{note}{' '+ft if ft else ''}")
             if len(parts) > 4:
                 parts = parts[-4:]
             return " → ".join(parts) if parts else ""
