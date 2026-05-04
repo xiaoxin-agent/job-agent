@@ -338,6 +338,15 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "status_save_error": "\u274c Save error: ",
         "status_export_failed": "Export failed: ",
         "status_export_error": "Export error: ",
+        # Timeline & interview
+        "interview_note_prompt": "Record notes for this round (optional):",
+        "tl_round": "Round {}",
+        "tl_detail": "▶ Details",
+        "tl_hide": "▼ Hide",
+        "tl_interview_records": "—— Interviews ——",
+        "just_now": "just now",
+        "time_m_ago": "{}min ago",
+        "time_h_ago": "{}hr ago",
     },
     "zh-CN": {
         "nav_home": "🏠 首页",
@@ -547,6 +556,15 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "status_save_error": "\u274c \u4fdd\u5b58\u51fa\u9519: ",
         "status_export_failed": "\u5bfc\u51fa\u5931\u8d25: ",
         "status_export_error": "\u5bfc\u51fa\u51fa\u9519: ",
+        # Timeline & interview
+        "interview_note_prompt": "\u8bb0\u5f55\u8fd9\u8f6e\u9762\u8bd5\u5907\u6ce8\uff08\u53ef\u9009\uff09:",
+        "tl_round": "\u7b2c{}轮",
+        "tl_detail": "\u25b6 \u8be6\u60c5",
+        "tl_hide": "\u25bc \u6536\u8d77",
+        "tl_interview_records": "\u2014\u2014 \u9762\u8bd5\u8bb0\u5f55 \u2014\u2014",
+        "just_now": "\u521a\u521a",
+        "time_m_ago": "{} \u5206\u949f\u524d",
+        "time_h_ago": "{} \u5c0f\u65f6\u524d",
     },
     "fr": {
         # Navigation
@@ -759,6 +777,15 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "status_save_error": "\u274c Erreur enreg.: ",
         "status_export_failed": "\u00c9chec export: ",
         "status_export_error": "Erreur export: ",
+        # Timeline & interview
+        "interview_note_prompt": "Notes pour ce tour (optionnel) :",
+        "tl_round": "Tour {}",
+        "tl_detail": "\u25b6 D\u00e9tails",
+        "tl_hide": "\u25bc Masquer",
+        "tl_interview_records": "\u2014\u2014 Entretiens \u2014\u2014",
+        "just_now": "\u00e0 l\u2019instant",
+        "time_m_ago": "il y a {} min",
+        "time_h_ago": "il y a {} h",
 
     },
 
@@ -1350,9 +1377,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 delta = now - d
                 if delta < datetime.timedelta(hours=1):
                     mins = int(delta.total_seconds() / 60)
-                    return f"{mins}分钟前" if mins else "刚刚"
+                    return t(lang, "just_now") if mins == 0 else t(lang, "time_m_ago").format(mins)
                 elif delta < datetime.timedelta(days=1):
-                    return f"{int(delta.total_seconds() / 3600)}小时前"
+                    return t(lang, "time_h_ago").format(int(delta.total_seconds() / 3600))
                 else:
                     return d.strftime("%m-%d %H:%M")
             except:
@@ -1382,11 +1409,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 rows.append(f"<div class='tl-row'><span class='tl-icon'>{icon}</span><span class='tl-status'>{label_text}</span><span class='tl-time'>{t}</span></div>")
             # 面试详情（含备注）
             if interviews:
-                rows.append("<div class='tl-sep'>—— 面试记录 ——</div>")
+                rows.append("<div class='tl-sep'>" + t(lang, "tl_interview_records") + "</div>")
                 for iv in interviews:
                     t = _fmt_time(iv["date"])
                     note = ("<span class='tl-note'>" + iv["notes"] + "</span>") if iv.get("notes") else ""
-                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>第{iv['round']}轮</span><span class='tl-time'>{t}</span>{note}</div>")
+                    round_label = t(lang, "tl_round").format(iv['round'])
+                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>{round_label}</span><span class='tl-time'>{t}</span>{note}</div>")
             return "<div class='tl-container'>" + "".join(rows) + "</div>"
 
         def _render_status_timeline(j):
@@ -1414,7 +1442,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     icon = labels_map["interviewing"]
                     t = _fmt_time(iv["date"])
                     note = (" \"" + iv["notes"] + "\"") if iv.get("notes") else ""
-                    parts.append(f"{icon} 第{iv['round']}轮{note}{' '+t if t else ''}")
+                    round_label = t(lang, "tl_round").format(iv['round'])
+                    parts.append(f"{icon} {round_label}{note}{' '+t if t else ''}")
             # 只显示最后 4 段
             if len(parts) > 4:
                 parts = parts[-4:]
@@ -1422,6 +1451,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
         saved_to_tracker = t(lang, "saved_to_tracker")
         applied_text = t(lang, "applied")
+        tl_detail_text = t(lang, "tl_detail")
+        tl_hide_text = t(lang, "tl_hide")
         jobs_html = ""
         if not jobs:
             jobs_html = f'<p class="empty">{t(lang, "no_tracked")}</p>'
@@ -1448,7 +1479,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
                     <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
                 </div>
-                {('<div class="job-timeline" id="ttl-sum-'+j['id']+'" onclick="event.stopPropagation();toggleTimelineDetail(\''+j['id']+'\')">' + _render_status_timeline(j) + ' <span class="tl-expand-hint">▶ 详情</span></div>') if _render_status_timeline(j) else ''}
+                {('<div class="job-timeline" id="ttl-sum-'+j['id']+'" onclick="event.stopPropagation();toggleTimelineDetail(\''+j['id']+'\')">' + _render_status_timeline(j) + ' <span class="tl-expand-hint">' + tl_detail_text + '</span></div>') if _render_status_timeline(j) else ''}
                 {'<div class="job-timeline-detail" id="ttl-'+j['id']+'" style="display:none">' + _render_timeline_detail(j) + '</div>' if _render_timeline_detail(j) else ''}
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
@@ -1515,6 +1546,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _btn_assign = {json.dumps(t(lang, 'btn_assign'), ensure_ascii=False)};
         var _upload_new_resume = {json.dumps(t(lang, 'upload_new_resume'), ensure_ascii=False)};
         var _cancel = {json.dumps(t(lang, 'cancel'), ensure_ascii=False)};
+        var _tl_detail = {json.dumps(tl_detail_text, ensure_ascii=False)};
+        var _tl_hide = {json.dumps(tl_hide_text, ensure_ascii=False)};
         var _lang = {json.dumps(lang, ensure_ascii=False)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
@@ -1818,10 +1851,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if (!el || !sum) return;
             if (el.style.display === 'none') {{
                 el.style.display = 'block';
-                sum.innerHTML = sum.innerHTML.replace('▶ 详情', '▼ 收起');
+                sum.innerHTML = sum.innerHTML.replace(_tl_detail, _tl_hide);
             }} else {{
                 el.style.display = 'none';
-                sum.innerHTML = sum.innerHTML.replace('▼ 收起', '▶ 详情');
+                sum.innerHTML = sum.innerHTML.replace(_tl_hide, _tl_detail);
             }}
         }}
         async function upd(id, st) {{
@@ -1835,7 +1868,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             .then(function() {{ location.reload(); }});
         }}
         async function recordInterview(jobId) {{
-            var notes = prompt('\u8bb0\u5f55\u8fd9\u8f6e\u9762\u8bd5\u5907\u6ce8\uff08\u53ef\u9009\uff09:','')||'';
+            var _interview_note_prompt = {json.dumps(t(lang, 'interview_note_prompt'), ensure_ascii=False)};
+            var notes = prompt(_interview_note_prompt,'')||'';
             await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'interviewing', notes:notes}})}});
             location.reload();
         }}
