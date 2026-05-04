@@ -1365,6 +1365,30 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             history = j.get("status_history") or []
             return any(h.get("status") == "applied" for h in history)
 
+        def _render_timeline_detail(j):
+            """渲染完整状态变更详情（展开后显示，含面试备注）。"""
+            interviews = j.get("interviews") or []
+            history = j.get("status_history") or []
+            if not history and not interviews:
+                return ""
+            labels_map = {"saved": "📌", "applied": "📄", "interviewing": "💬", "rejected": "❌", "offer": "🎉"}
+            rows = []
+            for h in history:
+                s = h.get("status", "")
+                base_s = s.split("_")[0] if "interviewing" in s else s
+                icon = labels_map.get(base_s, "●")
+                label_text = labels.get(base_s, base_s)
+                t = _fmt_time(h["timestamp"])
+                rows.append(f"<div class='tl-row'><span class='tl-icon'>{icon}</span><span class='tl-status'>{label_text}</span><span class='tl-time'>{t}</span></div>")
+            # 面试详情（含备注）
+            if interviews:
+                rows.append("<div class='tl-sep'>—— 面试记录 ——</div>")
+                for iv in interviews:
+                    t = _fmt_time(iv["date"])
+                    note = ("<span class='tl-note'>" + iv["notes"] + "</span>") if iv.get("notes") else ""
+                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>第{iv['round']}轮</span><span class='tl-time'>{t}</span>{note}</div>")
+            return "<div class='tl-container'>" + "".join(rows) + "</div>"
+
         def _render_status_timeline(j):
             """渲染状态变更时间线摘要（如 已申请3天前 → 面试第1轮 1天前 → 面试第2轮 2小时前）。"""
             history = j.get("status_history") or []
@@ -1388,9 +1412,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if len(interviews) > 1:
                 for iv in interviews[1:]:
                     icon = labels_map["interviewing"]
-                    label_text = labels.get("interviewing", "面试")
                     t = _fmt_time(iv["date"])
-                    parts.append(f"{icon} 第{iv['round']}轮{t if t else ''}")
+                    note = (" \"" + iv["notes"] + "\"") if iv.get("notes") else ""
+                    parts.append(f"{icon} 第{iv['round']}轮{note}{' '+t if t else ''}")
             # 只显示最后 4 段
             if len(parts) > 4:
                 parts = parts[-4:]
@@ -1423,6 +1447,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <div class="job-desc-toggle">
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
                     <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
+                    {'<div class="job-timeline-detail" id="ttl-'+j['id']+'">' + _render_timeline_detail(j) + '</div>' if _render_timeline_detail(j) else ''}
                 </div>
                 {('<div class="job-timeline">' + _render_status_timeline(j) + '</div>') if _render_status_timeline(j) else ''}
                 <div class="job-actions">
@@ -4776,6 +4801,13 @@ loadResume();
         .status-time {{ font-size:11px; opacity:0.7; margin-left:4px; }}
         .applied-time {{ font-size:11px; color:#34a853; margin-left:4px; }}
         .job-timeline {{ font-size:12px; color:#666; padding:4px 0 2px 0; }}
+        .tl-container {{ margin-top:10px; padding:12px; background:#f5f5f5; border-radius:6px; font-size:13px; }}
+        .tl-row {{ display:flex; align-items:center; gap:8px; padding:4px 0; }}
+        .tl-icon {{ flex:0 0 24px; text-align:center; }}
+        .tl-status {{ flex:0 0 80px; font-weight:500; }}
+        .tl-time {{ flex:0 0 auto; color:#888; font-size:12px; }}
+        .tl-note {{ color:#555; font-size:12px; margin-left:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; }}
+        .tl-sep {{ font-size:11px; color:#999; padding:6px 0 2px 0; border-top:1px dashed #ddd; margin-top:6px; }}
 
         .section {{ margin:28px 0; }}
 
