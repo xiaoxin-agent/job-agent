@@ -1358,6 +1358,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             except:
                 return iso_str[:16] if iso_str else ""
 
+        def _has_applied(j):
+            """判断职位是否曾标记为 applied，依据 status_history 或 applied_date。"""
+            if j.get("applied_date"):
+                return True
+            history = j.get("status_history") or []
+            return any(h.get("status") == "applied" for h in history)
+
         saved_to_tracker = t(lang, "saved_to_tracker")
         applied_text = t(lang, "applied")
         jobs_html = ""
@@ -1366,6 +1373,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         for j in jobs:
             label = labels.get(j["status"], j["status"])
             status_time = _fmt_time(j.get("last_updated"))
+            has_applied = _has_applied(j)
+            apply_btn_class = 'btn-save' if has_applied else 'btn-primary'
+            apply_btn_text = applied_text if has_applied else btn_apply
             jobs_html += f"""
             <div class="job-card">
                 <div class="job-header" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">
@@ -1384,7 +1394,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 </div>
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
-                    <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {j['status'] == 'applied' and 'btn-save' or 'btn-primary'}" id="apply-anal-btn-{j['id']}">{j['status'] == 'applied' and applied_text or btn_apply}</button>
+                    <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {apply_btn_class}" id="apply-anal-btn-{j['id']}">{apply_btn_text}</button>
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
