@@ -1376,6 +1376,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             has_applied = _has_applied(j)
             apply_btn_class = 'btn-save' if has_applied else 'btn-primary'
             apply_btn_text = applied_text if has_applied else btn_apply
+            apply_time_str = _fmt_time(j.get("applied_date"))
             jobs_html += f"""
             <div class="job-card">
                 <div class="job-header" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">
@@ -1395,6 +1396,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
                     <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {apply_btn_class}" id="apply-anal-btn-{j['id']}">{apply_btn_text}</button>
+                    {'<span class="applied-time" title="' + j.get('applied_date','') + '">🕐 ' + apply_time_str + '</span>' if has_applied and apply_time_str else ''}
                     <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
@@ -4735,6 +4737,7 @@ loadResume();
 
         .status-offer {{ background:#e6f4ea; color:#34a853; }}
         .status-time {{ font-size:11px; opacity:0.7; margin-left:4px; }}
+        .applied-time {{ font-size:11px; color:#34a853; margin-left:4px; }}
 
         .section {{ margin:28px 0; }}
 
