@@ -1,0 +1,19 @@
+{
+  "_comment": "Lever 一键投递用的个人资料。根据需要修改。",
+  "first_name": "Xiaoxin",
+  "last_name": "Yang",
+  "email": "xiaoxin.yang@example.com",
+  "phone": "+1 (555) 000-0000",
+  "location": "Toronto, ON, Canada",
+  "linkedin_url": "https://linkedin.com/in/xiaoxinyang",
+  "github_url": "https://github.com/xiaoxinyang",
+  "portfolio_url": "",
+  "twitter_url": "",
+  "referral_source": "",
+  "eeo_defaults": {
+    "gender": "",
+    "race": "",
+    "veteran": ""
+  },
+  "pronouns": "He/him"
+}

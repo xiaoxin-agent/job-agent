@@ -4618,6 +4618,7 @@ loadResume();
 
         .btn-delete {{ background:#d32f2f; color:#fff; border:none; }}
 
+
         .stats-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:16px 0; }}
 
         .stat-card {{ background:#fff; padding:16px; border-radius:8px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.06); }}

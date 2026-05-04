@@ -111,6 +111,35 @@ class RemoteOKApplyAdapter(ApplyAdapter):
         return "\n".join(parts)
 
 
+class LeverApplyAdapter(ApplyAdapter):
+    """Lever 申请适配器
+    Lever 的职位可以直接通过 Playwright headless 浏览器自动投递。
+    """
+
+    def analyze(self, job: Dict) -> Dict:
+        url = job.get("url", "")
+        company = job.get("company", "")
+        title = job.get("title", "")
+
+        return {
+            "can_auto_apply": True,
+            "method": "auto_browser",
+            "instructions": f"一键投递至 {company}（Lever 自动表单）",
+            "target": url,
+            "details": (
+                f"🏢 {company}\n"
+                f"📌 Lever 自动投递\n"
+                f"系统将通过 headless 浏览器自动填写简历、联系方式、"
+                f"并处理自定义问题后提交申请。"
+            ),
+            "next_steps": [
+                f"一键投递至 {company} 的 {title}",
+                "系统自动填写表单并提交",
+                "投递结果会记录到申请历史",
+            ],
+        }
+
+
 class IndeedApplyAdapter(ApplyAdapter):
     """Indeed 申请适配器"""
 
@@ -170,6 +199,10 @@ class ApplyManager:
             "RemoteOK": RemoteOKApplyAdapter(),
             "GitHub Jobs": RemoteOKApplyAdapter(),
             "Indeed": IndeedApplyAdapter(),
+            "Fullscript": LeverApplyAdapter(),
+            "MagnetForensics": LeverApplyAdapter(),
+            "Telesat": LeverApplyAdapter(),
+            "Lever": LeverApplyAdapter(),  # fallback for any other Lever company
         }
         self.data_dir = data_dir or os.path.join(os.path.dirname(__file__), "agent_data")
         self._ensure_dirs()
@@ -200,6 +233,14 @@ class ApplyManager:
         })
         self._save_record(record)
         return {"success": True, "method": "email", "record": record}
+
+    def auto_apply_lever(self, job: Dict, cover_letter: str = None) -> Dict:
+        """一键自动投递 Lever 职位。
+
+        使用 Playwright headless 浏览器自动填写并提交 Lever 申请表单。
+        """
+        from sites.lever_apply import apply_to_lever as lever_apply_browser
+        return lever_apply_browser(job, cover_letter=cover_letter)
 
     def record_manual_apply(self, job: Dict) -> Dict:
         """记录用户手动申请"""
