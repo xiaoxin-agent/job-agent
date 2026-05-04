@@ -1094,17 +1094,32 @@ class JobTracker:
                 if status == "applied" and not job.get("applied_date"):
                     job["applied_date"] = now
 
+                # 面试轮次记录
+                if status == "interviewing":
+                    if "interviews" not in job:
+                        job["interviews"] = []
+                    next_round = len(job["interviews"]) + 1
+                    job["interviews"].append({
+                        "round": next_round,
+                        "date": now,
+                        "notes": notes or ""
+                    })
+                    # 在状态历史中标记轮次
+                    status_label = f"interviewing_{next_round}"
+                else:
+                    status_label = status
+
                 # 状态变更历史（只记录实际变化，忽略重复点击）
                 if status != old_status:
                     if "status_history" not in job:
                         job["status_history"] = []
                     job["status_history"].append({
-                        "status": status,
+                        "status": status_label,
                         "timestamp": now,
                         "from": old_status or ""
                     })
 
-                if notes:
+                if notes and status != "interviewing":
                     job["notes"] = notes
 
                 self.save()

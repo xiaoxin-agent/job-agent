@@ -1366,26 +1366,34 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             return any(h.get("status") == "applied" for h in history)
 
         def _render_status_timeline(j):
-            """渲染状态变更时间线摘要（如 已申请3天前 → 面试中1天前）。"""
+            """渲染状态变更时间线摘要（如 已申请3天前 → 面试第1轮 1天前 → 面试第2轮 2小时前）。"""
             history = j.get("status_history") or []
-            if len(history) < 2:
+            interviews = j.get("interviews") or []
+            if len(history) < 2 and len(interviews) < 2:
                 return ""
             labels_map = {"saved": "📌", "applied": "📄", "interviewing": "💬", "rejected": "❌", "offer": "🎉"}
-            # 取最新两次有变化的记录（跳过重复状态）
+            parts = []
+            # 从 status_history 取状态变更（interviewing 只取第一次）
             seen = set()
-            unique = []
             for h in history:
                 s = h.get("status", "")
-                if s not in seen:
-                    seen.add(s)
-                    unique.append(h)
-            # 只显示最后 3 个状态（太多挤不下）
-            parts = []
-            for h in unique[-3:]:
-                icon = labels_map.get(h["status"], "●")
-                label = labels.get(h["status"], h["status"])
-                t = _fmt_time(h["timestamp"])
-                parts.append(f"{icon} {label}{' '+t if t else ''}")
+                base_s = s.split("_")[0] if "interviewing" in s else s
+                if base_s not in seen:
+                    seen.add(base_s)
+                    icon = labels_map.get(base_s, "●")
+                    label_text = labels.get(base_s, base_s)
+                    t = _fmt_time(h["timestamp"])
+                    parts.append(icon + " " + label_text + (" " + t if t else ""))
+            # 如果有多轮面试，追加后续轮次
+            if len(interviews) > 1:
+                for iv in interviews[1:]:
+                    icon = labels_map["interviewing"]
+                    label_text = labels.get("interviewing", "面试")
+                    t = _fmt_time(iv["date"])
+                    parts.append(f"{icon} 第{iv['round']}轮{t if t else ''}")
+            # 只显示最后 4 段
+            if len(parts) > 4:
+                parts = parts[-4:]
             return " → ".join(parts) if parts else ""
 
         saved_to_tracker = t(lang, "saved_to_tracker")
@@ -1421,7 +1429,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
                     <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {apply_btn_class}" id="apply-anal-btn-{j['id']}">{apply_btn_text}</button>
                     {'<span class="applied-time" title="' + j.get('applied_date','') + '">🕐 ' + apply_time_str + '</span>' if has_applied and apply_time_str else ''}
-                    <button onclick="upd('{j['id']}','interviewing')" class="btn btn-small btn-interview">{btn_interview}</button>
+                    <button onclick="recordInterview('{j['id']}')" class="btn btn-small btn-interview">{btn_interview}</button>
                     <button onclick="upd('{j['id']}','rejected')" class="btn btn-small btn-reject">{btn_reject}</button>
                     <button onclick="upd('{j['id']}','offer')" class="btn btn-small btn-offer">{btn_offer}</button>
                     <button onclick="delJob('{j['id']}')" class="btn btn-small btn-delete">{btn_delete}</button>
@@ -1788,6 +1796,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var notes = prompt('\u6dfb\u52a0\u5907\u6ce8\uff08\u53ef\u9009\uff09:','')||'';
             fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'applied', notes:notes}})}})
             .then(function() {{ location.reload(); }});
+        }}
+        async function recordInterview(jobId) {{
+            var notes = prompt('\u8bb0\u5f55\u8fd9\u8f6e\u9762\u8bd5\u5907\u6ce8\uff08\u53ef\u9009\uff09:','')||'';
+            await fetch('/api/update_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId, status:'interviewing', notes:notes}})}});
+            location.reload();
         }}
 
         // ===== Manual URL Job Addition =====
