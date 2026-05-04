@@ -347,6 +347,14 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "just_now": "just now",
         "time_m_ago": "{}min ago",
         "time_h_ago": "{}hr ago",
+        "analyzing": "Analyzing...",
+        "apply_analysis": "\U0001F4E4 Apply Analysis",
+        "method_email": "\U0001F4E7 Apply by Email",
+        "method_manual": "\U0001F64B Apply Manually",
+        "applied_btn": "\u2705 Applied",
+        "next_steps": "\U0001F4CB Next Steps",
+        "analysis_failed": "Analysis failed",
+        "analysis_error": "Analysis error",
     },
     "zh-CN": {
         "nav_home": "🏠 首页",
@@ -565,6 +573,14 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "just_now": "\u521a\u521a",
         "time_m_ago": "{} \u5206\u949f\u524d",
         "time_h_ago": "{} \u5c0f\u65f6\u524d",
+        "analyzing": "\u5206\u6790\u4e2d...",
+        "apply_analysis": "\U0001F4E4 \u7533\u8bf7\u5206\u6790",
+        "method_email": "\U0001F4E7 \u90ae\u7bb1\u7533\u8bf7",
+        "method_manual": "\U0001F64B \u624b\u52a8\u7533\u8bf7",
+        "applied_btn": "\u2705 \u5df2\u7533\u8bf7",
+        "next_steps": "\U0001F4CB \u4e0b\u4e00\u6b65",
+        "analysis_failed": "\u5206\u6790\u5931\u8d25",
+        "analysis_error": "\u5206\u6790\u51fa\u9519",
     },
     "fr": {
         # Navigation
@@ -786,6 +802,14 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "just_now": "\u00e0 l\u2019instant",
         "time_m_ago": "il y a {} min",
         "time_h_ago": "il y a {} h",
+        "analyzing": "Analyse en cours...",
+        "apply_analysis": "\U0001F4E4 Analyse de candidature",
+        "method_email": "\U0001F4E7 Postuler par email",
+        "method_manual": "\U0001F64B Postuler manuellement",
+        "applied_btn": "\u2705 Postul\u00e9",
+        "next_steps": "\U0001F4CB Prochaines \u00e9tapes",
+        "analysis_failed": "\u00c9chec d\u2019analyse",
+        "analysis_error": "Erreur d\u2019analyse",
 
     },
 
@@ -1321,7 +1345,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         for key, label in [("all",t(lang, 'all')),("saved",t(lang, 'saved')),("applied",t(lang, 'applied')),("interviewing",t(lang, 'interviewing')),("rejected",t(lang, 'rejected')),("offer",t(lang, 'offer'))]:
             cnt = len([j for j in tracker.tracked_jobs if key=="all" or j["status"]==key])
             active = "active" if status_filter == key else ""
-            tabs += f'<a href="/tracked?status={key}" class="tab {active}">{label} ({cnt})</a>'
+            tabs += f'<a href="/tracked?status={key}&lang={lang}" class="tab {active}">{label} ({cnt})</a>'
 
         btn_view = t(lang, "btn_view")
         btn_letter = t(lang, "btn_letter")
@@ -1545,6 +1569,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _cancel = {json.dumps(t(lang, 'cancel'), ensure_ascii=False)};
         var _tl_detail = {json.dumps(tl_detail_text, ensure_ascii=False)};
         var _tl_hide = {json.dumps(tl_hide_text, ensure_ascii=False)};
+        var _analyzing_text = {json.dumps(t(lang, "analyzing"), ensure_ascii=False)};
+        var _apply_analysis = {json.dumps(t(lang, "apply_analysis"), ensure_ascii=False)};
+        var _method_email = {json.dumps(t(lang, "method_email"), ensure_ascii=False)};
+        var _method_manual = {json.dumps(t(lang, "method_manual"), ensure_ascii=False)};
+        var _applied_btn = {json.dumps(t(lang, "applied_btn"), ensure_ascii=False)};
+        var _next_steps = {json.dumps(t(lang, "next_steps"), ensure_ascii=False)};
+        var _analysis_failed = {json.dumps(t(lang, "analysis_failed"), ensure_ascii=False)};
+        var _analysis_error = {json.dumps(t(lang, "analysis_error"), ensure_ascii=False)};
         var _lang = {json.dumps(lang, ensure_ascii=False)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
@@ -1806,7 +1838,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var el = document.getElementById('apply-analysis-modal');
             if (el) el.remove();
         }}
-        var ANALYZING_TEXT = '\u5206\u6790\u4e2d...';
+        var ANALYZING_TEXT = _analyzing_text;
         var APPLY_TEXT = '\u7533\u8bf7';
         var RECORDED_TEXT = '\u2705 \u5df2\u8bb0\u5f55';
 
@@ -1950,10 +1982,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             try {{
                 var r = await fetch('/api/analyze_apply', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
                 var d = await r.json();
-                if (!d.success) {{ alert('分析失败: ' + (d.error || '')); return; }}
+                if (!d.success) {{ alert(_analysis_failed + ': ' + (d.error || '')); return; }}
                 showApplyAnalysis(jobId, d.analysis, d.job);
             }} catch(e) {{
-                alert('分析出错: ' + e);
+                alert(_analysis_error + ': ' + e);
             }} finally {{
                 if (btn && origText !== null) {{ btn.textContent = origText; btn.disabled = false; }}
             }}
@@ -1965,7 +1997,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
             // Title
             h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e0e0e0;flex-shrink:0">';
-            h += '<h3 style="margin:0;font-size:16px">\U0001F4E4 申请分析</h3>';
+            h += '<h3 style="margin:0;font-size:16px">' + _apply_analysis + '</h3>';
             h += '<button style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1" onclick="closeApplyModal()">\u00d7</button>';
             h += '</div>';
 
@@ -1980,7 +2012,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
             // Method badge
             var method = analysis.method;
-            var methodLabel = method === 'email' ? '\U0001F4E7 邮箱申请' : '\U0001F64B 手动申请';
+            var methodLabel = method === 'email' ? _method_email : _method_manual;
             h += '<div style="margin-bottom:12px;padding:8px 12px;border-radius:6px;background:' + (method === 'email' ? '#e8f0fe' : '#fef7e0') + ';font-size:13px">';
             h += '<strong>' + methodLabel + '</strong>: ' + analysis.instructions;
             h += '</div>';
@@ -1995,7 +2027,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             // Next steps
             if (analysis.next_steps && analysis.next_steps.length > 0) {{
                 h += '<div style="margin-bottom:12px">';
-                h += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">\U0001F4CB 下一步</div>';
+                h += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">' + _next_steps + '</div>';
                 h += '<ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.8">';
                 analysis.next_steps.forEach(function(s) {{
                     h += '<li>' + s + '</li>';
@@ -2009,7 +2041,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             h += '<div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid #e0e0e0;flex-shrink:0">';
             h += '<button class="btn" onclick="closeApplyModal()">' + _cancel + '</button>';
             var recordBtnId = 'apply-rec-' + jobId;
-            h += '<button class="btn btn-primary" id="' + recordBtnId + '">\u2705 \u5df2\u7533\u8bf7</button>';
+            h += '<button class="btn btn-primary" id="' + recordBtnId + '">' + _applied_btn + '</button>';
             h += '</div>';
 
             h += '</div></div>';
