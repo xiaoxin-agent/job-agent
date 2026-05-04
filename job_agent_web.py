@@ -1365,6 +1365,29 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             history = j.get("status_history") or []
             return any(h.get("status") == "applied" for h in history)
 
+        def _render_status_timeline(j):
+            """渲染状态变更时间线摘要（如 已申请3天前 → 面试中1天前）。"""
+            history = j.get("status_history") or []
+            if len(history) < 2:
+                return ""
+            labels_map = {"saved": "📌", "applied": "📄", "interviewing": "💬", "rejected": "❌", "offer": "🎉"}
+            # 取最新两次有变化的记录（跳过重复状态）
+            seen = set()
+            unique = []
+            for h in history:
+                s = h.get("status", "")
+                if s not in seen:
+                    seen.add(s)
+                    unique.append(h)
+            # 只显示最后 3 个状态（太多挤不下）
+            parts = []
+            for h in unique[-3:]:
+                icon = labels_map.get(h["status"], "●")
+                label = labels.get(h["status"], h["status"])
+                t = _fmt_time(h["timestamp"])
+                parts.append(f"{icon} {label}{' '+t if t else ''}")
+            return " → ".join(parts) if parts else ""
+
         saved_to_tracker = t(lang, "saved_to_tracker")
         applied_text = t(lang, "applied")
         jobs_html = ""
@@ -1393,6 +1416,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
                     <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
                 </div>
+                {('<div class="job-timeline">' + _render_status_timeline(j) + '</div>') if _render_status_timeline(j) else ''}
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
                     <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {apply_btn_class}" id="apply-anal-btn-{j['id']}">{apply_btn_text}</button>
@@ -4738,6 +4762,7 @@ loadResume();
         .status-offer {{ background:#e6f4ea; color:#34a853; }}
         .status-time {{ font-size:11px; opacity:0.7; margin-left:4px; }}
         .applied-time {{ font-size:11px; color:#34a853; margin-left:4px; }}
+        .job-timeline {{ font-size:12px; color:#666; padding:4px 0 2px 0; }}
 
         .section {{ margin:28px 0; }}
 
