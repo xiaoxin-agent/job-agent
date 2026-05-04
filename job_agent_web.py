@@ -1340,6 +1340,24 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         btn_save = t(lang, "btn_save")
         btn_regenerate = t(lang, "btn_regenerate")
         btn_copy = t(lang, "btn_copy")
+        def _fmt_time(iso_str):
+            """格式化 ISO 时间戳为简短显示。"""
+            if not iso_str:
+                return ""
+            try:
+                d = datetime.datetime.fromisoformat(iso_str)
+                now = datetime.datetime.now(d.tzinfo) if d.tzinfo else datetime.datetime.now()
+                delta = now - d
+                if delta < datetime.timedelta(hours=1):
+                    mins = int(delta.total_seconds() / 60)
+                    return f"{mins}分钟前" if mins else "刚刚"
+                elif delta < datetime.timedelta(days=1):
+                    return f"{int(delta.total_seconds() / 3600)}小时前"
+                else:
+                    return d.strftime("%m-%d %H:%M")
+            except:
+                return iso_str[:16] if iso_str else ""
+
         saved_to_tracker = t(lang, "saved_to_tracker")
         applied_text = t(lang, "applied")
         jobs_html = ""
@@ -1347,11 +1365,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             jobs_html = f'<p class="empty">{t(lang, "no_tracked")}</p>'
         for j in jobs:
             label = labels.get(j["status"], j["status"])
+            status_time = _fmt_time(j.get("last_updated"))
             jobs_html += f"""
             <div class="job-card">
                 <div class="job-header" onclick="toggleTrackedDesc('{j['id']}')" style="cursor:pointer">
                     <div class="job-title">{j['title']}{' <span class="job-type-tag">'+j['job_type']+'</span>' if j.get('job_type') else ''}</div>
-                    <span class="status-tag status-{j['status']}">{label}</span>
+                    <span class="status-tag status-{j['status']}">{label}{' <span class="status-time">'+status_time+'</span>' if status_time else ''}</span>
                 </div>
                 <div class="job-meta">
                     <span>{get_company_logo(j.get('company',''))} {j['company']}</span>
@@ -4705,6 +4724,7 @@ loadResume();
         .status-rejected {{ background:#fce8e6; color:#ea4335; }}
 
         .status-offer {{ background:#e6f4ea; color:#34a853; }}
+        .status-time {{ font-size:11px; opacity:0.7; margin-left:4px; }}
 
         .section {{ margin:28px 0; }}
 

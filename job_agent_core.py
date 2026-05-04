@@ -1030,6 +1030,7 @@ class JobTracker:
     
     def add_job(self, job: Dict):
         """添加职位到跟踪列表"""
+        now = datetime.datetime.now().isoformat()
         tracked = {
             "id": hashlib.md5(f"{job.get('title')}_{job.get('company')}_{time.time()}".encode()).hexdigest()[:8],
             "title": job.get("title", ""),
@@ -1046,8 +1047,9 @@ class JobTracker:
             "applied_date": None,
             "interview_dates": [],
             "follow_up_dates": [],
-            "saved_at": datetime.datetime.now().isoformat(),
-            "last_updated": datetime.datetime.now().isoformat()
+            "saved_at": now,
+            "last_updated": now,
+            "status_history": [{"status": "saved", "timestamp": now, "from": ""}]
         }
         
         # 去重
@@ -1080,18 +1082,31 @@ class JobTracker:
         return False
 
     def update_status(self, job_id: str, status: str, notes: str = ""):
-        """更新申请状态"""
+        """更新申请状态，自动记录每次状态变更时间。"""
         for job in self.tracked_jobs:
             if job["id"] == job_id:
+                now = datetime.datetime.now().isoformat()
+                old_status = job.get("status")
                 job["status"] = status
-                job["last_updated"] = datetime.datetime.now().isoformat()
-                
-                if status == "applied" and not job["applied_date"]:
-                    job["applied_date"] = datetime.datetime.now().isoformat()
-                
+                job["last_updated"] = now
+
+                # 首次标记 applied 时记录
+                if status == "applied" and not job.get("applied_date"):
+                    job["applied_date"] = now
+
+                # 状态变更历史（只记录实际变化，忽略重复点击）
+                if status != old_status:
+                    if "status_history" not in job:
+                        job["status_history"] = []
+                    job["status_history"].append({
+                        "status": status,
+                        "timestamp": now,
+                        "from": old_status or ""
+                    })
+
                 if notes:
                     job["notes"] = notes
-                
+
                 self.save()
                 return True
         return False
