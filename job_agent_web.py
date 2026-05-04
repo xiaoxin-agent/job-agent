@@ -380,6 +380,8 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "apply_on_site_prefix": "Apply on Company Site \u2014 Visit",
         "guessed_url": "Guessed career page",
         "desc_emails": "Emails in description",
+        "auto_fill_detail": "The system will automatically fill in your resume, contact info, and custom questions via headless browser and submit.",
+        "lever_auto_submit": "Lever Auto-Submit",
         # Learn plan page
         "learn_tasks_done": "tasks done",
         "skill_header": "Skills",
@@ -643,6 +645,8 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "apply_on_site_prefix": "Apply on Company Site \u2014 \u524d\u5f80",
         "guessed_url": "\u731c\u6d4b\u7684\u62db\u8058\u9875",
         "desc_emails": "\u63cf\u8ff0\u4e2d\u90ae\u7bb1",
+        "auto_fill_detail": "\u7cfb\u7edf\u5c06\u901a\u8fc7 headless \u6d4f\u89c8\u5668\u81ea\u52a8\u586b\u5199\u7b80\u5386\u3001\u8054\u7cfb\u65b9\u5f0f\u3001\u5e76\u5904\u7406\u81ea\u5b9a\u4e49\u95ee\u9898\u540e\u63d0\u4ea4\u7533\u8bf7\u3002",
+        "lever_auto_submit": "Lever \u81ea\u52a8\u6295\u9012",
         "learn_tasks_done": "\u4efb\u52a1\u5b8c\u6210",
         "skill_header": "\u6280\u80fd",
         "kw_header": "\u5173\u952e\u8bcd",
@@ -908,6 +912,8 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "apply_on_site_prefix": "Apply on Company Site \u2014 Visiter",
         "guessed_url": "Page Carri\u00e8res estim\u00e9e",
         "desc_emails": "Emails dans la description",
+        "auto_fill_detail": "Le syst\u00e8me remplira automatiquement votre CV, coordonn\u00e9es et questions personnalis\u00e9es via un navigateur headless et soumettra.",
+        "lever_auto_submit": "Soumission auto Lever",
         "learn_tasks_done": "t\u00e2ches faites",
         "skill_header": "Comp\u00e9tences",
         "kw_header": "Mots-cl\u00e9s",
@@ -1710,6 +1716,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _apply_on_site_prefix = {json.dumps(t(lang, "apply_on_site_prefix"), ensure_ascii=False)};
         var _guessed_url = {json.dumps(t(lang, "guessed_url"), ensure_ascii=False)};
         var _desc_emails = {json.dumps(t(lang, "desc_emails"), ensure_ascii=False)};
+        var _auto_fill_detail = {json.dumps(t(lang, "auto_fill_detail"), ensure_ascii=False)};
+        var _lever_auto_submit = {json.dumps(t(lang, "lever_auto_submit"), ensure_ascii=False)};
         var _lang = {json.dumps(lang, ensure_ascii=False)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
@@ -2149,12 +2157,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     }}
                     if (d.analysis.details) {{
                         d.analysis.details = d.analysis.details
+                            .replace('系统将通过 headless 浏览器自动填写简历、联系方式、并处理自定义问题后提交申请。', _auto_fill_detail)
                             .replace('Indeed 申请方式', _indeed_method_header)
                             .replace('Easy Apply — 通过 Indeed 直接投递', _easy_apply)
                             .replace('Apply on Company Site — 前往 ', _apply_on_site_prefix)
                             .replace(' 官网', '')
                             .replace('猜测的招聘页', _guessed_url)
-                            .replace('描述中邮箱', _desc_emails);
+                            .replace('描述中邮箱', _desc_emails)
+                            .replace('Lever 自动投递', _lever_auto_submit);
                     }}
                 }}
                 showApplyAnalysis(jobId, d.analysis, d.job);
