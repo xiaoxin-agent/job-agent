@@ -355,6 +355,43 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "next_steps": "\U0001F4CB Next Steps",
         "analysis_failed": "Analysis failed",
         "analysis_error": "Analysis error",
+        # Apply analysis instruction templates (used by JS post-processing)
+        "visit_company_site": "Visit the company website or job platform to apply",
+        "auto_submit_prefix": "Auto-submit to",
+        "visit_prefix": "Visit",
+        "site_apply_suffix": "website to apply",
+        "career_page_suffix": "careers page",
+        "search_prefix": "Search",
+        "linkedin_suggestion": "Or find the hiring contact via LinkedIn",
+        "prep_cover_resume": "Prepare cover letter and resume",
+        "auto_fill_submit": "System auto-fills form and submits",
+        "result_logged": "Submission result recorded in history",
+        "indeed_apply": "Open Indeed page, click \"Apply on Company Site\"",
+        "or_visit_prefix": "Or directly visit",
+        "search_job_suffix": "to search for jobs",
+        "upload_resume_cover": "Upload tailored resume and cover letter",
+        "record_status": "Return to system and record application status",
+        "gen_cover": "Generate cover letter",
+        "send_resume_email": "Send resume to provided email",
+        "wait_reply": "Wait for response",
+        "indeed_click_prefix": "Open Indeed page, click",
+        "indeed_method_header": "Indeed Application Methods",
+        "easy_apply": "Easy Apply \u2014 Submit directly on Indeed",
+        "apply_on_site_prefix": "Apply on Company Site \u2014 Visit",
+        "guessed_url": "Guessed career page",
+        "desc_emails": "Emails in description",
+        # Learn plan page
+        "learn_tasks_done": "tasks done",
+        "skill_header": "Skills",
+        "kw_header": "Keywords",
+        "level_header": "Level",
+        "exp_header": "Experience",
+        "saved_status": "Saved",
+        "failed_status": "Failed",
+        "hint_gen_cover": "Please generate a cover letter from the search page first.",
+        "downloaded_text": "Downloaded!",
+        "copied_text": "Copied!",
+        "confirm_regen": "This will discard progress. Regenerate?",
     },
     "zh-CN": {
         "nav_home": "🏠 首页",
@@ -581,6 +618,42 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "next_steps": "\U0001F4CB \u4e0b\u4e00\u6b65",
         "analysis_failed": "\u5206\u6790\u5931\u8d25",
         "analysis_error": "\u5206\u6790\u51fa\u9519",
+        # Apply analysis instruction templates
+        "visit_company_site": "\u8bf7\u81ea\u884c\u524d\u5f80\u516c\u53f8\u5b98\u7f51\u6216\u6c42\u804c\u5e73\u53f0\u6295\u9012",
+        "auto_submit_prefix": "\u4e00\u952e\u6295\u9012\u81f3",
+        "visit_prefix": "\u524d\u5f80",
+        "site_apply_suffix": "\u5b98\u7f51\u63d0\u4ea4\u7533\u8bf7",
+        "career_page_suffix": "\u5b98\u7f51\u67e5\u627e Careers \u9875\u9762",
+        "search_prefix": "\u641c\u7d22",
+        "linkedin_suggestion": "\u6216\u901a\u8fc7 LinkedIn \u627e\u5230\u62db\u8058\u8d1f\u8d23\u4eba\u8054\u7cfb",
+        "prep_cover_resume": "\u51c6\u5907\u6c42\u804c\u4fe1\u548c\u7b80\u5386",
+        "auto_fill_submit": "\u7cfb\u7edf\u81ea\u52a8\u586b\u5199\u8868\u5355\u5e76\u63d0\u4ea4",
+        "result_logged": "\u6295\u9012\u7ed3\u679c\u4f1a\u8bb0\u5f55\u5230\u7533\u8bf7\u5386\u53f2",
+        "indeed_apply": "\u6253\u5f00 Indeed \u9875\u9762\uff0c\u70b9\u51fb \"Apply on Company Site\"",
+        "or_visit_prefix": "\u6216\u76f4\u63a5\u524d\u5f80",
+        "search_job_suffix": "\u641c\u7d22\u804c\u4f4d",
+        "upload_resume_cover": "\u4e0a\u4f20\u5b9a\u5236\u7b80\u5386\u548c\u6c42\u804c\u4fe1",
+        "record_status": "\u8fd4\u56de\u7cfb\u7edf\u8bb0\u5f55\u7533\u8bf7\u72b6\u6001",
+        "gen_cover": "\u751f\u6210\u6c42\u804c\u4fe1",
+        "send_resume_email": "\u53d1\u9001\u7b80\u5386\u5230\u6307\u5b9a\u90ae\u7bb1",
+        "wait_reply": "\u7b49\u5f85\u5bf9\u65b9\u56de\u590d",
+        "indeed_click_prefix": "\u6253\u5f00 Indeed \u9875\u9762\uff0c\u70b9\u51fb",
+        "indeed_method_header": "Indeed \u7533\u8bf7\u65b9\u5f0f",
+        "easy_apply": "Easy Apply \u2014 \u901a\u8fc7 Indeed \u76f4\u63a5\u6295\u9012",
+        "apply_on_site_prefix": "Apply on Company Site \u2014 \u524d\u5f80",
+        "guessed_url": "\u731c\u6d4b\u7684\u62db\u8058\u9875",
+        "desc_emails": "\u63cf\u8ff0\u4e2d\u90ae\u7bb1",
+        "learn_tasks_done": "\u4efb\u52a1\u5b8c\u6210",
+        "skill_header": "\u6280\u80fd",
+        "kw_header": "\u5173\u952e\u8bcd",
+        "level_header": "\u6c34\u5e73",
+        "exp_header": "\u7ecf\u9a8c",
+        "saved_status": "\u5df2\u4fdd\u5b58",
+        "failed_status": "\u5931\u8d25",
+        "hint_gen_cover": "\u8bf7\u5148\u5728\u641c\u7d22\u9875\u9762\u751f\u6210\u6c42\u804c\u4fe1\u3002",
+        "downloaded_text": "\u5df2\u4e0b\u8f7d!",
+        "copied_text": "\u5df2\u590d\u5236!",
+        "confirm_regen": "\u786e\u5b9a\u91cd\u65b0\u751f\u6210\u5b66\u4e60\u8ba1\u5212\uff1f\uff08\u5c06\u4e22\u5f03\u5f53\u524d\u8fdb\u5ea6\uff09",
     },
     "fr": {
         # Navigation
@@ -810,6 +883,42 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "next_steps": "\U0001F4CB Prochaines \u00e9tapes",
         "analysis_failed": "\u00c9chec d\u2019analyse",
         "analysis_error": "Erreur d\u2019analyse",
+        # Apply analysis instruction templates
+        "visit_company_site": "Visitez le site web de l\u2019entreprise ou une plateforme d\u2019emploi pour postuler",
+        "auto_submit_prefix": "Soumission auto pour",
+        "visit_prefix": "Visiter",
+        "site_apply_suffix": "le site web pour postuler",
+        "career_page_suffix": "page Carri\u00e8res",
+        "search_prefix": "Rechercher",
+        "linkedin_suggestion": "Ou trouver le recruteur sur LinkedIn",
+        "prep_cover_resume": "Pr\u00e9parer lettre de motivation et CV",
+        "auto_fill_submit": "Le syst\u00e8me remplit le formulaire et soumet",
+        "result_logged": "Le r\u00e9sultat sera enregistr\u00e9 dans l\u2019historique",
+        "indeed_apply": "Ouvrir la page Indeed, cliquer sur \"Apply on Company Site\"",
+        "or_visit_prefix": "Ou visiter directement",
+        "search_job_suffix": "pour chercher des offres",
+        "upload_resume_cover": "T\u00e9l\u00e9charger CV et lettre de motivation personnalis\u00e9s",
+        "record_status": "Revenir au syst\u00e8me et enregistrer le statut",
+        "gen_cover": "G\u00e9n\u00e9rer une lettre de motivation",
+        "send_resume_email": "Envoyer le CV par email",
+        "wait_reply": "Attendre une r\u00e9ponse",
+        "indeed_click_prefix": "Ouvrir la page Indeed, cliquer",
+        "indeed_method_header": "M\u00e9thodes de candidature Indeed",
+        "easy_apply": "Easy Apply \u2014 Postuler directement sur Indeed",
+        "apply_on_site_prefix": "Apply on Company Site \u2014 Visiter",
+        "guessed_url": "Page Carri\u00e8res estim\u00e9e",
+        "desc_emails": "Emails dans la description",
+        "learn_tasks_done": "t\u00e2ches faites",
+        "skill_header": "Comp\u00e9tences",
+        "kw_header": "Mots-cl\u00e9s",
+        "level_header": "Niveau",
+        "exp_header": "Exp\u00e9rience",
+        "saved_status": "Sauvegard\u00e9",
+        "failed_status": "\u00c9chec",
+        "hint_gen_cover": "G\u00e9n\u00e9rez d\u2019abord une lettre de motivation depuis la page de recherche.",
+        "downloaded_text": "T\u00e9l\u00e9charg\u00e9 !",
+        "copied_text": "Copi\u00e9 !",
+        "confirm_regen": "Cela supprimera la progression. Reg\u00e9n\u00e9rer ?",
 
     },
 
@@ -1577,6 +1686,30 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _next_steps = {json.dumps(t(lang, "next_steps"), ensure_ascii=False)};
         var _analysis_failed = {json.dumps(t(lang, "analysis_failed"), ensure_ascii=False)};
         var _analysis_error = {json.dumps(t(lang, "analysis_error"), ensure_ascii=False)};
+        var _visit_company_site = {json.dumps(t(lang, "visit_company_site"), ensure_ascii=False)};
+        var _auto_submit_prefix = {json.dumps(t(lang, "auto_submit_prefix"), ensure_ascii=False)};
+        var _visit_prefix = {json.dumps(t(lang, "visit_prefix"), ensure_ascii=False)};
+        var _site_apply_suffix = {json.dumps(t(lang, "site_apply_suffix"), ensure_ascii=False)};
+        var _career_page_suffix = {json.dumps(t(lang, "career_page_suffix"), ensure_ascii=False)};
+        var _search_prefix = {json.dumps(t(lang, "search_prefix"), ensure_ascii=False)};
+        var _linkedin_suggestion = {json.dumps(t(lang, "linkedin_suggestion"), ensure_ascii=False)};
+        var _prep_cover_resume = {json.dumps(t(lang, "prep_cover_resume"), ensure_ascii=False)};
+        var _auto_fill_submit = {json.dumps(t(lang, "auto_fill_submit"), ensure_ascii=False)};
+        var _result_logged = {json.dumps(t(lang, "result_logged"), ensure_ascii=False)};
+        var _indeed_apply = {json.dumps(t(lang, "indeed_apply"), ensure_ascii=False)};
+        var _or_visit_prefix = {json.dumps(t(lang, "or_visit_prefix"), ensure_ascii=False)};
+        var _search_job_suffix = {json.dumps(t(lang, "search_job_suffix"), ensure_ascii=False)};
+        var _upload_resume_cover = {json.dumps(t(lang, "upload_resume_cover"), ensure_ascii=False)};
+        var _record_status = {json.dumps(t(lang, "record_status"), ensure_ascii=False)};
+        var _gen_cover = {json.dumps(t(lang, "gen_cover"), ensure_ascii=False)};
+        var _send_resume_email = {json.dumps(t(lang, "send_resume_email"), ensure_ascii=False)};
+        var _wait_reply = {json.dumps(t(lang, "wait_reply"), ensure_ascii=False)};
+        var _indeed_click_prefix = {json.dumps(t(lang, "indeed_click_prefix"), ensure_ascii=False)};
+        var _indeed_method_header = {json.dumps(t(lang, "indeed_method_header"), ensure_ascii=False)};
+        var _easy_apply = {json.dumps(t(lang, "easy_apply"), ensure_ascii=False)};
+        var _apply_on_site_prefix = {json.dumps(t(lang, "apply_on_site_prefix"), ensure_ascii=False)};
+        var _guessed_url = {json.dumps(t(lang, "guessed_url"), ensure_ascii=False)};
+        var _desc_emails = {json.dumps(t(lang, "desc_emails"), ensure_ascii=False)};
         var _lang = {json.dumps(lang, ensure_ascii=False)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
@@ -1599,7 +1732,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 if (!regenModal) return;
                 var jobIdRegen = regenModal.getAttribute('data-learn-jobid');
                 if (!jobIdRegen) return;
-                var confirmMsg = {{'en':'This will discard progress. Regenerate?','zh-CN':'确定重新生成学习计划？（将丢弃当前进度）','fr':'Cela supprimera la progression. Regénérer ?'}}[_lang] || '确定重新生成？';
+                var confirmMsg = _confirm_regen;
                 if (!confirm(confirmMsg)) return;
                 var regenBtnEl = document.querySelector('.learn-plan-btn[data-learn-jobid="' + jobIdRegen + '"]');
                 if (regenBtnEl) {{ regenBtnEl.textContent = _loading_text; regenBtnEl.disabled = true; }}
@@ -1983,6 +2116,47 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 var r = await fetch('/api/analyze_apply', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
                 var d = await r.json();
                 if (!d.success) {{ alert(_analysis_failed + ': ' + (d.error || '')); return; }}
+                // i18n post-process: replace known Chinese instruction templates
+                if (d.analysis) {{
+                    d.analysis.instructions = d.analysis.instructions
+                        .replace('请自行前往公司官网或求职平台投递', _visit_company_site)
+                        .replace('一键投递至', _auto_submit_prefix + ' ')
+                        .replace('（Lever 自动表单）', '')
+                        .replace('前往 ', _visit_prefix + ' ')
+                        .replace(' 官网提交申请', _site_apply_suffix)
+                        .replace(' 官网查找 Careers 页面', _career_page_suffix);
+                    if (d.analysis.next_steps) {{
+                        d.analysis.next_steps = d.analysis.next_steps.map(function(s) {{
+                            return s
+                                .replace('请自行前往公司官网或求职平台投递', _visit_company_site)
+                                .replace('搜索 ', _search_prefix + ' ')
+                                .replace(' 官网查找 Careers 页面', _career_page_suffix)
+                                .replace('或通过 LinkedIn 找到招聘负责人联系', _linkedin_suggestion)
+                                .replace('准备求职信和简历', _prep_cover_resume)
+                                .replace('一键投递至', _auto_submit_prefix)
+                                .replace('系统自动填写表单并提交', _auto_fill_submit)
+                                .replace('投递结果会记录到申请历史', _result_logged)
+                                .replace('打开 Indeed 页面，点击 "Apply on Company Site"', _indeed_apply)
+                                .replace('或直接前往 ', _or_visit_prefix)
+                                .replace(' 搜索职位', _search_job_suffix)
+                                .replace('上传定制简历和求职信', _upload_resume_cover)
+                                .replace('返回系统记录申请状态', _record_status)
+                                .replace('生成求职信', _gen_cover)
+                                .replace('发送简历到指定邮箱', _send_resume_email)
+                                .replace('等待对方回复', _wait_reply)
+                                .replace('打开 Indeed 页面，点击', _indeed_click_prefix);
+                        }});
+                    }}
+                    if (d.analysis.details) {{
+                        d.analysis.details = d.analysis.details
+                            .replace('Indeed 申请方式', _indeed_method_header)
+                            .replace('Easy Apply — 通过 Indeed 直接投递', _easy_apply)
+                            .replace('Apply on Company Site — 前往 ', _apply_on_site_prefix)
+                            .replace(' 官网', '')
+                            .replace('猜测的招聘页', _guessed_url)
+                            .replace('描述中邮箱', _desc_emails);
+                    }}
+                }}
                 showApplyAnalysis(jobId, d.analysis, d.job);
             }} catch(e) {{
                 alert(_analysis_error + ': ' + e);
@@ -2071,10 +2245,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         btn.className = 'btn btn-small';
                     }}
                 }} else {{
-                    alert('记录失败: ' + (d.error || ''));
+                    alert(_analysis_failed + ': ' + (d.error || ''));
                 }}
             }} catch(e) {{
-                alert('记录出错: ' + e);
+                alert(_analysis_error + ': ' + e);
             }}
         }}
         function tailorResume(jobId) {{
@@ -2083,16 +2257,16 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             fetch('/api/tailor_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
             .then(function(r){{return r.json()}})
             .then(function(d){{
-                if (btn) {{ btn.textContent = '🎯 优化'; btn.disabled = false; }}
+                if (btn) {{ btn.textContent = _btn_optimize; btn.disabled = false; }}
                 if (d.success) {{
                     window.open('/resume_view?job_id=' + jobId, '_blank');
                 }} else {{
-                    alert('优化失败: ' + (d.error || ''));
+                    alert(_analysis_failed + ': ' + (d.error || ''));
                 }}
             }})
             .catch(function(e){{
-                if (btn) {{ btn.textContent = '🎯 优化'; btn.disabled = false; }}
-                alert('请求出错: ' + e);
+                if (btn) {{ btn.textContent = _btn_optimize; btn.disabled = false; }}
+                alert(_analysis_error + ': ' + e);
             }});
         }}
         function analyzeSkillGap(jobId) {{
@@ -2657,6 +2831,19 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _quiz_reference_answer = __quiz_reference_answer;
         var _quiz_not_answered = __quiz_not_answered;
         var _btn_generate_quiz = __btn_generate_quiz;
+        var _btn_optimize = {json.dumps(t(lang, 'btn_optimize'), ensure_ascii=False)};
+        var _confirm_regen = {json.dumps(t(lang, 'confirm_regen'), ensure_ascii=False)};
+        var _learn_tasks_done = {json.dumps(t(lang, 'learn_tasks_done'), ensure_ascii=False)};
+        var _skill_header = {json.dumps(t(lang, 'skill_header'), ensure_ascii=False)};
+        var _kw_header = {json.dumps(t(lang, 'kw_header'), ensure_ascii=False)};
+        var _level_header = {json.dumps(t(lang, 'level_header'), ensure_ascii=False)};
+        var _exp_header = {json.dumps(t(lang, 'exp_header'), ensure_ascii=False)};
+        var _saved_status = {json.dumps(t(lang, 'saved_status'), ensure_ascii=False)};
+        var _failed_status = {json.dumps(t(lang, 'failed_status'), ensure_ascii=False)};
+        var _hint_gen_cover = {json.dumps(t(lang, 'hint_gen_cover'), ensure_ascii=False)};
+        var _downloaded_text = {json.dumps(t(lang, 'downloaded_text'), ensure_ascii=False)};
+        var _copied_text = {json.dumps(t(lang, 'copied_text'), ensure_ascii=False)};
+        var _tasks_completed = {json.dumps(t(lang, 'tasks_completed'), ensure_ascii=False)};
 
         // Store current task's job/task id for modal checkbox
         var _td_job_id = '';
@@ -2938,7 +3125,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         var bar = wc.querySelector('.week-progress-fill');
                         if (bar) bar.style.width = Math.round(wDone / wTotal * 100) + '%';
                         var stat = wc.querySelector('.week-stats span');
-                        if (stat) stat.textContent = wDone + '/' + wTotal + ' 任务完成';
+                        if (stat) stat.textContent = _tasks_completed.replace('{}', wDone).replace('{}', wTotal);
                     });
                 });
             });
@@ -2990,12 +3177,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         for cat, info in p.get("skills", {}).items():
             kw = ", ".join(info.get("keywords", [])[:4])
             sk += f"<tr><td>{cat}</td><td>{kw}…</td><td>{info.get('level','')}</td><td>{info.get('years',0)}{years_label}</td></tr>"
-        skill_header = "Skills" if lang == "en" else "技能"
-        kw_header = "Keywords" if lang == "en" else "关键词"
-        level_header = "Level" if lang == "en" else "水平"
-        exp_header = "Experience" if lang == "en" else "经验"
-        saved_text = " ✅ Saved" if lang == "en" else " ✅ 已保存"
-        failed_text = " ❌ Failed" if lang == "en" else " ❌ 失败"
+        skill_header = t(lang, "skill_header")
+        kw_header = t(lang, "kw_header")
+        level_header = t(lang, "level_header")
+        exp_header = t(lang, "exp_header")
+        saved_text = " ✅ " + t(lang, "saved_status")
+        failed_text = " ❌ " + t(lang, "failed_status")
 
         html = self._page(t(lang, 'profile_title'), f"""
         <h1>{t(lang, 'profile_title')}</h1>
@@ -3047,9 +3234,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
     def handle_letter_page(self, params):
         lang = self._get_lang(params)
-        hint_text = "Please generate a cover letter from the search page first." if lang == "en" else "请先在搜索页面点击\"求职信\"按钮生成。"
-        downloaded_text = "Downloaded!" if lang == "en" else "已下载!"
-        copied_text = "Copied!" if lang == "en" else "已复制!"
+        hint_text = t(lang, "hint_gen_cover")
+        downloaded_text = t(lang, "downloaded_text")
+        copied_text = t(lang, "copied_text")
         html = self._page(t(lang, 'letter_title'), f"""
         <h1>{t(lang, 'letter_title')}</h1>
         <div id="letter-content"><p>{hint_text}</p></div>
