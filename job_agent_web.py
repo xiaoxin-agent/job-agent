@@ -1447,9 +1447,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <div class="job-desc-toggle">
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
                     <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
-                    {'<div class="job-timeline-detail" id="ttl-'+j['id']+'" style="display:none">' + _render_timeline_detail(j) + '</div>' if _render_timeline_detail(j) else ''}
                 </div>
                 {('<div class="job-timeline" id="ttl-sum-'+j['id']+'" onclick="event.stopPropagation();toggleTimelineDetail(\''+j['id']+'\')">' + _render_status_timeline(j) + ' <span class="tl-expand-hint">▶ 详情</span></div>') if _render_status_timeline(j) else ''}
+                {'<div class="job-timeline-detail" id="ttl-'+j['id']+'" style="display:none">' + _render_timeline_detail(j) + '</div>' if _render_timeline_detail(j) else ''}
                 <div class="job-actions">
                     <a href="{j.get('url','#')}" target="_blank" class="btn btn-small">{btn_view}</a>
                     <button onclick="analyzeApply('{j['id']}')" class="btn btn-small {apply_btn_class}" id="apply-anal-btn-{j['id']}">{apply_btn_text}</button>
