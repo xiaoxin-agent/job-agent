@@ -2299,22 +2299,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if (d.success) {{
                 var el = document.getElementById('ttl-' + jobId);
                 if (el) {{
-                    // 用 data-round 精确删除该行
                     var row = el.querySelector('.tl-row[data-round="' + roundNum + '"]');
                     if (row) row.remove();
-                    // 如果没有任何面试行了，移除分隔线
                     var remaining = el.querySelectorAll('.tl-row[data-round]');
                     if (remaining.length === 0) {{
                         var sep = el.querySelector('.tl-sep');
                         if (sep) {{ sep.remove(); }}
-                        // 如果 status_history 只有 1 条，收起整个 timeline
-                        var historyRows = el.querySelectorAll('.tl-row:not([data-round])');
-                        if (historyRows.length <= 1) {{
-                            var sum = document.getElementById('ttl-sum-' + jobId);
-                            if (sum) {{
-                                el.style.display = 'none';
-                                sum.innerHTML = sum.innerHTML.replace(_tl_hide, _tl_detail);
-                            }}
+                        // 面试全删光且 status 不再是 interviewing 时刷新页面
+                        if (d.new_status && d.new_status !== 'interviewing') {{
+                            location.reload();
                         }}
                     }}
                 }}
@@ -3790,7 +3783,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             if not self.agent.tracker.delete_interview(job_id, round_num):
                 self.send_json({"success": False, "error": "未找到该面试记录"}, 400)
                 return
-            self.send_json({"success": True})
+            job = self.agent.tracker.get_job(job_id)
+            self.send_json({"success": True, "new_status": job.get("status", "")})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
