@@ -13,14 +13,15 @@ Nokia's Oracle HCM instance (siteNumber=CX_1) has a SERVER-SIDE RESTRICTION:
 the findReqs finder API ALWAYS returns the exact same 25 jobs regardless of
 keyword, locationId, offset, or any other filter parameter.
 
-Confirmed facts (investigated 2026-04-29):
-- 858 total jobs exist in the database (returned as TotalJobsCount)
+Confirmed facts (investigated 2026-04-29 & 2026-05-05):
+- 867 total jobs exist in the database (returned as TotalJobsCount)
+- 107 Canada jobs exist (from locationsFacet)
 - But the API only ever returns the same 25 "default" jobs
-- keyword (e.g. "software") → completely ignored by the API
+- keyword (e.g. "Engineer") → completely ignored by the API
 - locationId (e.g. Canada=300000000471544) → ignored
 - selectedLocationsFacet → ignored
-- offset=25 (pagination) → returns IDENTICAL 25 jobs, not page 2
-- locationsFacet shows 68 Canada jobs exist, but API won't return them
+- offset (pagination) → returns IDENTICAL 25 jobs, not page 2
+- All query parameters fed through findParams mapSearchParamsToRest are ignored
 
 Why this happens:
 - The SPA uses the same URL format as Fortinet's WORKING instance
@@ -37,7 +38,8 @@ What the website shows:
 - It calls the SAME restricted API and gets the SAME 25 jobs
 - Client-side JS filters by keyword/location (React state)
 - So the website ALSO only displays from these 25 jobs
-- "Many Canada software jobs" would be client-side filtered view of the 25
+- The "89 Open Jobs" shown on the site is the TotalJobsCount for Canada from
+  locationsFacet metadata, NOT the actual number of accessible job detail pages
 
 What we've tried (all failed):
 1. Direct oraclecloud /hcmRestApi/ endpoint
@@ -47,13 +49,19 @@ What we've tried (all failed):
 5. selectedLocationsFacet (SAME) parameter
 6. POST to /action/getRequisitionDetailsForMap (empty result)
 7. All offsets from 0 to 800 (same 25 jobs repeated)
-8. Browser automation not viable (1.3GB disk, and wouldn't bypass server restriction)
+8. Oracle HCM resource version "24" vs "11.13.18.05" (version 24 not supported)
+9. Browser automation not viable (1.3GB disk, and wouldn't bypass server restriction)
+
+Known also affected:
+- Nokia job detail pages (e.g. /requisition/job/35679, /requisition/job/34461)
+  return 200 but SPA redirects to /404 client-side because Oracle API returns 404
+  for individual requisition detail endpoints — jobs can be listed but not viewed.
 
 Module behavior:
 - Returns the 25 jobs the API does provide
-- Client-side Canada location filter catches ~2 Canada-relevant jobs
-  (HW Test Engineer, Senior Photonics System Test Specialist)
-- This is the BEST we can do with the restricted API
+- Applies client-side keyword/location filter to the available 25
+- This is the BEST we can do with the restricted API — full search is impossible
+  without Nokia changing their Oracle HCM tenant configuration.
 
 Contrast with Fortinet (sites/fortinet.py):
 - Same Oracle HCM platform
@@ -80,6 +88,20 @@ WORKPLACE_MAP = {
 
 _COUNTRY_WHITELIST = {"CA", "US"}
 
+# Known geography IDs from locationsFacet
+LOCATION_IDS = {
+    "india": "300000000471745",
+    "united states": "300000000480126",
+    "canada": "300000000471544",
+    "poland": "300000000471967",
+    "portugal": "300000000471982",
+    "germany": "300000000471987",
+    "united kingdom": "300000000471975",
+    "china": "300000000471829",
+    "finland": "300000000471718",
+    "france": "300000000471823",
+}
+
 
 def _build_finder_url(keyword: str = "", location: str = "",
                       limit: int = 25, offset: int = 0) -> str:
@@ -92,7 +114,14 @@ def _build_finder_url(keyword: str = "", location: str = "",
     if keyword:
         finder_params["keyword"] = keyword
     if location and location.lower() not in ("remote", "global"):
-        finder_params["location"] = location
+        # Try to map location to geography ID (though API ignores it anyway)
+        loc_lower = location.lower()
+        for loc_name, geo_id in LOCATION_IDS.items():
+            if loc_lower == loc_name or loc_name.startswith(loc_lower) or loc_lower.startswith(loc_name):
+                finder_params["locationId"] = geo_id
+                break
+        else:
+            finder_params["location"] = location
 
     finder_encoded = requests.utils.quote(json.dumps(finder_params))
     url = (
@@ -104,15 +133,19 @@ def _build_finder_url(keyword: str = "", location: str = "",
     return url
 
 
-def _call_api(url: str) -> List[Dict]:
-    """Call the Nokia Oracle HCM REST API and return the job list."""
+def _call_api(url: str, extract_facets: bool = False) -> tuple:
+    """Call the Nokia Oracle HCM REST API.
+    
+    Returns (job_list, facet_data) tuple.
+    facet_data is a dict with locationsFacet, categoriesFacet etc. if available.
+    """
     try:
         resp = requests.get(url, headers={
             "User-Agent": "Mozilla/5.0",
             "Accept": "application/json",
         }, timeout=20)
         if resp.status_code != 200:
-            return []
+            return [], {}
         raw = resp.text
         # Response is a JSON-encoded string — double-parse
         if raw.startswith('"'):
@@ -121,10 +154,27 @@ def _call_api(url: str) -> List[Dict]:
             data = json.loads(raw)
         items = data.get("items", [])
         if not items:
-            return []
-        return items[0].get("requisitionList", [])
+            return [], {}
+        
+        item = items[0]
+        reqs = item.get("requisitionList", [])
+        
+        # Extract facet data if available
+        facets = {}
+        for facet_key in ("locationsFacet", "categoriesFacet", "titlesFacet",
+                          "postingDatesFacet", "workplaceTypesFacet"):
+            val = item.get(facet_key)
+            if val:
+                facets[facet_key] = val
+        
+        # TotalJobsCount
+        total = item.get("TotalJobsCount")
+        if total:
+            facets["TotalJobsCount"] = total
+            
+        return reqs, facets
     except Exception:
-        return []
+        return [], {}
 
 
 def _parse_job(raw_job: Dict) -> Dict:
@@ -153,9 +203,6 @@ def _parse_job(raw_job: Dict) -> Dict:
 
     is_remote = "Remote" if job_type == "Remote" else ""
 
-    # Detect Canada via country code or location text
-    is_canada = country == "CA" or "Canada" in location or "ON" in location
-
     return {
         "title": title,
         "company": "Nokia",
@@ -171,16 +218,21 @@ def _parse_job(raw_job: Dict) -> Dict:
 
 def search(keywords: List[str] = None, location: str = "",
            max_results: int = 10, **kwargs) -> List[Dict]:
-    """Search Nokia jobs."""
+    """Search Nokia jobs.
+    
+    NOTE: Due to Nokia's Oracle HCM server-side restriction, this function can
+    only return from a fixed pool of ~25 jobs. All keyword/location filters are
+    applied client-side to those 25. The actual Nokia site has 867 jobs (107 in
+    Canada as of 2026-05-05) but the API refuses to return them.
+    """
     if not keywords:
         keywords = ["Software", "Engineer"]
     kw_lower = set(k.lower() for k in keywords)
 
-    # Try with keyword search
     keyword = keywords[0] if keywords else ""
     url = _build_finder_url(keyword=keyword, location=location,
                             limit=min(max_results * 5, 100), offset=0)
-    raw_jobs = _call_api(url)
+    raw_jobs, _ = _call_api(url)
 
     # The Nokia API pagination is limited (always returns same 25 jobs).
     # We'll filter what we get.
@@ -193,11 +245,9 @@ def search(keywords: List[str] = None, location: str = "",
         seen_ids.add(jid)
 
         title = rj.get("Title", "").lower()
-        title_words = set(re.split(r"[\s\-/]+", title))
 
         # Keyword match
         if not any(kw in title for kw in kw_lower):
-            # Also check ShortDescriptionStr
             desc = (rj.get("ShortDescriptionStr") or "").lower()
             if not any(kw in desc for kw in kw_lower):
                 continue
@@ -221,7 +271,7 @@ def search(keywords: List[str] = None, location: str = "",
                 txt_w = {w for w in re.split(r"[\s,\/]+", loc_text.lower()) if len(w) > 2}
                 if user_w & txt_w:
                     loc_ok = True
-            if not loc_ok and country != "CA":
+            if not loc_ok and country not in ("CA", "US"):
                 continue
             if not loc_ok:
                 continue
@@ -236,7 +286,12 @@ def search(keywords: List[str] = None, location: str = "",
 
 
 def fetch_job_details(job_id: str) -> Optional[Dict]:
-    """Fetch a single job by ID for detailed description."""
+    """Fetch a single job by ID for detailed description.
+    
+    NOTE: Due to Nokia's Oracle HCM server-side restriction, individual job
+    detail endpoints return 404 even though the job ID exists in search results.
+    This function searches the 25 available jobs for a matching ID.
+    """
     url = _build_finder_url(limit=1, offset=0)
     try:
         resp = requests.get(url, headers={

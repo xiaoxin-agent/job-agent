@@ -1058,6 +1058,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/download_resume_pdf": self.api_download_resume_pdf,
             "/api/convert_markdown": self.api_convert_markdown,
             "/api/save_job_resume_md": self.api_save_job_resume_md,
+            "/api/delete_job_resume": self.api_delete_job_resume,
+            "/api/rerun_analysis": self.api_rerun_analysis,
             "/api/undo_status": self.api_undo_status,
             "/api/delete_interview": self.api_delete_interview,
             "/api/analyze_apply": self.api_analyze_apply,
@@ -1623,7 +1625,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <div class="job-meta">
                     <span>{get_company_logo(j.get('company',''))} {j['company']}</span>
                     <span>📍 {j['location']}</span>
-                    <span>📊 {j.get('match_score',0)}{match_percent}</span>
+                    <span>📊 <span id="ms-{j['id']}">{j.get('match_score',0)}</span>{match_percent}</span> <button onclick="rerunAnalysis('{j['id']}')" class="btn-rerun" title="{t(lang, 'rerun_match')}" id="rr-{j['id']}">↻</button>
                     <span id="skill-gap-{j['id']}">{self._render_skill_gap_html(j, lang)}</span>
                 </div>
                 <div class="job-desc-toggle">
@@ -1643,7 +1645,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <button class="btn btn-small cover-letter-btn" data-job-id="{j['id']}" style="font-size:12px">{btn_letter}</button>
                 </div>
                 {f'<div class="job-notes">📝 {j.get("notes","")}</div>' if j.get("notes") else ''}
-                {('<div class="job-resume"><span class="resume-icon">📜</span> <span class="resume-name">'+j['resume_name']+'</span> <span class="resume-actions"><a href="#" class="link-url view-resume-btn" data-job-id="' + j['id'] + '">'+btn_preview+'</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">'+btn_edit+'</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">'+btn_optimize+'</button></span></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">'+btn_link_resume+'</button></div>'}
+                {('<div class="job-resume"><span class="resume-icon">📜</span> <span class="resume-name">'+j['resume_name']+'</span><button onclick="unlinkResume('+chr(39)+j['id']+chr(39)+')" class="btn-unlink-resume" title="解除关联">×</button> <span class="resume-actions"><a href="#" class="link-url view-resume-btn" data-job-id="' + j['id'] + '">'+btn_preview+'</a> <a href="/resume_view?job_id='+j['id']+'" class="link-url" target="_blank">'+btn_edit+'</a> <button id="tailor-'+j['id']+'" onclick="tailorResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="font-size:12px">'+btn_optimize+'</button></span></div>') if j.get('resume_id') else '<div class="job-resume"><button onclick="linkResume('+chr(39)+j['id']+chr(39)+')" class="btn btn-small" style="margin-top:6px">'+btn_link_resume+'</button></div>'}
             </div>"""
 
         html = self._page(t(lang, 'tracked_title'), f"""
@@ -2022,6 +2024,35 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         async function delJob(id) {{
             if (!confirm(_confirm_delete)) return;
             await fetch('/api/delete_job', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:id}})}});
+            location.reload();
+        }}
+
+        async function rerunAnalysis(jobId) {{
+            var btn = document.getElementById('rr-' + jobId);
+            btn.textContent = '⏳';
+            btn.disabled = true;
+            try {{
+                var d = await (await fetch('/api/rerun_analysis', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId}})}})).json();
+                if (d.success) {{
+                    var ms = document.getElementById('ms-' + jobId);
+                    if (ms) ms.textContent = d.match_score;
+                    btn.textContent = '✓';
+                    setTimeout(function() {{ btn.textContent = '↻'; btn.disabled = false; }}, 2000);
+                }} else {{
+                    alert('重算失败: ' + (d.error || ''));
+                    btn.textContent = '↻';
+                    btn.disabled = false;
+                }}
+            }} catch(e) {{
+                alert('重算出错: ' + e);
+                btn.textContent = '↻';
+                btn.disabled = false;
+            }}
+        }}
+
+        async function unlinkResume(jobId) {{
+            if (!confirm('确定解除此职位的简历关联？')) return;
+            await fetch('/api/delete_job_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id:jobId}})}});
             location.reload();
         }}
         function toggleTrackedDesc(id) {{
@@ -3688,6 +3719,33 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
+    def api_delete_job_resume(self, data):
+        """删除指定职位关联的简历（不删除简历库中的原始文件）"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            ok = self.agent.tracker.delete_job_resume(job_id)
+            self.send_json({"success": ok})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_rerun_analysis(self, data):
+        """根据简历重新计算匹配度"""
+        try:
+            job_id = data.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            job = self.agent.rerun_analysis(job_id)
+            if not job:
+                self.send_json({"success": False, "error": "未找到职位或未关联简历"}, 400)
+                return
+            self.send_json({"success": True, "match_score": job.get("match_score", 0)})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
     def api_save_job_resume_md(self, data):
         """保存职位简历的 Markdown 版本"""
         try:
@@ -4602,11 +4660,24 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
             var delBtn = e.target.closest('.btn-del-resume');
             if (!delBtn) return;
             var id = delBtn.getAttribute('data-resume-id');
-            if (!confirm('\u786E\u5B9A\u5220\u9664\uFF1F')) return;
-            fetch('/api/delete_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{resume_id:id}})}})
-              .then(function(r){{ return r.json(); }})
-              .then(function(d){{ if(d.success) loadResumes(); }});
+            deleteResumeById(id);
         }});
+
+        async function deleteResumeById(resumeId) {{
+            if (!confirm('\u786E\u5B9A\u5220\u9664\u8FD9\u4EFD\u7B80\u5386\uFF1F')) return;
+            try {{
+                var d = await (await fetch('/api/delete_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{resume_id:resumeId}})}})).json();
+                if (d.success) {{
+                    var modal = document.getElementById('resume-lib-preview-modal');
+                    if (modal) modal.remove();
+                    loadResumes();
+                }} else {{
+                    alert('\u5220\u9664\u5931\u8D25: ' + (d.error || ''));
+                }}
+            }} catch(e) {{
+                alert('\u5220\u9664\u51FA\u9519: ' + e);
+            }}
+        }}
 
         async function showResumeLibraryPreview(resumeId) {{
             var old = document.getElementById('resume-lib-preview-modal');
@@ -4616,7 +4687,8 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
             h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e0e0e0;flex-shrink:0">';
             h += '<h3 style="margin:0;font-size:16px">\U0001F4C4 \u7B80\u5386\u9884\u89C8</h3>';
             h += '<div>';
-            h += '<a href="/api/get_resume?resume_id=' + resumeId + '" target="_blank" class="btn" style="margin-right:8px;font-size:13px;padding:5px 12px">\U0001F4E5 \u4E0B\u8F7D</a>';
+            h += '<a href="/api/get_resume?resume_id=' + resumeId + '" target="_blank" class="btn" style="margin-right:4px;font-size:13px;padding:5px 12px">\U0001F4E5 \u4E0B\u8F7D</a>';
+            h += '<button class="btn" onclick="deleteResumeById(\'' + resumeId + '\')" style="margin-right:4px;font-size:13px;padding:5px 12px;color:#d32f2f;border-color:#d32f2f">\U0001F5D1 \u5220\u9664</button>';
             h += '<button class="resume-lib-modal-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1">\u00d7</button>';
             h += '</div></div>';
             h += '<div id="resume-lib-preview-content" style="overflow-y:auto;padding:20px;line-height:1.7;font-size:14px;flex:1">';
@@ -4698,8 +4770,8 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
         resume_name = job.get("resume_name", "简历")
         resume_id = job["resume_id"]
         i18n = {}
-        for k in ["resume_edit_title", "resume_edit_subtitle", "btn_back", "btn_export_pdf",
-                   "btn_exporting", "md_editor_label", "md_editor_placeholder", "preview_failed",
+        for k in ["resume_edit_title", "resume_edit_subtitle", "btn_back", "btn_delete",
+                   "btn_export_pdf", "btn_exporting", "md_editor_label", "md_editor_placeholder", "preview_failed",
                    "toolbar_bold", "toolbar_heading", "toolbar_list", "toolbar_link",
                    "status_saved", "status_save_failed", "status_save_error",
                    "status_export_failed", "status_export_error",
@@ -4714,6 +4786,7 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
         e_title = kw.get("resume_edit_title", "Edit Resume - ")
         e_subtitle = kw.get("resume_edit_subtitle", "Job-specific copy")
         b_back = kw.get("btn_back", "← Back")
+        b_delete = kw.get("btn_delete", "🗑 Delete")
         b_export_pdf = kw.get("btn_export_pdf", "📄 Export PDF")
         b_exporting = kw.get("btn_exporting", "Generating...")
         b_save = kw.get("btn_save", "💾 Save")
@@ -4778,6 +4851,7 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-seri
   <div>
     <a href="/tracked?lang={lang}" class="btn btn-back">{b_back}</a>
     <button onclick="exportPdf()" class="btn btn-download" id="exportBtn">{b_export_pdf}</button>
+    <button onclick="deleteCurrentResume()" class="btn" style="color:#d32f2f;border-color:#d32f2f">{b_delete}</button>
     <button onclick="saveResume()" class="btn btn-save">{b_save}</button>
   </div>
 </div>
@@ -4894,6 +4968,21 @@ async function exportPdf() {{
   }} finally {{
     btn.disabled = false;
     btn.textContent = _b_export_pdf;
+  }}
+}}
+
+async function deleteCurrentResume() {{
+  if (!confirm('确定删除此简历并解除关联？')) return;
+  try {{
+    var resp = await fetch('/api/delete_job_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
+    var d = await resp.json();
+    if (d.success) {{
+      window.location.href = '/tracked?lang={lang}';
+    }} else {{
+      alert('删除失败: ' + (d.error || ''));
+    }}
+  }} catch(e) {{
+    alert('删除出错: ' + e);
   }}
 }}
 
@@ -5107,10 +5196,15 @@ loadResume();
         .job-resume {{ margin-top:8px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:14px; }}
         .resume-icon {{ font-size:18px; line-height:1; }}
         .resume-name {{ font-weight:500; color:#333; }}
+        .btn-unlink-resume {{ background:none; border:none; color:#d32f2f; cursor:pointer; font-size:18px; line-height:1; padding:0 2px; margin:0; opacity:0.6; vertical-align:middle; }}
+        .btn-unlink-resume:hover {{ opacity:1; }}
         .resume-actions {{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-left:auto; }}
         .resume-actions .link-url {{ display:inline; color:#1a73e8; font-size:13px; }}
         .resume-actions .btn-small {{ font-size:12px; }}
 
+        .btn-rerun {{ background:none; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:13px; padding:0 6px; color:#555; vertical-align:middle; line-height:1.8; }}
+        .btn-rerun:hover {{ background:#e8e8e8; border-color:#999; }}
+        .btn-rerun:disabled {{ opacity:0.5; cursor:not-allowed; }}
         .search-summary {{ margin:18px 0; }}
 
         .result-stats {{ display:flex; gap:16px; margin:10px 0; }}

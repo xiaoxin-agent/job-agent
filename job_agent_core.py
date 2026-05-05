@@ -406,7 +406,13 @@ class JobSearchEngine:
         return ranovus_search(keywords, location, max_results)
 
     def search_nokia(self, keywords: List[str], location: str, max_results: int = 5) -> List[Dict]:
-        """委托 sites.nokia.search 进行 Nokia 职位搜索 (Oracle HCM)"""
+        """委托 sites.nokia.search 进行 Nokia 职位搜索 (Oracle HCM)
+        
+        ⚠️ 已知限制：Nokia 的 Oracle HCM 租户（CX_1）在服务器端做
+        了限制，API 永远只返回固定的 25 个职位，所有关键字/地点筛选
+        和分页参数均被忽略。实际数据库有 867 个职位（加拿大 107 个），
+        但 API 拒绝返回。详情见 sites/nokia.py 的模块文档。
+        """
         if not keywords:
             keywords = self.profile.get_skill_keywords()[:3]
         elif isinstance(keywords, str):
@@ -907,8 +913,9 @@ class JobAnalyzer:
             }
         }
     
-    def _get_category_weight(self, category: str) -> float:
-        """获取技能类别权重"""
+    @staticmethod
+    def _get_category_weight_static(category: str) -> float:
+        """获取技能类别权重（静态版本）"""
         weights = {
             "Cloud": 25,
             "AI/ML": 25,
@@ -919,14 +926,23 @@ class JobAnalyzer:
         }
         return weights.get(category, 10)
     
-    def _skill_match_score(self, level: str) -> float:
-        """获取技能匹配得分"""
+    @staticmethod
+    def _skill_match_score_static(level: str) -> float:
+        """获取技能匹配得分（静态版本）"""
         scores = {
             "expert": 1.0,
             "intermediate": 0.7,
             "beginner": 0.4
         }
         return scores.get(level, 0.5)
+    
+    def _get_category_weight(self, category: str) -> float:
+        """获取技能类别权重"""
+        return self._get_category_weight_static(category)
+    
+    def _skill_match_score(self, level: str) -> float:
+        """获取技能匹配得分"""
+        return self._skill_match_score_static(level)
     
     def _extract_salary(self, text: str) -> Optional[Dict]:
         """从文本中提取薪资信息"""
@@ -1280,6 +1296,24 @@ class JobTracker:
                         if os.path.exists(job_dir):
                             import shutil
                             shutil.rmtree(job_dir, ignore_errors=True)
+                self.save()
+                return True
+        return False
+
+    def delete_job_resume(self, job_id: str) -> bool:
+        """删除职位关联的简历副本，保留简历库原始文件"""
+        for job in self.tracked_jobs:
+            if job["id"] == job_id:
+                # 删除职位副本目录
+                job_dir = os.path.join(self._resume_dir(), f"job_{job['id']}")
+                if os.path.exists(job_dir):
+                    import shutil
+                    shutil.rmtree(job_dir, ignore_errors=True)
+                # 清空引用
+                job.pop("resume_id", None)
+                job.pop("resume_name", None)
+                job.pop("job_resume_file", None)
+                job.pop("has_edited_resume", None)
                 self.save()
                 return True
         return False
@@ -1882,8 +1916,112 @@ class JobAgent:
         """删除跟踪的职位"""
         return self.tracker.delete_job(job_id)
     
+    def rerun_analysis(self, job_id: str) -> Optional[Dict]:
+        """根据关联的简历 Markdown 重新计算匹配度"
+        
+        Args:
+            job_id: 职位 ID
+            
+        Returns:
+            更新后的 job dict，若无关联简历或无职位返回 None
+        """
+        import re
+        
+        # 找到职位
+        job = None
+        for j in self.tracker.tracked_jobs:
+            if j["id"] == job_id:
+                job = j
+                break
+        if not job:
+            return None
+        
+        # 获取简历 Markdown
+        resume_md = self.tracker.get_job_resume_markdown(job_id)
+        if not resume_md:
+            return None
+        
+        # 计算简历与职位的匹配度：
+        # 遍历 profile 技能类别，检查简历中哪些技能在职位要求中存在（交集）
+        resume_lower = resume_md.lower()
+        job_title_desc = (job.get("title", "") + " " + job.get("description", "")).lower()
+        skills = self.profile.profile.get("skills", {})
+        
+        total_weight = 0
+        matched_weight = 0
+        matched_skills = []
+        
+        for category, info in skills.items():
+            weight = JobAnalyzer._get_category_weight_static(category)
+            total_weight += weight
+            
+            # 先看职位描述了哪些技能
+            job_has_skill = False
+            job_skill_keyword = ""
+            for keyword in info.get("keywords", []):
+                kw_lower = keyword.lower()
+                if kw_lower in job_title_desc:
+                    job_has_skill = True
+                    job_skill_keyword = keyword
+                    break
+                parts = kw_lower.split()
+                if len(parts) > 1 and any(p in job_title_desc for p in parts):
+                    job_has_skill = True
+                    job_skill_keyword = keyword
+                    break
+            
+            # 职位要求了该技能，再检查简历是否有
+            if job_has_skill:
+                # 检查简历是否包含该技能
+                resume_has = False
+                partial_match = False
+                for keyword in info.get("keywords", []):
+                    kw_lower = keyword.lower()
+                    if kw_lower in resume_lower:
+                        resume_has = True
+                        break
+                    parts = kw_lower.split()
+                    if len(parts) > 1 and any(p in resume_lower for p in parts):
+                        partial_match = True
+                        break
+                
+                if resume_has:
+                    matched_skills.append({
+                        "category": category,
+                        "keyword": job_skill_keyword,
+                        "from": "resume",
+                        "level": info.get("level", "intermediate"),
+                        "score": JobAnalyzer._skill_match_score_static(info.get("level", "intermediate"))
+                    })
+                    matched_weight += weight
+                elif partial_match:
+                    matched_skills.append({
+                        "category": category,
+                        "keyword": job_skill_keyword,
+                        "from": "resume",
+                        "partial": True,
+                        "level": info.get("level", "intermediate"),
+                        "score": JobAnalyzer._skill_match_score_static(info.get("level", "intermediate")) * 0.5
+                    })
+                    matched_weight += weight * 0.5
+        
+        match_score = round((matched_weight / total_weight) * 100) if total_weight > 0 else 0
+        
+        # 更新职位的 match_score
+        job["match_score"] = match_score
+        job["match_details"] = {
+            "skill_match": matched_skills,
+            "matched_skills_count": len(matched_skills),
+            "source": "resume_rerun"
+        }
+        # 标记已根据简历重新匹配
+        job["resume_rerun"] = True
+        self.tracker.save()
+        
+        return job
+
     def _save_search_history(self, result: Dict):
-        """保存搜索历史"""
+        """保存搜索历史""" 
         history_file = os.path.join(self.data_dir, "search_history.json")
         history = []
         

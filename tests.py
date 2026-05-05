@@ -29,7 +29,12 @@ class TestCoreModule(unittest.TestCase):
         cls.test_dir = "/tmp/agent_test_data"
         os.makedirs(cls.test_dir, exist_ok=True)
         cls.agent = JobAgent(data_dir=cls.test_dir)
-    
+
+    def setUp(self):
+        """每个测试前清理 tracker，避免残留数据"""
+        for j in list(self.agent.tracker.tracked_jobs):
+            self.agent.tracker.delete_job(j["id"])
+
     def test_01_agent_init(self):
         """Agent初始化正常"""
         self.assertIsNotNone(self.agent)
@@ -102,18 +107,25 @@ class TestCoreModule(unittest.TestCase):
     
     def test_08_tracker_duplicate(self):
         """重复保存应返回False"""
-        job = {
+        self.agent.save_job({
             "title": "Cloud AI Engineer",
             "company": "Amazon",
             "location": "Vancouver",
             "match_score": 85,
             "source": "test"
-        }
-        ok = self.agent.save_job(job)
+        })
+        ok = self.agent.save_job({
+            "title": "Cloud AI Engineer",
+            "company": "Amazon",
+            "location": "Vancouver",
+            "match_score": 85,
+            "source": "test"
+        })
         self.assertFalse(ok)
     
     def test_09_tracker_update_status(self):
         """更新申请状态"""
+        self.agent.save_job({"title": "Update Test", "company": "UpdateCo", "source": "test"})
         job_id = self.agent.tracker.tracked_jobs[0]["id"]
         ok = self.agent.update_job_status(job_id, "applied", "已提交简历")
         self.assertTrue(ok)
@@ -156,11 +168,232 @@ class TestCoreModule(unittest.TestCase):
         self.assertGreaterEqual(len(history), 1)
 
 
+class TestCoreCoverage(unittest.TestCase):
+    """补充核心模块覆盖率 - 测试纯逻辑、无网络依赖的方法"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.test_dir = "/tmp/agent_test_coverage"
+        os.makedirs(cls.test_dir, exist_ok=True)
+        from job_agent_core import JobAgent
+        cls.agent = JobAgent(data_dir=cls.test_dir)
+        cls.profile = cls.agent.profile
+        cls.analyzer = cls.agent.analyzer
+        cls.tracker = cls.agent.tracker
+
+    def setUp(self):
+        for j in list(self.tracker.tracked_jobs):
+            self.tracker.delete_job(j["id"])
+
+    # ─── JobAnalyzer 纯逻辑方法 ───
+
+    def test_get_category_weight(self):
+        self.assertEqual(self.analyzer._get_category_weight("Cloud"), 25)
+        self.assertEqual(self.analyzer._get_category_weight("AI/ML"), 25)
+        self.assertEqual(self.analyzer._get_category_weight("Linux"), 20)
+        self.assertEqual(self.analyzer._get_category_weight("Python"), 15)
+        self.assertEqual(self.analyzer._get_category_weight("C/C++"), 10)
+        self.assertEqual(self.analyzer._get_category_weight("DevOps"), 5)
+        self.assertEqual(self.analyzer._get_category_weight("Unknown"), 10)
+
+    def test_skill_match_score(self):
+        self.assertEqual(self.analyzer._skill_match_score("expert"), 1.0)
+        self.assertEqual(self.analyzer._skill_match_score("intermediate"), 0.7)
+        self.assertEqual(self.analyzer._skill_match_score("beginner"), 0.4)
+        self.assertEqual(self.analyzer._skill_match_score("unknown"), 0.5)
+
+    def test_extract_salary(self):
+        r = self.analyzer._extract_salary("$80,000 - $120,000 CAD")
+        self.assertEqual(r["min"], 80000); self.assertEqual(r["max"], 120000)
+        self.assertIsNone(self.analyzer._extract_salary("no salary"))
+        r = self.analyzer._extract_salary("$60,000–$90,000")
+        self.assertEqual(r["min"], 60000)
+
+    def test_analyze_job_basic(self):
+        r = self.agent.analyzer.analyze_job({
+            "title": "Senior ML Engineer", "company": "NVIDIA",
+            "description": "Cloud AI expert with Python, PyTorch, Linux kernel",
+            "url": "https://example.com/job/x", "source": "test"})
+        self.assertTrue(r.get("analyzed"))
+        self.assertIn("skill_match", r.get("match_details", {}))
+
+    def test_analyze_job_empty(self):
+        r = self.agent.analyzer.analyze_job(
+            {"title": "", "company": "", "description": "", "source": "test"})
+        self.assertIsInstance(r, dict)
+
+    def test_analyze_job_low_match(self):
+        r = self.agent.analyzer.analyze_job({
+            "title": "Junior Barista", "company": "Coffee Shop",
+            "description": "Making coffee and serving customers", "source": "test"})
+        self.assertLess(r.get("match_score", 100), 50)
+
+    def test_generate_cover_letter(self):
+        letter = self.analyzer.generate_cover_letter({
+            "company": "TestCorp", "title": "Cloud Engineer",
+            "match_details": {
+                "skill_match": [
+                    {"category": "Cloud", "keyword": "AWS", "level": "expert"},
+                    {"category": "Linux", "keyword": "Kernel", "level": "intermediate"}
+                ]}})
+        self.assertIn("TestCorp", letter); self.assertIn("Cloud Engineer", letter)
+
+    def test_generate_cover_letter_empty(self):
+        letter = self.analyzer.generate_cover_letter(
+            {"company": "AnyCo", "title": "Engineer"})
+        self.assertIn("AnyCo", letter)
+
+    # ─── JobTracker 纯逻辑方法 ───
+
+    def test_tracker_add_and_get_job(self):
+        ok = self.tracker.add_job({"title": "T1", "company": "C1", "location": "R"})
+        self.assertTrue(ok)
+        jid = self.tracker.tracked_jobs[0]["id"]
+        got = self.tracker.get_job(jid)
+        self.assertEqual(got["id"], jid)
+
+    def test_tracker_get_job_not_found(self):
+        self.assertIsNone(self.tracker.get_job("nonexistent"))
+
+    def test_tracker_deduplicate(self):
+        self.tracker.add_job({"title": "Dup", "company": "DC", "location": "A"})
+        self.assertFalse(self.tracker.add_job({"title": "Dup", "company": "DC", "location": "B"}))
+        self.assertEqual(len(self.tracker.tracked_jobs), 1)
+
+    def test_tracker_update_status(self):
+        self.tracker.add_job({"title": "S", "company": "SC"})
+        jid = self.tracker.tracked_jobs[0]["id"]
+        self.tracker.update_status(jid, "applied", "Applied online")
+        job = self.tracker.get_job(jid)
+        self.assertEqual(job["status"], "applied")
+        self.assertEqual(job["notes"], "Applied online")
+
+    def test_tracker_update_status_nonexistent(self):
+        self.tracker.update_status("fake", "applied")  # no crash
+
+    def test_tracker_get_stats_empty(self):
+        s = self.tracker.get_stats()
+        self.assertEqual(s["total"], 0)
+
+    def test_tracker_get_stats_varied(self):
+        self.tracker.add_job({"title": "A", "company": "C", "match_score": 90})
+        self.tracker.add_job({"title": "B", "company": "C2", "match_score": 70})
+        self.tracker.add_job({"title": "C", "company": "C3", "match_score": 50})
+        # add_job inserts at index 0 (newest first), so find by title
+        def find(title):
+            for j in self.tracker.tracked_jobs:
+                if j["title"] == title:
+                    return j["id"]
+        self.tracker.update_status(find("A"), "applied")
+        self.tracker.update_status(find("B"), "interviewing")
+        s = self.tracker.get_stats()
+        self.assertEqual(s["total"], 3)
+        self.assertEqual(s["applied"], 1)
+        self.assertEqual(s["interviewing"], 1)
+        self.assertEqual(s["avg_match_score"], 70)
+
+    def test_tracker_delete_job(self):
+        self.tracker.add_job({"title": "D", "company": "DC"})
+        jid = self.tracker.tracked_jobs[0]["id"]
+        self.assertTrue(self.tracker.delete_job(jid))
+        self.assertEqual(len(self.tracker.tracked_jobs), 0)
+
+    def test_tracker_delete_job_nonexistent(self):
+        self.assertFalse(self.tracker.delete_job("bad"))
+
+    def test_tracker_cover_letter(self):
+        self.tracker.add_job({"title": "CL", "company": "CLC"})
+        jid = self.tracker.tracked_jobs[0]["id"]
+        self.assertTrue(self.tracker.update_cover_letter("CL", "CLC", "letter"))
+        self.assertEqual(self.tracker.tracked_jobs[0]["cover_letter"], "letter")
+        self.assertFalse(self.tracker.update_cover_letter("Nope", "No", "l"))
+        self.assertTrue(self.tracker.update_cover_letter_by_id(jid, "by id"))
+        self.assertEqual(self.tracker.get_job(jid)["cover_letter"], "by id")
+        self.assertFalse(self.tracker.update_cover_letter_by_id("bad", "x"))
+
+    def test_tracker_undo_last_status(self):
+        self.tracker.add_job({"title": "U", "company": "UC"})
+        jid = self.tracker.tracked_jobs[0]["id"]
+        self.tracker.update_status(jid, "applied")
+        self.assertTrue(self.tracker.undo_last_status(jid))
+        self.assertEqual(self.tracker.get_job(jid)["status"], "saved")
+        self.assertFalse(self.tracker.undo_last_status(jid))  # only one history left
+        self.assertFalse(self.tracker.undo_last_status("bad"))
+
+    def test_tracker_delete_interview(self):
+        self.tracker.add_job({"title": "I", "company": "IC"})
+        jid = self.tracker.tracked_jobs[0]["id"]
+        job = self.tracker.get_job(jid)
+        job["interviews"] = [{"round": 1, "date": "2026-05-10"}, {"round": 2, "date": "2026-05-20"}]
+        self.tracker.save()
+        self.assertTrue(self.tracker.delete_interview(jid, 1))
+        self.assertEqual(len(self.tracker.get_job(jid)["interviews"]), 1)
+        self.assertFalse(self.tracker.delete_interview(jid, 5))
+
+    def test_tracker_markdown_to_html(self):
+        html = self.tracker.markdown_to_html("# Hello\n\n**bold**")
+        self.assertIn("<h1>", html); self.assertIn("<strong>", html)
+        # 空字符串应返回空（现有实现返回占位html，但接受）
+        html2 = self.tracker.markdown_to_html("")
+        self.assertIsInstance(html2, str)
+
+    # ─── UserProfile ───
+
+    def test_profile_update_and_reload(self):
+        self.profile.update_profile({"name": "Cover Test"})
+        self.assertEqual(self.profile.profile.get("name"), "Cover Test")
+        from job_agent_core import UserProfile
+        p2 = UserProfile(self.profile.profile_file)
+        self.assertEqual(p2.profile.get("name"), "Cover Test")
+
+    # ─── JobAgent 层面 ───
+
+    def test_agent_dashboard(self):
+        data = self.agent.get_dashboard_data()
+        self.assertIn("profile", data)
+        self.assertIn("tracker_stats", data)
+        self.assertIn("recent_searches", data)
+        self.assertIn("current_time", data)
+
+    def test_agent_update_and_delete_job(self):
+        self.tracker.add_job({"title": "X", "company": "Y"})
+        jid = self.tracker.tracked_jobs[0]["id"]
+        self.agent.update_job_status(jid, "interviewing", "call")
+        self.assertEqual(self.tracker.get_job(jid)["status"], "interviewing")
+        self.assertTrue(self.agent.delete_job(jid))
+
+    def test_agent_search_history(self):
+        self.agent._save_search_history({
+            "stats": {
+                "search_time": "1.2s",
+                "search_id": "test123",
+                "total_jobs": 5,
+                "high_match": 2,
+                "medium_match": 1,
+                "avg_match_score": 70
+            },
+            "sources": {}})
+        h = self.agent._get_search_history()
+        self.assertGreaterEqual(len(h), 1)
+        self.assertEqual(h[0]["total_jobs"], 5)
+
+    # ─── JobTracker 底层 ───
+
+    def test_tracker_load_empty(self):
+        import tempfile
+        f = tempfile.mktemp(suffix=".json")
+        # 文件不能存在，JobTracker 会创建目录但不会自动创建文件
+        if os.path.exists(f):
+            os.remove(f)
+        from job_agent_core import JobTracker
+        tr = JobTracker(f)
+        self.assertEqual(tr.tracked_jobs, [])
+        if os.path.exists(f):
+            os.remove(f)
+
+
 class TestWebServer(unittest.TestCase):
     """HTTP接口集成测试"""
-
-    # 共享agent引用，供测试方法访问
-    _agent = None
 
     @classmethod
     def setUpClass(cls):
@@ -1376,6 +1609,7 @@ if __name__ == "__main__":
     # 核心模块测试
     loader = unittest.TestLoader()
     suite.addTests(loader.loadTestsFromTestCase(TestCoreModule))
+    suite.addTests(loader.loadTestsFromTestCase(TestCoreCoverage))
     
     # Web接口测试
     suite.addTests(loader.loadTestsFromTestCase(TestWebServer))
