@@ -1144,6 +1144,40 @@ class JobTracker:
         
         return stats
     
+    def undo_last_status(self, job_id: str) -> bool:
+        """删除最后一条 status_history 记录，并把 status 回退到上一条。"""
+        job = self.get_job(job_id)
+        if not job:
+            return False
+        history = job.get("status_history") or []
+        if len(history) < 2:
+            return False
+        history.pop()  # 删除最后一条
+        # 回退到倒数第二条的状态
+        prev = history[-1]
+        prev_status = prev["status"]
+        job["status"] = prev_status.split("_")[0] if "interviewing" in prev_status else prev_status
+        job["last_updated"] = prev["timestamp"]
+        self.save()
+        return True
+
+    def delete_interview(self, job_id: str, round_num: int) -> bool:
+        """删除指定轮次的面试记录。"""
+        job = self.get_job(job_id)
+        if not job:
+            return False
+        interviews = job.get("interviews") or []
+        before = len(interviews)
+        job["interviews"] = [iv for iv in interviews if iv.get("round") != round_num]
+        if len(job["interviews"]) == before:
+            return False
+        # 如果所有面试记录都删除了，且当前状态是 interviewing，回退到 applied
+        if not job["interviews"] and job["status"] == "interviewing":
+            job["status"] = "applied"
+            job["last_updated"] = datetime.datetime.now().isoformat()
+        self.save()
+        return True
+
     def get_job(self, job_id: str) -> Optional[Dict]:
         """获取单个职位"""
         for job in self.tracked_jobs:

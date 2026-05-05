@@ -394,6 +394,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "downloaded_text": "Downloaded!",
         "copied_text": "Copied!",
         "confirm_regen": "This will discard progress. Regenerate?",
+        "undo_status": "↩ Undo",
+        "confirm_undo_status": "Undo the last status change?",
+        "confirm_delete_interview": "Delete interview Round {0}?",
     },
     "zh-CN": {
         "nav_home": "🏠 首页",
@@ -658,6 +661,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "downloaded_text": "\u5df2\u4e0b\u8f7d!",
         "copied_text": "\u5df2\u590d\u5236!",
         "confirm_regen": "\u786e\u5b9a\u91cd\u65b0\u751f\u6210\u5b66\u4e60\u8ba1\u5212\uff1f\uff08\u5c06\u4e22\u5f03\u5f53\u524d\u8fdb\u5ea6\uff09",
+        "undo_status": "\u2190 \u64a4\u56de",
+        "confirm_undo_status": "\u64a4\u56de\u6700\u540e\u4e00\u6761\u72b6\u6001\u53d8\u66f4\uff1f",
+        "confirm_delete_interview": "\u5220\u9664\u7b2c{0}\u8f6e\u9762\u8bd5\u8bb0\u5f55\uff1f",
     },
     "fr": {
         # Navigation
@@ -925,6 +931,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "downloaded_text": "T\u00e9l\u00e9charg\u00e9 !",
         "copied_text": "Copi\u00e9 !",
         "confirm_regen": "Cela supprimera la progression. Reg\u00e9n\u00e9rer ?",
+        "undo_status": "\u2190 Annuler",
+        "confirm_undo_status": "Annuler le dernier changement de statut ?",
+        "confirm_delete_interview": "Supprimer l\u2019entretien Tour {0} ?",
 
     },
 
@@ -1049,6 +1058,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/download_resume_pdf": self.api_download_resume_pdf,
             "/api/convert_markdown": self.api_convert_markdown,
             "/api/save_job_resume_md": self.api_save_job_resume_md,
+            "/api/undo_status": self.api_undo_status,
+            "/api/delete_interview": self.api_delete_interview,
             "/api/analyze_apply": self.api_analyze_apply,
             "/api/record_apply": self.api_record_apply,
             "/api/tailor_resume": self.api_tailor_resume,
@@ -1546,14 +1557,18 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 label_text = labels.get(base_s, base_s)
                 ft = _fmt_time(h["timestamp"])
                 rows.append(f"<div class='tl-row'><span class='tl-icon'>{icon}</span><span class='tl-status'>{label_text}</span><span class='tl-time'>{ft}</span></div>")
-            # 面试详情（含备注）
+            # 面试详情（含备注），每轮加删除按钮
             if interviews:
                 rows.append("<div class='tl-sep'>" + t(lang, "tl_interview_records") + "</div>")
                 for iv in interviews:
                     ft = _fmt_time(iv["date"])
                     note = ("<span class='tl-note'>" + iv["notes"] + "</span>") if iv.get("notes") else ""
                     round_label = t(lang, "tl_round").format(iv['round'])
-                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>{round_label}</span><span class='tl-time'>{ft}</span>{note}</div>")
+                    del_btn = f"<span class='tl-del' onclick=\"event.stopPropagation();deleteInterview('{j['id']}', {iv['round']})\">\u2716</span>"
+                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>{round_label}</span><span class='tl-time'>{ft}</span>{note}{del_btn}</div>")
+            # 撤回最后一条状态变更按钮
+            if len(history) >= 2:
+                rows.append(f"<div class='tl-undo' onclick=\"event.stopPropagation();undoLastStatus('{j['id']}')\">" + t(lang, "undo_status") + "</div>")
             return "<div class='tl-container'>" + "".join(rows) + "</div>"
 
         def _render_status_timeline(j):
@@ -2261,6 +2276,26 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 alert(_analysis_error + ': ' + e);
             }}
         }}
+        async function undoLastStatus(jobId) {{
+            if (!confirm(_confirm_undo_status)) return;
+            var r = await fetch('/api/undo_status', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}});
+            var d = await r.json();
+            if (d.success) {{
+                location.reload();
+            }} else {{
+                alert(d.error || _analysis_failed);
+            }}
+        }}
+        async function deleteInterview(jobId, roundNum) {{
+            if (!confirm(_confirm_delete_interview.format(roundNum))) return;
+            var r = await fetch('/api/delete_interview', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, round: roundNum}})}});
+            var d = await r.json();
+            if (d.success) {{
+                location.reload();
+            }} else {{
+                alert(d.error || _analysis_failed);
+            }}
+        }}
         function tailorResume(jobId) {{
             var btn = document.getElementById('tailor-' + jobId);
             if (btn) {{ btn.textContent = '⏳ ' + _quiz_generating + ''; btn.disabled = true; }}
@@ -2854,6 +2889,16 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _downloaded_text = {json.dumps(t(lang, 'downloaded_text'), ensure_ascii=False)};
         var _copied_text = {json.dumps(t(lang, 'copied_text'), ensure_ascii=False)};
         var _tasks_completed = {json.dumps(t(lang, 'tasks_completed'), ensure_ascii=False)};
+        var _undo_status = {json.dumps(t(lang, 'undo_status'), ensure_ascii=False)};
+        var _confirm_undo_status = {json.dumps(t(lang, 'confirm_undo_status'), ensure_ascii=False)};
+        var _confirm_delete_interview = {json.dumps(t(lang, 'confirm_delete_interview'), ensure_ascii=False)};
+        // String.prototype.format polyfill for the {0} placeholder
+        if (!String.prototype.format) {{
+            String.prototype.format = function() {{
+                var args = arguments;
+                return this.replace(/{{\d+}}/g, function(m){{ return args[+m.slice(1,-1)]; }});
+            }};
+        }}
 
         // Store current task's job/task id for modal checkbox
         var _td_job_id = '';
@@ -3694,6 +3739,32 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             # 同时更新跟踪状态
             self.agent.tracker.update_status(job_id, "applied")
             self.send_json({"success": True, "record": result.get("record")})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_undo_status(self, data):
+        """撤回最后一条状态变更。"""
+        try:
+            job_id = data.get("job_id", "")
+            if not self.agent.tracker.undo_last_status(job_id):
+                self.send_json({"success": False, "error": "无可撤回的状态变更"}, 400)
+                return
+            self.send_json({"success": True})
+        except Exception as e:
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_delete_interview(self, data):
+        """删除指定轮次的面试记录。"""
+        try:
+            job_id = data.get("job_id", "")
+            round_num = data.get("round", 0)
+            if not round_num:
+                self.send_json({"success": False, "error": "缺少 round 参数"}, 400)
+                return
+            if not self.agent.tracker.delete_interview(job_id, round_num):
+                self.send_json({"success": False, "error": "未找到该面试记录"}, 400)
+                return
+            self.send_json({"success": True})
         except Exception as e:
             self.send_json({"success": False, "error": str(e)}, 500)
 
@@ -5080,6 +5151,10 @@ loadResume();
         .tl-time {{ flex:0 0 auto; color:#888; font-size:12px; }}
         .tl-note {{ color:#555; font-size:12px; margin-left:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; }}
         .tl-sep {{ font-size:11px; color:#999; padding:6px 0 2px 0; border-top:1px dashed #ddd; margin-top:6px; }}
+        .tl-del {{ cursor:pointer; color:#ccc; font-size:14px; margin-left:auto; padding:0 4px; }}
+        .tl-del:hover {{ color:#d32f2f; }}
+        .tl-undo {{ cursor:pointer; font-size:12px; color:#666; padding:6px 0 2px 4px; text-decoration:underline; text-decoration-style:dotted; }}
+        .tl-undo:hover {{ color:#d32f2f; }}
 
         .section {{ margin:28px 0; }}
 
