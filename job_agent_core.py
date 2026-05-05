@@ -1013,11 +1013,18 @@ class JobTracker:
         self.tracked_jobs = self._load()
     
     def _load(self) -> List[Dict]:
-        """加载跟踪数据"""
+        """加载跟踪数据，自动修复数据不一致"""
         if os.path.exists(self.jobs_file):
             try:
                 with open(self.jobs_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    jobs = json.load(f)
+                # 修复 interviewing 但 interviews 为空的不一致
+                for job in jobs:
+                    if job.get("status") == "interviewing":
+                        interviews = job.get("interviews")
+                        if not interviews or len(interviews) == 0:
+                            job["status"] = "applied"
+                return jobs
             except:
                 return []
         return []
