@@ -2911,12 +2911,18 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _undo_status = {json.dumps(t(lang, 'undo_status'), ensure_ascii=False)};
         var _confirm_undo_status = {json.dumps(t(lang, 'confirm_undo_status'), ensure_ascii=False)};
         var _confirm_delete_interview = {json.dumps(t(lang, 'confirm_delete_interview'), ensure_ascii=False)};
-        // String.prototype.format polyfill for the {0} placeholder
-        if (!String.prototype.format) {{
-            String.prototype.format = function() {{
-                var args = arguments;
-                return this.replace(/{{\d+}}/g, function(m){{ return args[+m.slice(1,-1)]; }});
-            }};
+        // toggleLearnTask 函数 (共用，tracked page 和 learn calendar page 都会用)
+        function toggleLearnTask(jobId, taskId, cb) {{
+            var done = cb.checked;
+            fetch('/api/learn_plan_progress', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, task_id: taskId, done: done}})}})
+            .then(function(r){{return r.json()}})
+            .then(function(d){{
+                if (!d.success) return;
+                var bar = document.getElementById('learn-progress-bar-' + jobId);
+                var txt = document.getElementById('learn-progress-txt-' + jobId);
+                if (bar && d.total > 0) {{ bar.style.width = Math.round(d.done / d.total * 100) + '%'; }}
+                if (txt) {{ txt.textContent = d.done + '/' + d.total; }}
+            }});
         }}
 
         // Store current task's job/task id for modal checkbox
