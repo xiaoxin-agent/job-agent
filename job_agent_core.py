@@ -792,6 +792,20 @@ class JobSearchEngine:
             lines.append(line)
         text = '\n'.join(lines)
         text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        # Remove common LinkedIn UI noise lines (typically at bottom of page)
+        noise_lines = [
+            'apply now', 'save job', 'save job saved', 'show more', 'show less', 'share:',
+            'report this', 'report this job',
+        ]
+        filtered = []
+        for line in text.split('\n'):
+            stripped = line.strip().lower()
+            # Skip pure noise lines (but keep within a bullet or paragraph)
+            if stripped in noise_lines:
+                continue
+            filtered.append(line)
+        text = '\n'.join(filtered)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
         return text
 
 # ============================================================

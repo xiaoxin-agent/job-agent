@@ -71,7 +71,9 @@ def _try_json_ld(html: str, result: Dict) -> None:
                         result['location'] = loc.get('name', '')
                 desc = data.get('description', '')
                 if desc:
-                    result['description'] = re.sub(r'<[^>]+>', ' ', desc).strip()
+                    # Keep raw HTML description — _clean_html(keep_format=True) in caller
+                    # will handle structure preservation (headings, lists, bold, etc.)
+                    result['description'] = desc
                 return
         except (json.JSONDecodeError, AttributeError):
             continue
@@ -100,9 +102,10 @@ def _try_embedded_data(html: str, result: Dict) -> None:
         r'\s*<[^>]+>\s*(.*?)\s*</span>',
     ]:
         for m in re.finditer(pattern, html, re.DOTALL):
-            text = re.sub(r'<[^>]+>', ' ', m.group(1)).strip()
-            # Clean up excessive whitespace
-            text = re.sub(r'\s+', ' ', text)
+            # Keep HTML structure tags — _clean_html(keep_format=True) in the
+            # caller will handle converting <strong>/<p>/<ul>/<li>/<br> etc.
+            # into Markdown-compatible formatting (headings, lists, bold, etc.)
+            text = m.group(1).strip()
             if text and len(text) > len(best_text):
                 best_text = text
 
@@ -152,14 +155,15 @@ def _try_description_content(html: str, result: Dict) -> None:
         r'class=["\'][^"\']*show-more-less[^"\']*["\'][^>]*>(.*?)</div>',
         html, re.DOTALL
     ):
-        text = re.sub(r'<[^>]+>', ' ', m.group(1)).strip()
+        # Keep HTML structure — caller will apply _clean_html(keep_format=True)
+        text = m.group(1)
         if text and len(text) > len(result['description']):
             result['description'] = text
 
     # Try article content
     article = re.search(r'<article[^>]*>(.*?)</article>', html, re.DOTALL)
     if article and not result['description']:
-        text = re.sub(r'<[^>]+>', ' ', article.group(1)).strip()
+        text = article.group(1)
         if text:
             result['description'] = text
 
