@@ -2895,35 +2895,6 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _quiz_reference_answer = __quiz_reference_answer;
         var _quiz_not_answered = __quiz_not_answered;
         var _btn_generate_quiz = __btn_generate_quiz;
-        var _btn_optimize = {json.dumps(t(lang, 'btn_optimize'), ensure_ascii=False)};
-        var _confirm_regen = {json.dumps(t(lang, 'confirm_regen'), ensure_ascii=False)};
-        var _learn_tasks_done = {json.dumps(t(lang, 'learn_tasks_done'), ensure_ascii=False)};
-        var _skill_header = {json.dumps(t(lang, 'skill_header'), ensure_ascii=False)};
-        var _kw_header = {json.dumps(t(lang, 'kw_header'), ensure_ascii=False)};
-        var _level_header = {json.dumps(t(lang, 'level_header'), ensure_ascii=False)};
-        var _exp_header = {json.dumps(t(lang, 'exp_header'), ensure_ascii=False)};
-        var _saved_status = {json.dumps(t(lang, 'saved_status'), ensure_ascii=False)};
-        var _failed_status = {json.dumps(t(lang, 'failed_status'), ensure_ascii=False)};
-        var _hint_gen_cover = {json.dumps(t(lang, 'hint_gen_cover'), ensure_ascii=False)};
-        var _downloaded_text = {json.dumps(t(lang, 'downloaded_text'), ensure_ascii=False)};
-        var _copied_text = {json.dumps(t(lang, 'copied_text'), ensure_ascii=False)};
-        var _tasks_completed = {json.dumps(t(lang, 'tasks_completed'), ensure_ascii=False)};
-        var _undo_status = {json.dumps(t(lang, 'undo_status'), ensure_ascii=False)};
-        var _confirm_undo_status = {json.dumps(t(lang, 'confirm_undo_status'), ensure_ascii=False)};
-        var _confirm_delete_interview = {json.dumps(t(lang, 'confirm_delete_interview'), ensure_ascii=False)};
-        // toggleLearnTask 函数 (共用，tracked page 和 learn calendar page 都会用)
-        function toggleLearnTask(jobId, taskId, cb) {{
-            var done = cb.checked;
-            fetch('/api/learn_plan_progress', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, task_id: taskId, done: done}})}})
-            .then(function(r){{return r.json()}})
-            .then(function(d){{
-                if (!d.success) return;
-                var bar = document.getElementById('learn-progress-bar-' + jobId);
-                var txt = document.getElementById('learn-progress-txt-' + jobId);
-                if (bar && d.total > 0) {{ bar.style.width = Math.round(d.done / d.total * 100) + '%'; }}
-                if (txt) {{ txt.textContent = d.done + '/' + d.total; }}
-            }});
-        }}
 
         // Store current task's job/task id for modal checkbox
         var _td_job_id = '';
