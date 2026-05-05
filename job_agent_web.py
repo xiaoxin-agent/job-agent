@@ -1996,6 +1996,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         }}
         var ANALYZING_TEXT = _analyzing_text;
         var APPLY_TEXT = '\u7533\u8bf7';
+        var _undo_status = {json.dumps(t(lang, 'undo_status'), ensure_ascii=False)};
+        var _confirm_undo_status = {json.dumps(t(lang, 'confirm_undo_status'), ensure_ascii=False)};
+        var _confirm_delete_interview = {json.dumps(t(lang, 'confirm_delete_interview'), ensure_ascii=False)};
+        function fmtNum(tpl, n) {{
+            return tpl.replace(/{0}/g, n);
+        }}
         var RECORDED_TEXT = '\u2705 \u5df2\u8bb0\u5f55';
 
         // Auto-analyze skill gaps for jobs with linked resume but no analysis
@@ -2287,7 +2293,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }}
         }}
         async function deleteInterview(jobId, roundNum) {{
-            if (!confirm(_confirm_delete_interview.format(roundNum))) return;
+            if (!confirm(fmtNum(_confirm_delete_interview, roundNum))) return;
             var r = await fetch('/api/delete_interview', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, round: roundNum}})}});
             var d = await r.json();
             if (d.success) {{
