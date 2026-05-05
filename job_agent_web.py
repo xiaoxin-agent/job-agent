@@ -1565,7 +1565,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     note = ("<span class='tl-note'>" + iv["notes"] + "</span>") if iv.get("notes") else ""
                     round_label = t(lang, "tl_round").format(iv['round'])
                     del_btn = f"<span class='tl-del' onclick=\"event.stopPropagation();deleteInterview('{j['id']}', {iv['round']})\">\u2716</span>"
-                    rows.append(f"<div class='tl-row'><span class='tl-icon'>💬</span><span class='tl-status'>{round_label}</span><span class='tl-time'>{ft}</span>{note}{del_btn}</div>")
+                    rows.append(f"<div class='tl-row' data-round='{iv['round']}'><span class='tl-icon'>💬</span><span class='tl-status'>{round_label}</span><span class='tl-time'>{ft}</span>{note}{del_btn}</div>")
             # 撤回最后一条状态变更按钮
             if len(history) >= 2:
                 rows.append(f"<div class='tl-undo' onclick=\"event.stopPropagation();undoLastStatus('{j['id']}')\">" + t(lang, "undo_status") + "</div>")
@@ -2297,7 +2297,27 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var r = await fetch('/api/delete_interview', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, round: roundNum}})}});
             var d = await r.json();
             if (d.success) {{
-                location.reload();
+                var el = document.getElementById('ttl-' + jobId);
+                if (el) {{
+                    // 用 data-round 精确删除该行
+                    var row = el.querySelector('.tl-row[data-round="' + roundNum + '"]');
+                    if (row) row.remove();
+                    // 如果没有任何面试行了，移除分隔线
+                    var remaining = el.querySelectorAll('.tl-row[data-round]');
+                    if (remaining.length === 0) {{
+                        var sep = el.querySelector('.tl-sep');
+                        if (sep) {{ sep.remove(); }}
+                        // 如果 status_history 只有 1 条，收起整个 timeline
+                        var historyRows = el.querySelectorAll('.tl-row:not([data-round])');
+                        if (historyRows.length <= 1) {{
+                            var sum = document.getElementById('ttl-sum-' + jobId);
+                            if (sum) {{
+                                el.style.display = 'none';
+                                sum.innerHTML = sum.innerHTML.replace(_tl_hide, _tl_detail);
+                            }}
+                        }}
+                    }}
+                }}
             }} else {{
                 alert(d.error || _analysis_failed);
             }}
