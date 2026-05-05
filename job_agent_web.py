@@ -3362,7 +3362,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 try:
                     fetched = self.agent.fetch_job_from_url(url, keep_html=True)
                     if fetched.get("description"):
-                        job_data["description"] = fetched["description"]
+                        # 保留格式但清除纯 HTML 标签（转成 Markdown 友好文本）
+                        desc = fetched["description"]
+                        if '<' in desc and '>' in desc:
+                            desc = self.agent.engine._clean_html(desc, keep_format=True)
+                        job_data["description"] = desc
                     if fetched.get("title"):
                         job_data["title"] = fetched["title"]
                     if fetched.get("company"):

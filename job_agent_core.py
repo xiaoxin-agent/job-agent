@@ -1725,7 +1725,8 @@ class JobAgent:
         if result['description']:
             try:
                 result['description'] = self.engine._clean_html(
-                    '<div>' + result['description'] + '</div>'
+                    '<div>' + result['description'] + '</div>',
+                    keep_format=True
                 )
             except:
                 pass
