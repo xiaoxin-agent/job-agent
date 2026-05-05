@@ -825,22 +825,50 @@ class JobAnalyzer:
             
             category_matched = False
             for keyword in info.get("keywords", []):
-                if keyword.lower() in title:
-                    matched_skills.append({
-                        "category": category,
-                        "keyword": keyword,
-                        "level": info.get("level", "intermediate"),
-                        "score": self._skill_match_score(info.get("level", "intermediate"))
-                    })
-                    matched_weight += weight
-                    category_matched = True
-                    break
+                kw_lower = keyword.lower()
+                if kw_lower in title:
+                    # Word boundary check for short keywords to avoid false positives
+                    # e.g. "C" shouldn't match "product", "AI" shouldn't match "detail"
+                    if len(kw_lower) <= 3:
+                        # Use regex word boundary for short keywords
+                        import re
+                        if re.search(r'\b' + re.escape(kw_lower) + r'\b', title):
+                            matched_skills.append({
+                                "category": category,
+                                "keyword": keyword,
+                                "level": info.get("level", "intermediate"),
+                                "score": self._skill_match_score(info.get("level", "intermediate"))
+                            })
+                            matched_weight += weight
+                            category_matched = True
+                            break
+                    else:
+                        matched_skills.append({
+                            "category": category,
+                            "keyword": keyword,
+                            "level": info.get("level", "intermediate"),
+                            "score": self._skill_match_score(info.get("level", "intermediate"))
+                        })
+                        matched_weight += weight
+                        category_matched = True
+                        break
             
             if not category_matched:
                 # 检查是否有部分匹配
                 for keyword in info.get("keywords", []):
-                    parts = keyword.lower().split()
+                    kw_lower = keyword.lower()
+                    parts = kw_lower.split()
                     if len(parts) > 1 and any(p in title for p in parts):
+                        # Word boundary for short parts in partial match too
+                        all_ok = True
+                        for part in parts:
+                            if len(part) <= 3:
+                                import re
+                                if not re.search(r'\b' + re.escape(part) + r'\b', title):
+                                    all_ok = False
+                                    break
+                        if not all_ok:
+                            continue
                         matched_skills.append({
                             "category": category,
                             "keyword": keyword,
@@ -1958,17 +1986,32 @@ class JobAgent:
             # 先看职位描述了哪些技能
             job_has_skill = False
             job_skill_keyword = ""
+            import re
             for keyword in info.get("keywords", []):
                 kw_lower = keyword.lower()
                 if kw_lower in job_title_desc:
-                    job_has_skill = True
-                    job_skill_keyword = keyword
-                    break
+                    # Word boundary for short keywords
+                    if len(kw_lower) <= 3:
+                        if re.search(r'\b' + re.escape(kw_lower) + r'\b', job_title_desc):
+                            job_has_skill = True
+                            job_skill_keyword = keyword
+                            break
+                    else:
+                        job_has_skill = True
+                        job_skill_keyword = keyword
+                        break
                 parts = kw_lower.split()
                 if len(parts) > 1 and any(p in job_title_desc for p in parts):
-                    job_has_skill = True
-                    job_skill_keyword = keyword
-                    break
+                    # Check word boundary for short parts
+                    all_ok = True
+                    for part in parts:
+                        if len(part) <= 3 and not re.search(r'\b' + re.escape(part) + r'\b', job_title_desc):
+                            all_ok = False
+                            break
+                    if all_ok:
+                        job_has_skill = True
+                        job_skill_keyword = keyword
+                        break
             
             # 职位要求了该技能，再检查简历是否有
             if job_has_skill:
@@ -1978,12 +2021,23 @@ class JobAgent:
                 for keyword in info.get("keywords", []):
                     kw_lower = keyword.lower()
                     if kw_lower in resume_lower:
-                        resume_has = True
-                        break
+                        if len(kw_lower) <= 3:
+                            if re.search(r'\b' + re.escape(kw_lower) + r'\b', resume_lower):
+                                resume_has = True
+                                break
+                        else:
+                            resume_has = True
+                            break
                     parts = kw_lower.split()
                     if len(parts) > 1 and any(p in resume_lower for p in parts):
-                        partial_match = True
-                        break
+                        all_ok = True
+                        for part in parts:
+                            if len(part) <= 3 and not re.search(r'\b' + re.escape(part) + r'\b', resume_lower):
+                                all_ok = False
+                                break
+                        if all_ok:
+                            partial_match = True
+                            break
                 
                 if resume_has:
                     matched_skills.append({
