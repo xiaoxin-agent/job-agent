@@ -388,6 +388,10 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "kw_header": "Keywords",
         "level_header": "Level",
         "exp_header": "Experience",
+        "btn_add_skill": "➕ Add Skill",
+        "btn_delete_skill": "🗑️",
+        "delete_skill_title": "Delete skill row",
+        "skill_edit_hint": "Edit skill name, keywords (comma-separated), level, and experience years, then save.",
         "saved_status": "Saved",
         "failed_status": "Failed",
         "hint_gen_cover": "Please generate a cover letter from the search page first.",
@@ -657,7 +661,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "exp_header": "\u7ecf\u9a8c",
         "saved_status": "\u5df2\u4fdd\u5b58",
         "failed_status": "\u5931\u8d25",
+        "btn_add_skill": "\u2795 \u6dfb\u52a0\u6280\u80fd",
+        "btn_delete_skill": "🗑️",
+        "delete_skill_title": "\u5220\u9664\u8fd9\u4e00\u884c",
         "hint_gen_cover": "\u8bf7\u5148\u5728\u641c\u7d22\u9875\u9762\u751f\u6210\u6c42\u804c\u4fe1\u3002",
+        "skill_edit_hint": "\u4fee\u6539\u6280\u80fd\u540d\u79f0\u3001\u5173\u952e\u8bcd\uff08\u9017\u53f7\u5206\u9694\uff09\u3001\u7ea7\u522b\u548c\u7ecf\u9a8c\u5e74\u540e\u4fdd\u5b58\u3002",
         "downloaded_text": "\u5df2\u4e0b\u8f7d!",
         "copied_text": "\u5df2\u590d\u5236!",
         "confirm_regen": "\u786e\u5b9a\u91cd\u65b0\u751f\u6210\u5b66\u4e60\u8ba1\u5212\uff1f\uff08\u5c06\u4e22\u5f03\u5f53\u524d\u8fdb\u5ea6\uff09",
@@ -927,7 +935,11 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "exp_header": "Exp\u00e9rience",
         "saved_status": "Sauvegard\u00e9",
         "failed_status": "\u00c9chec",
+        "btn_add_skill": "\u2795 Ajouter une comp\u00e9tence",
+        "btn_delete_skill": "🗑️",
+        "delete_skill_title": "Supprimer cette comp\u00e9tence",
         "hint_gen_cover": "G\u00e9n\u00e9rez d\u2019abord une lettre de motivation depuis la page de recherche.",
+        "skill_edit_hint": "Modifiez le nom, les mots-cl\u00e9s (s\u00e9par\u00e9s par des virgules), le niveau et les ann\u00e9es d\u2019exp\u00e9rience, puis enregistrez.",
         "downloaded_text": "T\u00e9l\u00e9charg\u00e9 !",
         "copied_text": "Copi\u00e9 !",
         "confirm_regen": "Cela supprimera la progression. Reg\u00e9n\u00e9rer ?",
@@ -3256,9 +3268,26 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         p = self.agent.profile.profile
         sk = ""
         years_label = "yr" if lang == "en" else "年"
-        for cat, info in p.get("skills", {}).items():
-            kw = ", ".join(info.get("keywords", [])[:4])
-            sk += f"<tr><td>{cat}</td><td>{kw}…</td><td>{info.get('level','')}</td><td>{info.get('years',0)}{years_label}</td></tr>"
+        skill_header = t(lang, "skill_header")
+        kw_header = t(lang, "kw_header")
+        level_header = t(lang, "level_header")
+        exp_header = t(lang, "exp_header")
+        skill_cats = list(p.get("skills", {}).keys())
+        def esc(s):
+            import html
+            return html.escape(str(s))
+        for cat in skill_cats:
+            info = p.get("skills", {}).get(cat, {})
+            kw_str = ", ".join(info.get("keywords", []))
+            level = info.get("level", "intermediate")
+            years = info.get("years", 0)
+            sk += f'''<tr>
+                <td><input class="skill-cat" value="{esc(cat)}" style="width:70px;font-weight:600"></td>
+                <td><input class="skill-kw" value="{esc(kw_str)}" style="width:100%"></td>
+                <td><select class="skill-lvl"><option value="beginner"{" selected" if level=="beginner" else ""}>beginner</option><option value="intermediate"{" selected" if level=="intermediate" else ""}>intermediate</option><option value="expert"{" selected" if level=="expert" else ""}>expert</option></select></td>
+                <td><input class="skill-yr" type="number" value="{years}" style="width:50px">{years_label}</td>
+                <td><button class="btn-small btn-del-skill" title="{t(lang, 'delete_skill_title')}" onclick="delSkillRow(this)">{t(lang, 'btn_delete_skill')}</button></td>
+            </tr>'''
         skill_header = t(lang, "skill_header")
         kw_header = t(lang, "kw_header")
         level_header = t(lang, "level_header")
@@ -3291,16 +3320,47 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         </div>
         <div class="section">
             <h2>{t(lang, 'skill_profile')}</h2>
-            <table class="skills-table"><thead><tr><th>{skill_header}</th><th>{kw_header}</th><th>{level_header}</th><th>{exp_header}</th></tr></thead>
+            <p style="color:#888;font-size:13px;margin-bottom:8px">{t(lang, 'skill_edit_hint')}</p>
+            <table class="skills-table"><thead><tr><th>{skill_header}</th><th>{kw_header}</th><th>{level_header}</th><th>{exp_header}</th><th style="width:44px"></th></tr></thead>
             <tbody>{sk}</tbody></table>
+            <div style="margin-top:8px">
+                <button onclick="addSkillRow()" class="btn">{t(lang, 'btn_add_skill')}</button>
+            </div>
         </div>
         <script>
+        function addSkillRow() {{
+            var tbody = document.querySelector('.skills-table tbody');
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td><input class="skill-cat" value="" style="width:70px;font-weight:600"></td>' +
+                '<td><input class="skill-kw" value="" style="width:100%"></td>' +
+                '<td><select class="skill-lvl"><option value="beginner">beginner</option><option value="intermediate" selected>intermediate</option><option value="expert">expert</option></select></td>' +
+                '<td><input class="skill-yr" type="number" value="3" style="width:50px">{years_label}</td>' +
+                '<td><button class="btn-small btn-del-skill" onclick="delSkillRow(this)">{t(lang, 'btn_delete_skill')}</button></td>';
+            tbody.appendChild(tr);
+        }}
+        function delSkillRow(btn) {{
+            var tr = btn.closest('tr');
+            if (tr) tr.remove();
+        }}
         async function saveProfile() {{
+            // Collect skills from editable table
+            var skills = {{}};
+            var rows = document.querySelectorAll('.skills-table tbody tr');
+            rows.forEach(function(row) {{
+                var cat = row.querySelector('.skill-cat').value.trim();
+                if (!cat) return;
+                var kwStr = row.querySelector('.skill-kw').value.trim();
+                var keywords = kwStr.split(',').map(function(s){{return s.trim();}}).filter(Boolean);
+                var level = row.querySelector('.skill-lvl').value;
+                var years = parseInt(row.querySelector('.skill-yr').value) || 0;
+                skills[cat] = {{keywords: keywords, level: level, years: years}};
+            }});
             var d = {{
                 name: document.getElementById('name').value,
                 title: document.getElementById('title').value,
                 experience_years: parseInt(document.getElementById('exp').value),
                 education: document.getElementById('edu').value,
+                skills: skills,
                 preferred_companies: document.getElementById('cos').value.split(',').map(s=>s.trim()).filter(Boolean),
                 preferred_locations: document.getElementById('locs').value.split(',').map(s=>s.trim()).filter(Boolean),
                 preferred_roles: document.getElementById('roles').value.split(',').map(s=>s.trim()).filter(Boolean),
@@ -4558,6 +4618,16 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
             # Limit to 5
             if len(quiz_data) > 5:
                 quiz_data = quiz_data[:5]
+            # 清理选项中的字母前缀（AI 可能生成 "A. xxx" 或 "A、xxx" 甚至 "A. A. xxx"，前端会统一加字母标签）
+            import re as _re
+            _prefix_re = _re.compile(r'^[A-Da-d][.、）)]\s*')
+            def _strip_prefix(s):
+                while _prefix_re.match(s):
+                    s = _prefix_re.sub('', s).strip()
+                return s
+            for _q in quiz_data:
+                if _q.get("type") == "choice" and "options" in _q:
+                    _q["options"] = [_strip_prefix(o) for o in _q["options"]]
             self.send_json({"success": True, "quiz": quiz_data})
         except json.JSONDecodeError:
             self.send_json({"success": False, "error": "AI 返回格式异常"}, 500)
