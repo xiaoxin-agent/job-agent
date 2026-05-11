@@ -1737,7 +1737,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <div><label style="font-size:13px;color:#555">{manual_add_recruiter_phone}</label><br><input id="mf-recruiter-phone" type="tel" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
                     <div><label style="font-size:13px;color:#555">{manual_add_recruiter_email}</label><br><input id="mf-recruiter-email" type="email" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
                 </div>
-                <div style="margin-top:8px"><label style="font-size:13px;color:#555">{manual_add_desc}</label><br><textarea id="mf-desc" rows="10" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;resize:vertical"></textarea></div>
+                <div style="margin-top:8px"><label style="font-size:13px;color:#555">{manual_add_desc}</label><br><textarea id="mf-desc" rows="16" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;resize:vertical"></textarea></div>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
                     <button onclick="toggleManualForm()" class="btn btn-small" style="padding:7px 14px">{btn_url_add}</button>
                     <button onclick="saveManualJob()" class="btn btn-primary" id="manual-form-save-btn" style="padding:7px 20px">{btn_save}</button>
