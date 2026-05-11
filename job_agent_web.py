@@ -249,6 +249,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "manual_add_url": "URL:",
         "manual_add_desc": "Description:",
         "manual_add_job_type": "Job Type:",
+        "manual_add_recruiter_name": "Recruiter Name:",
+        "manual_add_recruiter_phone": "Recruiter Phone:",
+        "manual_add_recruiter_email": "Recruiter Email:",
         "manual_add_saving": "Saving...",
         "manual_add_saved": "✅ Saved! Refreshing...",
         "manual_add_fields_empty": "Please fill in at least the title and description",
@@ -532,6 +535,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "manual_add_url": "链接:",
         "manual_add_desc": "职位描述:",
         "manual_add_job_type": "职位类型:",
+        "manual_add_recruiter_name": "招聘方姓名:",
+        "manual_add_recruiter_phone": "招聘方电话:",
+        "manual_add_recruiter_email": "招聘方邮箱:",
         "manual_add_saving": "保存中...",
         "manual_add_saved": "✅ 已保存！正在刷新...",
         "manual_add_fields_empty": "请至少填写标题和职位描述",
@@ -843,6 +849,9 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "manual_add_url": "URL:",
         "manual_add_desc": "Description:",
         "manual_add_job_type": "Type de poste:",
+        "manual_add_recruiter_name": "Recruteur:",
+        "manual_add_recruiter_phone": "Tél. recruteur:",
+        "manual_add_recruiter_email": "Email recruteur:",
         "manual_add_saving": "Enregistrement...",
         "manual_add_saved": "✅ Enregistré ! Actualisation...",
         "manual_add_fields_empty": "Veuillez remplir au moins le titre et la description",
@@ -1531,6 +1540,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         manual_add_url = t(lang, "manual_add_url")
         manual_add_desc = t(lang, "manual_add_desc")
         manual_add_job_type = t(lang, "manual_add_job_type")
+        manual_add_recruiter_name = t(lang, "manual_add_recruiter_name")
+        manual_add_recruiter_phone = t(lang, "manual_add_recruiter_phone")
+        manual_add_recruiter_email = t(lang, "manual_add_recruiter_email")
         manual_add_saving = t(lang, "manual_add_saving")
         manual_add_saved = t(lang, "manual_add_saved")
         manual_add_fields_empty = t(lang, "manual_add_fields_empty")
@@ -1684,6 +1696,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <span>📊 <span id="ms-{j['id']}">{j.get('match_score',0)}</span>{match_percent}</span> <button onclick="rerunAnalysis('{j['id']}')" class="btn-rerun" title="{t(lang, 'rerun_match')}" id="rr-{j['id']}">↻</button>
                     <span id="skill-gap-{j['id']}">{self._render_skill_gap_html(j, lang)}</span>
                 </div>
+                {'<div class="job-recruiter">' + ('<span>👤 ' + j.get('recruiter_name','') + '</span>' if j.get('recruiter_name') else '') + ('<span>📞 ' + j.get('recruiter_phone','') + '</span>' if j.get('recruiter_phone') else '') + ('<span>✉️ ' + j.get('recruiter_email','') + '</span>' if j.get('recruiter_email') else '') + '</div>' if j.get('recruiter_name') or j.get('recruiter_phone') or j.get('recruiter_email') else ''}
                 <div class="job-desc-toggle">
                     <div class="job-desc-snippet" id="tdesc-{j['id']}">{(j.get('description','') or '')[:150].replace(chr(10),' ')}</div>
                     <div class="job-desc-full" id="tfull-{j['id']}" style="display:none">{j.get('description','').replace(chr(10),'<br>').replace(chr(10)+'<br>','<br>')}</div>
@@ -1720,8 +1733,11 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                     <div><label style="font-size:13px;color:#555">{manual_add_location}</label><br><input id="mf-location" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
                     <div><label style="font-size:13px;color:#555">{manual_add_url}</label><br><input id="mf-url" type="url" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
                     <div><label style="font-size:13px;color:#555">{manual_add_job_type}</label><br><input id="mf-job-type" type="text" placeholder="e.g. Full-time, Contract..." style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                    <div><label style="font-size:13px;color:#555">{manual_add_recruiter_name}</label><br><input id="mf-recruiter-name" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                    <div><label style="font-size:13px;color:#555">{manual_add_recruiter_phone}</label><br><input id="mf-recruiter-phone" type="tel" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                    <div><label style="font-size:13px;color:#555">{manual_add_recruiter_email}</label><br><input id="mf-recruiter-email" type="email" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
                 </div>
-                <div style="margin-top:8px"><label style="font-size:13px;color:#555">{manual_add_desc}</label><br><textarea id="mf-desc" rows="5" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;resize:vertical"></textarea></div>
+                <div style="margin-top:8px"><label style="font-size:13px;color:#555">{manual_add_desc}</label><br><textarea id="mf-desc" rows="10" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;resize:vertical"></textarea></div>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
                     <button onclick="toggleManualForm()" class="btn btn-small" style="padding:7px 14px">{btn_url_add}</button>
                     <button onclick="saveManualJob()" class="btn btn-primary" id="manual-form-save-btn" style="padding:7px 20px">💾 {btn_save}</button>
@@ -2263,6 +2279,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             var location = document.getElementById('mf-location').value.trim();
             var url = document.getElementById('mf-url').value.trim();
             var jobType = document.getElementById('mf-job-type').value.trim();
+            var recruiterName = document.getElementById('mf-recruiter-name').value.trim();
+            var recruiterPhone = document.getElementById('mf-recruiter-phone').value.trim();
+            var recruiterEmail = document.getElementById('mf-recruiter-email').value.trim();
             var btn = document.getElementById('manual-form-save-btn');
             var status = document.getElementById('manual-form-status');
             btn.disabled = true;
@@ -2277,16 +2296,19 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         company: company,
                         location: location,
                         url: url,
-                        job_type: jobType
+                        job_type: jobType,
+                        recruiter_name: recruiterName,
+                        recruiter_phone: recruiterPhone,
+                        recruiter_email: recruiterEmail
                     }}}})
                 }});
                 var d = await r.json();
                 if (d.success) {{
                     status.innerHTML = '<span style="color:#2e7d32">' + _manual_add_saved + '</span>';
-                    setTimeout(function(){{ location.reload(); }}, 1500);
+                    location.reload();
                 }} else {{
                     if (d.error && d.error.indexOf('已保存') >= 0) {{
-                        setTimeout(function(){{ location.reload(); }}, 1000);
+                        location.reload();
                     }} else {{
                         status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || 'Save failed') + '</span>';
                     }}
@@ -5387,6 +5409,7 @@ loadResume();
         .job-type-tag {{ display:inline-block; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:600; background:#e8f5e9; color:#2e7d32; vertical-align:middle; margin-left:4px; }}
 
         .job-meta {{ display:flex; flex-wrap:wrap; gap:14px; font-size:15px; color:#666; margin-bottom:8px; }}
+        .job-recruiter {{ display:flex; flex-wrap:wrap; gap:14px; font-size:14px; color:#555; margin-bottom:8px; padding:6px 10px; background:#fff8e1; border-radius:6px; border:1px solid #ffe082; }}
 
         .job-desc {{ font-size:15px; color:#555; margin-bottom:10px; line-height:1.55; }}
 
