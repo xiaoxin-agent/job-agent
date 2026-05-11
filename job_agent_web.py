@@ -241,6 +241,17 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_letter": "✉️ Letter",
         "btn_view": "🔗 View Posting",
         "btn_add_job": "📤 Add Job",
+        "btn_manual_add": "✏️ Fill Manually",
+        "btn_url_add": "🔗 Add by URL",
+        "manual_add_title": "Title:",
+        "manual_add_company": "Company:",
+        "manual_add_location": "Location:",
+        "manual_add_url": "URL:",
+        "manual_add_desc": "Description:",
+        "manual_add_job_type": "Job Type:",
+        "manual_add_saving": "Saving...",
+        "manual_add_saved": "✅ Saved! Refreshing...",
+        "manual_add_fields_empty": "Please fill in at least the title and description",
         "saved_text": "✅ Saved",
         "btn_preview": "👁 Preview",
         "btn_download": "📥 Download",
@@ -513,6 +524,17 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_letter": "✉️ 求职信",
         "btn_view": "🔗 查看原文",
         "btn_add_job": "📤 添加职位",
+        "btn_manual_add": "✏️ 手动填写",
+        "btn_url_add": "🔗 通过URL添加",
+        "manual_add_title": "职位名称:",
+        "manual_add_company": "公司:",
+        "manual_add_location": "地点:",
+        "manual_add_url": "链接:",
+        "manual_add_desc": "职位描述:",
+        "manual_add_job_type": "职位类型:",
+        "manual_add_saving": "保存中...",
+        "manual_add_saved": "✅ 已保存！正在刷新...",
+        "manual_add_fields_empty": "请至少填写标题和职位描述",
         "saved_text": "✅ 已保存",
         "btn_preview": "👁 预览",
         "btn_download": "📥 下载",
@@ -813,6 +835,17 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "btn_letter": "✉️ Lettre de motivation",
         "btn_view": "🔗 Voir l'offre",
         "btn_add_job": "📤 Ajouter un poste",
+        "btn_manual_add": "✏️ Remplir manuellement",
+        "btn_url_add": "🔗 Ajouter par URL",
+        "manual_add_title": "Titre:",
+        "manual_add_company": "Entreprise:",
+        "manual_add_location": "Lieu:",
+        "manual_add_url": "URL:",
+        "manual_add_desc": "Description:",
+        "manual_add_job_type": "Type de poste:",
+        "manual_add_saving": "Enregistrement...",
+        "manual_add_saved": "✅ Enregistré ! Actualisation...",
+        "manual_add_fields_empty": "Veuillez remplir au moins le titre et la description",
         "saved_text": "✅ Enregistré",
         "btn_preview": "👁 Aperçu",
         "btn_download": "📥 Télécharger",
@@ -1490,6 +1523,17 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         btn_view = t(lang, "btn_view")
         btn_letter = t(lang, "btn_letter")
         btn_add_job = t(lang, "btn_add_job")
+        btn_manual_add = t(lang, "btn_manual_add")
+        btn_url_add = t(lang, "btn_url_add")
+        manual_add_title = t(lang, "manual_add_title")
+        manual_add_company = t(lang, "manual_add_company")
+        manual_add_location = t(lang, "manual_add_location")
+        manual_add_url = t(lang, "manual_add_url")
+        manual_add_desc = t(lang, "manual_add_desc")
+        manual_add_job_type = t(lang, "manual_add_job_type")
+        manual_add_saving = t(lang, "manual_add_saving")
+        manual_add_saved = t(lang, "manual_add_saved")
+        manual_add_fields_empty = t(lang, "manual_add_fields_empty")
         btn_preview = t(lang, "btn_preview")
         btn_edit = t(lang, "btn_edit")
         btn_fullscreen_edit = t(lang, "btn_fullscreen_edit")
@@ -1663,14 +1707,33 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         html = self._page(t(lang, 'tracked_title'), f"""
         <h1>{t(lang, 'tracked_title')}</h1>
         <div class="section"><div class="tab-bar">{tabs}</div></div>
-        <div class="section section-add-url" style="margin-top:8px;margin-bottom:8px;padding:8px 0;display:flex;gap:8px;align-items:center">
-            <input id="manual-job-url" type="url" placeholder="{url_placeholder}" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
-            <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">{btn_add_job}</button>
+        <div class="section section-add-url" style="margin-top:8px;margin-bottom:8px;padding:8px 0">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <input id="manual-job-url" type="url" placeholder="{url_placeholder}" style="flex:1;min-width:200px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+                <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">{btn_add_job}</button>
+                <button onclick="toggleManualForm()" class="btn btn-small" id="toggle-manual-btn" style="padding:8px 12px;font-size:13px">{btn_manual_add}</button>
+            </div>
+            <div id="manual-add-form" style="display:none;margin-top:10px;border:1px solid #e0e0e0;border-radius:8px;padding:14px;background:#fafafa">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                    <div><label style="font-size:13px;color:#555">{manual_add_title}</label><br><input id="mf-title" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                    <div><label style="font-size:13px;color:#555">{manual_add_company}</label><br><input id="mf-company" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                    <div><label style="font-size:13px;color:#555">{manual_add_location}</label><br><input id="mf-location" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                    <div><label style="font-size:13px;color:#555">{manual_add_url}</label><br><input id="mf-url" type="url" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                    <div><label style="font-size:13px;color:#555">{manual_add_job_type}</label><br><input id="mf-job-type" type="text" placeholder="e.g. Full-time, Contract..." style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
+                </div>
+                <div style="margin-top:8px"><label style="font-size:13px;color:#555">{manual_add_desc}</label><br><textarea id="mf-desc" rows="5" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;resize:vertical"></textarea></div>
+                <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+                    <button onclick="toggleManualForm()" class="btn btn-small" style="padding:7px 14px">{btn_url_add}</button>
+                    <button onclick="saveManualJob()" class="btn btn-primary" id="manual-form-save-btn" style="padding:7px 20px">💾 {btn_save}</button>
+                </div>
+                <div id="manual-form-status" style="margin-top:6px;font-size:13px"></div>
+            </div>
         </div>
-        <div id="manual-add-status" style="margin-bottom:8px;font-size:14px"></div>
         <div id="tracked-list">{jobs_html}</div>
         <script>
         var _btn_add_job = {json.dumps(btn_add_job, ensure_ascii=False)};
+        var _btn_url_add = {json.dumps(btn_url_add, ensure_ascii=False)};
+        var _btn_manual_add = {json.dumps(btn_manual_add, ensure_ascii=False)};
         var _url_empty = {json.dumps(url_empty, ensure_ascii=False)};
         var _parse_failed = {json.dumps(parse_failed, ensure_ascii=False)};
         var _loading_text = {json.dumps(loading_text, ensure_ascii=False)};
@@ -1747,6 +1810,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _desc_emails = {json.dumps(t(lang, "desc_emails"), ensure_ascii=False)};
         var _auto_fill_detail = {json.dumps(t(lang, "auto_fill_detail"), ensure_ascii=False)};
         var _lever_auto_submit = {json.dumps(t(lang, "lever_auto_submit"), ensure_ascii=False)};
+        var _btn_save = {json.dumps(btn_save, ensure_ascii=False)};
+        var _manual_add_saving = {json.dumps(manual_add_saving, ensure_ascii=False)};
+        var _manual_add_saved = {json.dumps(manual_add_saved, ensure_ascii=False)};
+        var _manual_add_fields_empty = {json.dumps(manual_add_fields_empty, ensure_ascii=False)};
         var _lang = {json.dumps(lang, ensure_ascii=False)};
         // Skill gap detail popup via event delegation
         document.addEventListener('click', function(e) {{
@@ -2169,6 +2236,68 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         function escHtml(s) {{
             if (!s) return '';
             return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }}
+
+        // ===== Toggle URL / Manual form =====
+        function toggleManualForm() {{
+            var form = document.getElementById('manual-add-form');
+            var btn = document.getElementById('toggle-manual-btn');
+            if (form.style.display === 'none') {{
+                form.style.display = 'block';
+                btn.textContent = _btn_url_add;
+            }} else {{
+                form.style.display = 'none';
+                btn.textContent = _btn_manual_add;
+            }}
+        }}
+
+        // ===== Save manually entered job =====
+        async function saveManualJob() {{
+            var title = document.getElementById('mf-title').value.trim();
+            var desc = document.getElementById('mf-desc').value.trim();
+            if (!title || !desc) {{
+                document.getElementById('manual-form-status').innerHTML = '<span style="color:#d32f2f">' + _manual_add_fields_empty + '</span>';
+                return;
+            }}
+            var company = document.getElementById('mf-company').value.trim();
+            var location = document.getElementById('mf-location').value.trim();
+            var url = document.getElementById('mf-url').value.trim();
+            var jobType = document.getElementById('mf-job-type').value.trim();
+            var btn = document.getElementById('manual-form-save-btn');
+            var status = document.getElementById('manual-form-status');
+            btn.disabled = true;
+            btn.textContent = '⏳ ' + _manual_add_saving;
+            status.innerHTML = '<span style="color:#888">' + _manual_add_saving + '</span>';
+            try {{
+                var r = await fetch('/api/save_job', {{
+                    method:'POST', headers:{{'Content-Type':'application/json'}},
+                    body:JSON.stringify({{job: {{
+                        title: title,
+                        description: desc,
+                        company: company,
+                        location: location,
+                        url: url,
+                        job_type: jobType
+                    }}}})
+                }});
+                var d = await r.json();
+                if (d.success) {{
+                    status.innerHTML = '<span style="color:#2e7d32">' + _manual_add_saved + '</span>';
+                    setTimeout(function(){{ location.reload(); }}, 1500);
+                }} else {{
+                    if (d.error && d.error.indexOf('已保存') >= 0) {{
+                        setTimeout(function(){{ location.reload(); }}, 1000);
+                    }} else {{
+                        status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || 'Save failed') + '</span>';
+                    }}
+                    btn.disabled = false;
+                    btn.textContent = '💾 ' + _btn_save;
+                }}
+            }} catch(e) {{
+                status.innerHTML = '<span style="color:#d32f2f">❌ Error: ' + e + '</span>';
+                btn.disabled = false;
+                btn.textContent = '💾 ' + _btn_save;
+            }}
         }}
 
         // ===== Apply Analysis =====
