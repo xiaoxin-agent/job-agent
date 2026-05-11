@@ -1740,7 +1740,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <div style="margin-top:8px"><label style="font-size:13px;color:#555">{manual_add_desc}</label><br><textarea id="mf-desc" rows="10" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;resize:vertical"></textarea></div>
                 <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
                     <button onclick="toggleManualForm()" class="btn btn-small" style="padding:7px 14px">{btn_url_add}</button>
-                    <button onclick="saveManualJob()" class="btn btn-primary" id="manual-form-save-btn" style="padding:7px 20px">💾 {btn_save}</button>
+                    <button onclick="saveManualJob()" class="btn btn-primary" id="manual-form-save-btn" style="padding:7px 20px">{btn_save}</button>
                 </div>
                 <div id="manual-form-status" style="margin-top:6px;font-size:13px"></div>
             </div>
@@ -2277,7 +2277,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }}
             var company = document.getElementById('mf-company').value.trim();
             var location = document.getElementById('mf-location').value.trim();
-            var url = document.getElementById('mf-url').value.trim();
+            var jobUrl = document.getElementById('mf-url').value.trim();
             var jobType = document.getElementById('mf-job-type').value.trim();
             var recruiterName = document.getElementById('mf-recruiter-name').value.trim();
             var recruiterPhone = document.getElementById('mf-recruiter-phone').value.trim();
@@ -2295,7 +2295,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         description: desc,
                         company: company,
                         location: location,
-                        url: url,
+                        url: jobUrl,
                         job_type: jobType,
                         recruiter_name: recruiterName,
                         recruiter_phone: recruiterPhone,
@@ -2313,12 +2313,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || 'Save failed') + '</span>';
                     }}
                     btn.disabled = false;
-                    btn.textContent = '💾 ' + _btn_save;
+                    btn.textContent = _btn_save;
                 }}
             }} catch(e) {{
                 status.innerHTML = '<span style="color:#d32f2f">❌ Error: ' + e + '</span>';
                 btn.disabled = false;
-                btn.textContent = '💾 ' + _btn_save;
+                btn.textContent = _btn_save;
             }}
         }}
 
