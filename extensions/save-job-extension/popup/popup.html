@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一键存职位</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="top-bar">
+      <span class="title">📥 存职位</span>
+      <button id="btn-settings-toggle" class="settings-btn" title="设置">⚙️</button>
+    </div>
+
+    <!-- Settings panel -->
+    <div id="settings-panel" class="settings-panel hidden">
+      <div class="field">
+        <label>Agent 地址</label>
+        <input type="text" id="api-url" value="http://localhost:9999" placeholder="http://localhost:9999">
+      </div>
+      <button id="btn-save-settings" class="btn btn-small">保存设置</button>
+      <hr>
+      <p class="hint">提示：如果 Agent 在其他机器/端口运行，请修改地址。</p>
+    </div>
+
+    <div id="state-loading" class="state">
+      <div class="spinner"></div>
+      <p>正在分析页面...</p>
+    </div>
+
+    <div id="state-result" class="state hidden">
+      <div class="header">
+        <h2 id="job-title">-</h2>
+        <span id="extracted-badge" class="badge">已提取</span>
+      </div>
+
+      <div class="field">
+        <label>公司</label>
+        <span id="job-company">-</span>
+      </div>
+      <div class="field">
+        <label>地点</label>
+        <span id="job-location">-</span>
+      </div>
+      <div class="field">
+        <label>类型</label>
+        <span id="job-type">-</span>
+      </div>
+
+      <div class="field desc">
+        <label>职位描述</label>
+        <textarea id="job-description" readonly></textarea>
+      </div>
+
+      <div class="field strategies">
+        <label>提取策略</label>
+        <span id="strategies-used"></span>
+      </div>
+
+      <div id="server-status" class="server-status">
+        <span class="dot dot-unknown"></span>
+        <span id="status-text">检查服务连接...</span>
+      </div>
+
+      <div class="actions">
+        <button id="btn-save" class="btn btn-primary" disabled>
+          💾 保存到求职Agent
+        </button>
+        <button id="btn-retry" class="btn btn-secondary hidden">
+          🔄 重新提取
+        </button>
+      </div>
+
+      <div id="save-result" class="save-result hidden"></div>
+    </div>
+
+    <div id="state-error" class="state hidden">
+      <div class="error-icon">⚠️</div>
+      <p id="error-message">提取失败</p>
+      <button id="btn-error-retry" class="btn btn-secondary">🔄 重试</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
