@@ -1720,14 +1720,14 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         html = self._page(t(lang, 'tracked_title'), f"""
         <h1>{t(lang, 'tracked_title')}</h1>
         <div class="section"><div class="tab-bar">{tabs}</div></div>
-        <div class="section section-add-url" style="margin-top:8px;margin-bottom:8px;padding:8px 0">
+        <div class="section section-add-url" style="margin-top:8px;margin-bottom:8px;padding:8px 0;width:100%;box-sizing:border-box">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <input id="manual-job-url" type="url" placeholder="{url_placeholder}" style="flex:1;min-width:200px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
                 <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">{btn_add_job}</button>
                 <button onclick="toggleManualForm()" class="btn btn-small" id="toggle-manual-btn" style="padding:8px 12px;font-size:13px">{btn_manual_add}</button>
             </div>
-            <div id="manual-add-form" style="display:none;margin-top:10px;border:1px solid #e0e0e0;border-radius:8px;padding:14px;background:#fafafa">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div id="manual-add-form" style="display:none;margin-top:10px;border:1px solid #e0e0e0;border-radius:8px;padding:14px;background:#fafafa;width:100%;box-sizing:border-box">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">
                     <div><label style="font-size:13px;color:#555">{manual_add_title}</label><br><input id="mf-title" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
                     <div><label style="font-size:13px;color:#555">{manual_add_company}</label><br><input id="mf-company" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
                     <div><label style="font-size:13px;color:#555">{manual_add_location}</label><br><input id="mf-location" type="text" style="width:100%%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
