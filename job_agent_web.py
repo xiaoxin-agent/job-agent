@@ -2276,7 +2276,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 return;
             }}
             var company = document.getElementById('mf-company').value.trim();
-            var location = document.getElementById('mf-location').value.trim();
+            var jobLoc = document.getElementById('mf-location').value.trim();
             var jobUrl = document.getElementById('mf-url').value.trim();
             var jobType = document.getElementById('mf-job-type').value.trim();
             var recruiterName = document.getElementById('mf-recruiter-name').value.trim();
@@ -2294,7 +2294,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         title: title,
                         description: desc,
                         company: company,
-                        location: location,
+                        location: jobLoc,
                         url: jobUrl,
                         job_type: jobType,
                         recruiter_name: recruiterName,
