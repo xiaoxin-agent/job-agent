@@ -219,12 +219,16 @@ class ApplyManager:
         source = job.get("source", "")
         adapter = self.adapters.get(source)
         if not adapter:
+            logger.info(f"No specific adapter for source '{source}', using fallback")
             adapter = self.adapters.get("RemoteOK")  # fallback
-        return adapter.analyze(job)
+        result = adapter.analyze(job)
+        logger.info(f"Analyzed apply method for {job.get('company','?')}/{job.get('title','?')}: {result['method']}")
+        return result
 
     def apply_via_email(self, job: Dict, resume_text: str, cover_letter: str,
                          email_target: str) -> Dict:
         """通过邮箱申请（占位——后续对接 SMTP）"""
+        logger.info(f"Email apply to {email_target} for {job.get('company','?')}/{job.get('title','?')}")
         # 记录申请历史
         record = self._create_record(job, "email", {
             "to": email_target,
@@ -240,10 +244,12 @@ class ApplyManager:
         使用 Playwright headless 浏览器自动填写并提交 Lever 申请表单。
         """
         from sites.lever_apply import apply_to_lever as lever_apply_browser
+        logger.info(f"Auto-apply Lever: {job.get('company','?')}/{job.get('title','?')}")
         return lever_apply_browser(job, cover_letter=cover_letter)
 
     def record_manual_apply(self, job: Dict) -> Dict:
         """记录用户手动申请"""
+        logger.info(f"Manual apply recorded: {job.get('company','?')}/{job.get('title','?')}")
         record = self._create_record(job, "manual", {})
         self._save_record(record)
         return {"success": True, "method": "manual", "record": record}

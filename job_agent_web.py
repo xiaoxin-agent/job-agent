@@ -8,6 +8,10 @@ import json
 import socket
 import base64
 import os
+import logging
+import logging.handlers
+
+logger = logging.getLogger(__name__)
 import datetime
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -140,6 +144,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_resume": "📄 Resumes",
         "nav_letter": "✉️ Cover Letter",
         "nav_learn_calendar": "📅 Learn Plan",
+        "nav_logs": "📋 Logs",
         "resume_title": "Resume Library",
         "resume_upload": "Upload Resume",
         "resume_delete": "Delete",
@@ -425,6 +430,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_resume": "📄 简历库",
         "nav_letter": "✉️ 求职信",
         "nav_learn_calendar": "📅 学习计划",
+        "nav_logs": "📋 日志",
         "resume_title": "简历库",
         "resume_upload": "上传简历",
         "resume_delete": "删除",
@@ -711,6 +717,7 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "nav_resume": "📄 CV",
         "nav_letter": "✉️ Lettre de motivation",
         "nav_learn_calendar": "📅 Plan d\u0027\u00e9tude",
+        "nav_logs": "📋 Journaux",
         "resume_title": "Bibliothèque de CV",
         "resume_upload": "Télécharger un CV",
         "resume_delete": "Supprimer",
@@ -1040,6 +1047,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/resumes": self.handle_resume_page,
             "/learn_plan": self.handle_learn_calendar_page,
             "/resume_view": self.handle_resume_view_page,
+            "/logs": self.handle_logs_page,
         }
 
         # GET 下载简历 / 获取简历列表
@@ -1068,6 +1076,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/generate_quiz":
             self.api_generate_quiz(params)
+            return
+        if path == "/api/logs":
+            self.api_logs(params)
             return
 
         handler = routes.get(path)
@@ -1127,6 +1138,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             "/api/generate_quiz": self.api_generate_quiz,
             "/api/quiz_submit": self.api_quiz_submit,
             "/api/save_cover_letter": self.api_save_cover_letter,
+            "/api/logs": self.api_logs,
         }
 
         handler = api_routes.get(path)
@@ -1726,6 +1738,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 <button onclick="fetchAndAddJob()" class="btn btn-primary" id="manual-add-btn" style="padding:8px 16px">{btn_add_job}</button>
                 <button onclick="toggleManualForm()" class="btn btn-small" id="toggle-manual-btn" style="padding:8px 12px;font-size:13px">{btn_manual_add}</button>
             </div>
+            <div id="manual-add-status" style="margin-top:8px;font-size:13px"></div>
             <div id="manual-add-form" style="display:none;margin-top:10px;border:1px solid #e0e0e0;border-radius:8px;padding:14px;background:#fafafa;width:100%;box-sizing:border-box">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">
                     <div><label style="font-size:13px;color:#555">{manual_add_title}</label><br><input id="mf-title" type="text" style="width:calc(100% - 2px);padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box"></div>
@@ -2200,11 +2213,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             btn.disabled = true;
             btn.textContent = '⏳ ' + _loading_text;
             status.innerHTML = '<span style="color:#888">' + _loading_text + '</span>';
+            // 12秒超时保护
+            var _fetchTimedOut = false;
+            var _fetchTimer = setTimeout(function() {{
+                _fetchTimedOut = true;
+                status.innerHTML = '<span style="color:#d32f2f">❌ ' + _parse_failed + ' (timeout 12s)</span>';
+                btn.disabled = false;
+                btn.textContent = _btn_add_job;
+            }}, 12000);
             try {{
                 var r = await fetch('/api/fetch_job_from_url', {{
                     method:'POST', headers:{{'Content-Type':'application/json'}},
                     body:JSON.stringify({{url:url}})
                 }});
+                clearTimeout(_fetchTimer);
+                if (_fetchTimedOut) return;
                 var d = await r.json();
                 if (!d.success) {{
                     status.innerHTML = '<span style="color:#d32f2f">❌ ' + (d.error || _parse_failed) + '</span>';
@@ -2287,6 +2310,13 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             btn.disabled = true;
             btn.textContent = '⏳ ' + _manual_add_saving;
             status.innerHTML = '<span style="color:#888">' + _manual_add_saving + '</span>';
+            var _saveTimedOut = false;
+            var _saveTimer = setTimeout(function() {{
+                _saveTimedOut = true;
+                status.innerHTML = '<span style="color:#d32f2f">❌ ' + _manual_add_saving + ' timeout</span>';
+                btn.disabled = false;
+                btn.textContent = _btn_save;
+            }}, 15000);
             try {{
                 var r = await fetch('/api/save_job', {{
                     method:'POST', headers:{{'Content-Type':'application/json'}},
@@ -2302,6 +2332,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         recruiter_email: recruiterEmail
                     }}}})
                 }});
+                clearTimeout(_saveTimer);
+                if (_saveTimedOut) return;
                 var d = await r.json();
                 if (d.success) {{
                     status.innerHTML = '<span style="color:#2e7d32">' + _manual_add_saved + '</span>';
@@ -3561,33 +3593,45 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 "stats": result.get("stats", {})
             })
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_save_job(self, data):
+        """保存职位到跟踪列表。后台同步抓取页面（5秒内），超时不阻塞。"""
         try:
             job_data = data.get("job", {})
-            # 如果职位有URL但描述不完整，尝试抓取完整详情
+            # 如果职位有URL但描述不完整，后台尝试抓取补充（不阻塞前端）
             url = job_data.get("url", "")
             desc = job_data.get("description", "")
             if url and (len(desc) < 500 or not job_data.get("title")):
                 try:
-                    fetched = self.agent.fetch_job_from_url(url, keep_html=True)
-                    if fetched.get("description"):
-                        # 保留格式但清除纯 HTML 标签（转成 Markdown 友好文本）
-                        desc = fetched["description"]
-                        if '<' in desc and '>' in desc:
-                            desc = self.agent.engine._clean_html(desc, keep_format=True)
-                        job_data["description"] = desc
-                    if fetched.get("title"):
-                        job_data["title"] = fetched["title"]
-                    if fetched.get("company"):
-                        job_data["company"] = fetched["company"]
-                    if fetched.get("location"):
-                        job_data["location"] = fetched["location"]
-                    if fetched.get("job_type"):
-                        job_data["job_type"] = fetched["job_type"]
-                except Exception:
-                    pass
+                    import threading
+                    def _bg_fetch():
+                        try:
+                            fetched = self.agent.fetch_job_from_url(url, keep_html=True)
+                            if not fetched.get("title"):
+                                return
+                            # 读取当前 job_data，后台更新 tracker
+                            tracker = self.agent.tracker
+                            for j in tracker.tracked_jobs:
+                                if j.get("url") and j["url"].rstrip("?/") == url.rstrip("?/"):
+                                    dirty = False
+                                    if fetched.get("company") and not j.get("company"):
+                                        j["company"] = fetched["company"]; dirty = True
+                                    if fetched.get("location") and not j.get("location"):
+                                        j["location"] = fetched["location"]; dirty = True
+                                    if fetched.get("description") and len(fetched["description"]) > len(j.get("description","")):
+                                        j["description"] = fetched["description"]; dirty = True
+                                    if dirty:
+                                        tracker.save_tracked_jobs()
+                                        logger.info(f"bg_fetch: updated job {j.get('title','')} from {url[:60]}")
+                                    break
+                        except Exception:
+                            pass
+                    t = threading.Thread(target=_bg_fetch, daemon=True)
+                    t.start()
+                except Exception as e:
+                    logger.warning(f"api_save_job: bg_fetch thread failed: {e}")
 
             ok = self.agent.save_job(job_data)
             if ok:
@@ -3600,6 +3644,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             else:
                 self.send_json({"success": False, "error": "该职位已保存，请勿重复添加"})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_update_status(self, data):
@@ -3607,6 +3652,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.update_job_status(data.get("job_id",""), data.get("status",""), data.get("notes",""))
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
     
     def api_delete_job(self, data):
@@ -3614,6 +3660,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.delete_job(data.get("job_id",""))
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_update_profile(self, data):
@@ -3624,6 +3671,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.agent.update_profile(data)
             self.send_json({"success": True})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_generate_letter(self, data):
@@ -3631,6 +3679,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             letter = self.agent.generate_cover_letter(data.get("job", {}))
             self.send_json({"success": True, "letter": letter})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_get_cover_letter(self, data):
@@ -3654,6 +3703,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         break
             self.send_json({"success": True, "letter": letter})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_save_cover_letter(self, data):
@@ -3663,6 +3713,58 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.tracker.update_cover_letter_by_id(job_id, letter)
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_logs(self, data):
+        """读取日志文件内容"""
+        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_web.log")
+        max_lines = int(data.get("lines", 200))
+        log_type = data.get("type", "app")  # app or watchdog
+
+        if log_type == "watchdog":
+            log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "watchdog.log")
+
+        try:
+            if not os.path.exists(log_file):
+                self.send_json({"success": True, "lines": [], "total": 0})
+                return
+
+            with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+                all_lines = f.readlines()
+
+            # 取最后 max_lines 行
+            tail = all_lines[-max_lines:]
+            # 把每一行转成结构化数据（解析时间戳和级别）
+            parsed = []
+            for line in tail:
+                line = line.rstrip("\n\r")
+                entry = {"raw": line}
+                # 尝试解析结构化日志: 2026-05-25 19:10:57,206 [INFO] name: msg
+                import re
+                m = re.match(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})\s+\[(\w+)\](.*)$", line)
+                if m:
+                    entry["time"] = m.group(1)
+                    entry["level"] = m.group(2)
+                    entry["message"] = m.group(3).strip()
+                else:
+                    # 尝试解析看门狗日志: [2026-...] msg
+                    m = re.match(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*(.*)$", line)
+                    if m:
+                        entry["time"] = m.group(1).replace(" ", "T")
+                        entry["level"] = "INFO"
+                        entry["message"] = m.group(2).strip()
+                parsed.append(entry)
+
+            self.send_json({
+                "success": True,
+                "lines": parsed,
+                "total": len(all_lines),
+                "showing": len(parsed),
+                "file": os.path.basename(log_file)
+            })
+        except Exception as e:
+            logger.error(f"Read log file failed: {e}")
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_upload_resume(self, body: bytes, content_type: str):
@@ -3709,6 +3811,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.agent.tracker.save_resume(job_id, file_data)
             self.send_json({"success": True})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_get_resume_GET(self, params):
@@ -3732,6 +3835,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_preview_resume_GET(self, params):
@@ -3761,6 +3865,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html.encode("utf-8"))
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_get_resume(self, data):
@@ -3778,6 +3883,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_list_resumes_GET(self, params):
@@ -3786,6 +3892,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             resumes = self.agent.tracker.list_resumes()
             self.send_json({"success": True, "resumes": resumes})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_list_resumes(self, data):
@@ -3806,6 +3913,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             else:
                 self.send_json({"success": False, "error": "缺少 file 字段(base64)"}, 400)
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_add_resume_multipart(self, body: bytes, content_type: str):
@@ -3845,6 +3953,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             entry = self.agent.tracker.add_resume(name, file_data)
             self.send_json({"success": True, "resume": entry})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_delete_resume(self, data):
@@ -3857,6 +3966,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.tracker.delete_resume(resume_id)
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_assign_resume(self, data):
@@ -3867,6 +3977,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.tracker.assign_resume(job_id, resume_id)
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_save_job_resume(self, data):
@@ -3880,6 +3991,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.tracker.save_job_resume_text(job_id, html)
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_get_resume_markdown(self, data):
@@ -3892,6 +4004,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             md = self.agent.tracker.get_job_resume_markdown(job_id)
             self.send_json({"success": True, "markdown": md or ""})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_download_resume_pdf(self, data):
@@ -3923,6 +4036,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(pdf_bytes)
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_convert_markdown(self, data):
@@ -3932,6 +4046,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             html = self.agent.tracker.markdown_to_html(markdown)
             self.send_json({"success": True, "html": html})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_delete_job_resume(self, data):
@@ -3944,6 +4059,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.tracker.delete_job_resume(job_id)
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_rerun_analysis(self, data):
@@ -3959,6 +4075,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 return
             self.send_json({"success": True, "match_score": job.get("match_score", 0)})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_save_job_resume_md(self, data):
@@ -3972,6 +4089,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             ok = self.agent.tracker.save_job_resume_markdown(job_id, markdown)
             self.send_json({"success": ok})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_analyze_apply(self, data):
@@ -3992,6 +4110,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 "source": job.get("source", ""),
             }})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_record_apply(self, data):
@@ -4009,6 +4128,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.agent.tracker.update_status(job_id, "applied")
             self.send_json({"success": True, "record": result.get("record")})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_undo_status(self, data):
@@ -4020,6 +4140,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 return
             self.send_json({"success": True})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_delete_interview(self, data):
@@ -4036,10 +4157,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             job = self.agent.tracker.get_job(job_id)
             self.send_json({"success": True, "new_status": job.get("status", "")})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_fetch_job_from_url(self, data):
         """接收URL，抓取并分析职位，返回分析结果供前端预览后保存"""
+        import signal
         try:
             url = data.get("url", "").strip()
             if not url:
@@ -4047,6 +4170,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 return
             raw = self.agent.fetch_job_from_url(url)
             if not raw.get("title") or not raw.get("description"):
+                logger.warning(f"fetch_job_from_url: couldn't extract job info from {url} — title='{raw.get('title')}' desc_len={len(raw.get('description',''))}")
                 self.send_json({"success": False, "error": "无法从此URL提取职位信息，请确认链接是否正确"})
                 return
 
@@ -4064,6 +4188,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             analyzed.update(raw)
             self.send_json({"success": True, "job": analyzed})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)})
 
     def api_tailor_resume(self, data):
@@ -4154,6 +4279,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.agent.tracker.save_job_resume_markdown(job_id, tailored_md)
             self.send_json({"success": True, "markdown": tailored_md})
         except Exception as e:
+            logger.error(f"Optimize fail: {e}")
             self.send_json({"success": False, "error": f"优化失败: {str(e)}"}, 500)
 
     def api_analyze_skill_gap(self, data):
@@ -4292,8 +4418,10 @@ class JobAgentHandler(BaseHTTPRequestHandler):
 
             self.send_json({"success": True, "html": gap_html})
         except json.JSONDecodeError:
+            logger.error("Skill gap AI response JSON decode error")
             self.send_json({"success": False, "error": "AI 返回格式异常，请重试"}, 500)
         except Exception as e:
+            logger.error(f"Analyze fail: {e}")
             self.send_json({"success": False, "error": f"分析失败: {str(e)}"}, 500)
 
     def api_learn_plan(self, data, method="POST"):
@@ -4466,7 +4594,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
             except: pass
             self.send_json({"success": False, "error": "AI 返回格式异常，请重试"}, 500)
         except Exception as e:
-            import traceback; traceback.print_exc()
+            logger.error(f"Generate learn plan fail: {e}", exc_info=True)
             self.send_json({"success": False, "error": f"生成学习计划失败: {str(e)}"}, 500)
 
     def api_learn_plan_progress(self, data):
@@ -4506,6 +4634,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
             self.agent.tracker.save()
             self.send_json({"success": True, "progress": progress, "done": done_count, "total": total})
         except Exception as e:
+            logger.error(f"Progress update fail: {e}")
             self.send_json({"success": False, "error": f"更新进度失败: {str(e)}"}, 500)
 
     def api_learn_plan_progress_GET(self, params):
@@ -4536,6 +4665,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
                                 done_count += 1
             self.send_json({"success": True, "progress": progress, "done": done_count, "total": total})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_learn_plan_ical(self, data):
@@ -4642,6 +4772,7 @@ Do NOT use any other language in the output. The entire response must be in {lan
             self.end_headers()
             self.wfile.write(ical_content.encode())
         except Exception as e:
+            logger.error(f"iCal export fail: {e}")
             self.send_json({"success": False, "error": f"导出日历失败: {str(e)}"}, 500)
 
     def api_generate_quiz(self, data):
@@ -4783,6 +4914,7 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
         except json.JSONDecodeError:
             self.send_json({"success": False, "error": "AI 返回格式异常"}, 500)
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_quiz_submit(self, data):
@@ -4806,6 +4938,7 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
             self.agent.tracker.save()
             self.send_json({"success": True, "score": score, "total": total})
         except Exception as e:
+            logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def _find_job_from_cache(self, job_id: str) -> Optional[Dict]:
@@ -5266,6 +5399,93 @@ loadResume();
             gap_html = '<span class="skill-gap-group" style="display:inline-block;margin-left:4px;cursor:pointer" data-gap-details="' + details_escaped + '" data-gap-jobid="' + str(job_data.get("id","")) + '">' + gap_html + '</span>'
         return gap_html
 
+    def handle_logs_page(self, params):
+        lang = self._get_lang(params)
+        log_title = "📋 Logs" if lang == "en" else "📋 日志" if lang == "zh-CN" else "📋 Journaux"
+
+        body = f"""
+        <div class="log-page">
+            <div class="log-header">
+                <h2>{log_title}</h2>
+                <div class="log-controls">
+                    <select id="log-type" onchange="loadLogs()">
+                        <option value="app">{"App Log" if lang == "en" else "应用日志" if lang == "zh-CN" else "Journal app"}</option>
+                        <option value="watchdog">Watchdog</option>
+                    </select>
+                    <select id="log-lines" onchange="loadLogs()">
+                        <option value="50">50 {"lines" if lang == "en" else "行"}</option>
+                        <option value="200" selected>200 {"lines" if lang == "en" else "行"}</option>
+                        <option value="1000">1000 {"lines" if lang == "en" else "行"}</option>
+                        <option value="5000">5000 {"lines" if lang == "en" else "行"}</option>
+                    </select>
+                    <button onclick="loadLogs()" class="btn-refresh">{"🔄 Refresh" if lang == "en" else "🔄 刷新"}</button>
+                    <span id="log-info" style="font-size:12px;color:#888;margin-left:8px"></span>
+                </div>
+            </div>
+            <pre id="log-output" class="log-output"></pre>
+        </div>
+
+        <style>
+        .log-page {{ padding: 8px 16px; max-width: 100%; }}
+        .log-header {{ display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }}
+        .log-header h2 {{ margin: 0; font-size: 18px; }}
+        .log-controls {{ display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }}
+        .log-controls select, .log-controls button {{ font-size: 13px; }}
+        .btn-refresh {{ padding: 4px 12px; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; }}
+        .btn-refresh:hover {{ background: #1557b0; }}
+        .log-output {{ background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 6px; font-family: 'Consolas','Courier New',monospace; font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 80vh; overflow-y: auto; margin: 0; }}
+        .log-line {{ display: flex; gap: 6px; }}
+        .log-time {{ color: #6a9955; flex-shrink: 0; }}
+        .log-level-INFO {{ color: #6a9955; }}
+        .log-level-WARNING {{ color: #e2b714; }}
+        .log-level-ERROR {{ color: #f14c4c; font-weight: bold; }}
+        .log-level-\u200d {{ color: #9cdcfe; }}
+        .log-msg {{ color: #d4d4d4; }}
+        .log-msg-error {{ color: #f14c4c; }}
+        </style>
+
+        <script>
+        async function loadLogs() {{
+            const type = document.getElementById('log-type').value;
+            const lines = document.getElementById('log-lines').value;
+            const out = document.getElementById('log-output');
+            const info = document.getElementById('log-info');
+            out.textContent = '{"Loading..." if lang == "en" else "加载中..."}';
+
+            try {{
+                const resp = await fetch('/api/logs?type='+type+'&lines='+lines);
+                const data = await resp.json();
+                if (!data.success) {{
+                    out.textContent = '{"Error:" if lang == "en" else "错误:"} ' + data.error;
+                    return;
+                }}
+                info.textContent = data.file + ' - ' + data.showing + '/' + data.total;
+
+                let html = '';
+                for (const entry of data.lines) {{
+                    const level = entry.level || 'INFO';
+                    const time = entry.time || '';
+                    const msg = entry.message || entry.raw || '';
+                    const levelCls = 'log-level-' + level;
+                    const msgCls = level === 'ERROR' || level === 'WARNING' ? 'log-msg-' + level.toLowerCase() : '';
+                    // Escape HTML
+                    const escTime = time.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    const escMsg = msg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    html += '<div class="log-line"><span class="log-time">' + escTime + '</span> <span class="' + levelCls + '">[' + level + ']</span> <span class="log-msg ' + msgCls + '">' + escMsg + '</span></div>';
+                }}
+                out.innerHTML = html || '{"No log entries" if lang == "en" else "暂无日志"}';
+            }} catch(e) {{
+                out.textContent = '{"Request failed:" if lang == "en" else "请求失败:"} ' + e.message;
+            }}
+        }}
+        loadLogs();
+        // Auto-refresh every 30 seconds
+        setInterval(loadLogs, 30000);
+        </script>
+        """
+        html = self._page(log_title, body, lang)
+        self._send_html(html)
+
     def _page(self, title, body, lang="zh-CN"):
         nav_items = ""
         pages = [
@@ -5277,6 +5497,7 @@ loadResume();
             ("/letter", t(lang, "nav_letter")),
             ("/resumes", t(lang, "nav_resume")),
             ("/learn_plan", t(lang, "nav_learn_calendar")),
+            ("/logs", t(lang, "nav_logs")),
         ]
         # Persist lang in nav links so switching pages doesn't lose language
         qs = f"?lang={lang}"
@@ -5559,37 +5780,48 @@ loadResume();
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
 
     def log_message(self, fmt, *args):
-        pass
+        # 替换默认的 stderr 日志为结构化 logging
+        logger.info(f"HTTP {self.command} {self.path} - {self.client_address[0]}")
 
 
 def main():
-    print("=" * 60)
-    print("🤖 求职Agent Web服务")
-    print("=" * 60)
+    LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_web.log")
+    
+    # 同时输出到 stderr 和日志文件
+    file_handler = logging.handlers.RotatingFileHandler(LOG_FILE, maxBytes=5*1024*1024, backupCount=2, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s'))
+    
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s'))
+    
+    logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
+    
+    logger.info("=" * 60)
+    logger.info("🤖 求职Agent Web服务")
+    logger.info("=" * 60)
     
     # 初始化Agent
     agent = JobAgent()
     JobAgentHandler.agent = agent
     
-    print("✅ Agent初始化完成")
-    print(f"📁 数据目录: {agent.data_dir}")
-    print(f"🎯 技能: {', '.join(agent.profile.get_skill_keywords()[:5])}")
-    print(f"📋 已跟踪: {agent.tracker.get_stats()['total']} 个职位")
-    print()
+    logger.info("✅ Agent初始化完成")
+    logger.info(f"📁 数据目录: {agent.data_dir}")
+    logger.info(f"🎯 技能: {', '.join(agent.profile.get_skill_keywords()[:5])}")
+    logger.info(f"📋 已跟踪: {agent.tracker.get_stats()['total']} 个职位")
     
     # 启动服务器
     server = HTTPServer(("", PORT), JobAgentHandler)
     server.allow_reuse_address = True
     server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    print(f"🌐 访问地址: http://localhost:{PORT}")
-    print(f"🌐 也可: http://<本机IP>:{PORT}")
-    print("按 Ctrl+C 停止")
-    print("=" * 60)
+    logger.info(f"🌐 访问地址: http://localhost:{PORT}")
+    logger.info(f"🌐 也可: http://<本机IP>:{PORT}")
+    logger.info("按 Ctrl+C 停止")
+    logger.info("=" * 60)
     
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n👋 服务器已停止")
+        logger.info("👋 服务器已停止")
         server.server_close()
 
 

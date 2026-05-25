@@ -11,8 +11,11 @@ import re
 import random
 import hashlib
 import time
+import logging
 from typing import List, Dict, Optional
 from job_agent_apply import ApplyManager
+
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # 配置文件
@@ -183,7 +186,7 @@ class JobSearchEngine:
             query = "+".join(keywords[:2])
             url = f"https://jobs.github.com/positions.json?description={query}"
             
-            print(f"搜索GitHub: {query}")
+            logger.info(f"搜索GitHub: {query}")
             response = requests.get(url, timeout=10)
             
             if response.status_code == 200:
@@ -205,7 +208,7 @@ class JobSearchEngine:
                         if len(jobs) >= max_results:
                             break
         except Exception as e:
-            print(f"GitHub Jobs 搜索失败: {e}")
+            logger.warning(f"GitHub Jobs 搜索失败: {e}")
         
         return jobs
     
@@ -620,12 +623,12 @@ class JobSearchEngine:
         for src in sources:
             fn = source_map.get(src)
             if fn:
-                print(f"搜索来源: {src}")
+                logger.info(f"搜索来源: {src}")
                 try:
                     jobs = fn()
                     all_jobs.extend(jobs)
                 except Exception as e:
-                    print(f"{src} 搜索出错: {e}")
+                    logger.error(f"{src} 搜索出错: {e}", exc_info=True)
         
         # 搜索链接只对综合搜索生成
         if len(sources) > 1:
@@ -1593,7 +1596,7 @@ pre {{ background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto;
             pdf_bytes = WeasyHTML(string=full_html).write_pdf()
             return pdf_bytes
         except Exception as e:
-            print(f"PDF 生成失败: {e}")
+            logger.error(f"PDF 生成失败: {e}", exc_info=True)
             return None
 
     def _pdf_bytes_to_html(self, data: bytes) -> str:
@@ -1668,12 +1671,12 @@ class JobAgent:
     
     def run_search(self, sources: List[str] = None, keywords: List[str] = None, location: str = None) -> Dict:
         """执行完整搜索和分析，可指定来源/关键词/地点"""
-        print(f"Agent: 开始搜索 (来源: {sources or '全部'})...")
+        logger.info(f"Agent: 开始搜索 (来源: {sources or '全部'})...")
         results = self.engine.search_all(sources=sources, keywords=keywords, location=location)
         
-        print(f"Agent: 找到 {results['stats']['total_jobs']} 个职位")
+        logger.info(f"Agent: 找到 {results['stats']['total_jobs']} 个职位")
         analyzed = self.analyzer.analyze_all(results)
-        print(f"Agent: 分析完成 - 高匹配: {analyzed['stats']['high_match']}")
+        logger.info(f"Agent: 分析完成 - 高匹配: {analyzed['stats']['high_match']}")
         
         # 保存历史
         self._save_search_history(analyzed)
@@ -1705,18 +1708,29 @@ class JobAgent:
             if not html:
                 return result
         else:
+            logger.info(f"fetch_job_from_url: fetching {url[:80]}...")
+            html = None
             try:
-                from curl_cffi import requests
-                resp = requests.get(url, impersonate='chrome120', timeout=20)
-            except:
+                from curl_cffi import requests as cffi_req
+                resp = cffi_req.get(url, impersonate='chrome120', timeout=8)
+                if resp.status_code == 200:
+                    html = resp.text
+            except Exception as e:
+                logger.warning(f"curl_cffi failed ({e}), trying std requests")
+            
+            if html is None:
                 try:
-                    resp = requests.get(url, timeout=20)
+                    import requests as std_req
+                    resp = std_req.get(url, timeout=8)
+                    if resp.status_code == 200:
+                        html = resp.text
+                    else:
+                        logger.warning(f"fetch_job_from_url: HTTP {resp.status_code} for {url}")
                 except Exception as e:
-                    return result
-
-            if resp.status_code != 200:
+                    logger.warning(f"fetch_job_from_url: all HTTP methods failed for {url}: {e}")
+            
+            if html is None:
                 return result
-            html = resp.text
 
 
         # Route to site-specific adapter if available
@@ -2140,24 +2154,19 @@ class JobAgent:
 # ============================================================
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("🤖 求职Agent 核心模块")
-    print("=" * 60)
-    print()
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+    logger.info("=" * 60)
+    logger.info("🤖 求职Agent 核心模块")
+    logger.info("=" * 60)
     
     agent = JobAgent()
     
-    print("Agent 已初始化")
-    print(f"技能: {', '.join(agent.profile.get_skill_keywords()[:5])}")
-    print(f"已跟踪职位: {agent.tracker.get_stats()['total']}")
-    print()
+    logger.info("Agent 已初始化")
+    logger.info(f"技能: {', '.join(agent.profile.get_skill_keywords()[:5])}")
+    logger.info(f"已跟踪职位: {agent.tracker.get_stats()['total']}")
     
     # 执行一次搜索测试
-    print("执行搜索测试...")
+    logger.info("执行搜索测试...")
     results = agent.run_search()
     
-    print(f"\n搜索完成!")
-    print(f"  职位: {results['stats']['total_jobs']}")
-    print(f"  搜索链接: {len(results['search_links'])}")
-    print(f"  高匹配: {results['stats']['high_match']}")
-    print(f"  平均匹配度: {results['stats']['avg_match_score']}%")
+    logger.info(f"搜索完成: {results['stats']['total_jobs']} 职位, 高匹配: {results['stats']['high_match']}, 平均匹配度: {results['stats']['avg_match_score']}%")
