@@ -87,6 +87,10 @@ def _ensure_registered():
     # Fullscript Lever jobs
     register('jobs.lever.co/fullscript', 'sites.fullscript', priority=10)
 
+    # Deloitte Careers (Workday-based custom domain)
+    register('careers.deloitte.ca', 'sites.deloitte', priority=10)
+    register('careers.deloitte.com', 'sites.deloitte', priority=10)
+
     # Generic company domain matchers (lower priority)
     for domain, name in [
         ('nvidia.com', 'NVIDIA'),
