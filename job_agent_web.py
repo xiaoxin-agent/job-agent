@@ -1060,6 +1060,9 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         if path == "/api/preview_resume":
             self.api_preview_resume_GET(params)
             return
+        if path == "/api/download_resume_pdf":
+            self.api_download_resume_pdf_GET(params)
+            return
 
         # Special GET handlers that need method awareness
         if path == "/api/learn_plan":
@@ -1774,6 +1777,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _gap_modal_title = {json.dumps(gap_modal_title, ensure_ascii=False)};
         var _btn_generate_plan = {json.dumps(btn_generate_plan, ensure_ascii=False)};
         var _btn_view_plan = {json.dumps(btn_view_plan, ensure_ascii=False)};
+        var _btn_optimize = {json.dumps(btn_optimize, ensure_ascii=False)};
         var _btn_edit = {json.dumps(btn_edit, ensure_ascii=False)};
         var _btn_fullscreen_edit = {json.dumps(btn_fullscreen_edit, ensure_ascii=False)};
         var _resume_preview_title = {json.dumps(resume_preview_title, ensure_ascii=False)};
@@ -2543,13 +2547,15 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         }}
         function tailorResume(jobId) {{
             var btn = document.getElementById('tailor-' + jobId);
-            if (btn) {{ btn.textContent = '⏳ ' + _quiz_generating + ''; btn.disabled = true; }}
+            if (btn) {{ btn.textContent = '⏳ ' + (_btn_optimize || 'Optimizing...'); btn.disabled = true; }}
             fetch('/api/tailor_resume', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId}})}})
             .then(function(r){{return r.json()}})
             .then(function(d){{
                 if (btn) {{ btn.textContent = _btn_optimize; btn.disabled = false; }}
                 if (d.success) {{
-                    window.open('/resume_view?job_id=' + jobId, '_blank');
+                    // 打开 PDF 预览
+                    var pdfUrl = '/api/download_resume_pdf?job_id=' + jobId;
+                    window.open(pdfUrl, '_blank');
                 }} else {{
                     alert(_analysis_failed + ': ' + (d.error || ''));
                 }}
@@ -4008,36 +4014,51 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             self.send_json({"success": False, "error": str(e)}, 500)
 
     def api_download_resume_pdf(self, data):
-        """下载职位简历的 PDF 版本（从 Markdown 生成）"""
+        """下载职位简历的 PDF 版本（从 Markdown 生成）- POST 版本"""
         try:
             job_id = data.get("job_id", "")
             if not job_id:
                 self.send_json({"success": False, "error": "缺少 job_id"}, 400)
                 return
-            # 查找职位信息
-            job = None
-            for j in self.agent.tracker.tracked_jobs:
-                if j["id"] == job_id:
-                    job = j
-                    break
-            md = self.agent.tracker.get_job_resume_markdown(job_id)
-            if not md:
-                self.send_json({"success": False, "error": "未找到简历内容"}, 404)
-                return
-            title = (job.get("resume_name", "") if job else "") or "简历"
-            pdf_bytes = self.agent.tracker.resume_to_pdf_bytes(md, title)
-            if not pdf_bytes:
-                self.send_json({"success": False, "error": "PDF 生成失败"}, 500)
-                return
-            self.send_response(200)
-            self.send_header("Content-Type", "application/pdf")
-            self.send_header("Content-Disposition", f'attachment; filename="resume_{job_id}.pdf"')
-            self.send_header("Content-Length", str(len(pdf_bytes)))
-            self.end_headers()
-            self.wfile.write(pdf_bytes)
+            self._serve_resume_pdf(job_id)
         except Exception as e:
             logger.error("API error: %s" % str(e))
             self.send_json({"success": False, "error": str(e)}, 500)
+
+    def api_download_resume_pdf_GET(self, params):
+        """GET 版本，通过 URL 参数接收 job_id（用于 window.open）"""
+        try:
+            job_id = params.get("job_id", "")
+            if not job_id:
+                self.send_json({"success": False, "error": "缺少 job_id"}, 400)
+                return
+            self._serve_resume_pdf(job_id)
+        except Exception as e:
+            logger.error("API error: %s" % str(e))
+            self.send_json({"success": False, "error": str(e)}, 500)
+
+    def _serve_resume_pdf(self, job_id: str):
+        """生成并输出 PDF 响应（共享逻辑）"""
+        job = None
+        for j in self.agent.tracker.tracked_jobs:
+            if j["id"] == job_id:
+                job = j
+                break
+        md = self.agent.tracker.get_job_resume_markdown(job_id)
+        if not md:
+            self.send_json({"success": False, "error": "未找到简历内容"}, 404)
+            return
+        title = (job.get("resume_name", "") if job else "") or "简历"
+        pdf_bytes = self.agent.tracker.resume_to_pdf_bytes(md, title)
+        if not pdf_bytes:
+            self.send_json({"success": False, "error": "PDF 生成失败"}, 500)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/pdf")
+        self.send_header("Content-Disposition", f'inline; filename="resume_{job_id}.pdf"')
+        self.send_header("Content-Length", str(len(pdf_bytes)))
+        self.end_headers()
+        self.wfile.write(pdf_bytes)
 
     def api_convert_markdown(self, data):
         """将 Markdown 转换为 HTML（用于实时预览）"""
@@ -4274,6 +4295,12 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                 self.send_json({"success": False, "error": f"API 返回为空: {result}"}, 500)
                 return
             tailored_md = choices[0]["message"]["content"].strip()
+
+            # 清洗：去掉 DeepSeek 可能添加的 markdown code fence
+            import re
+            tailored_md = re.sub(r'^```markdown\s*', '', tailored_md)
+            tailored_md = re.sub(r'```\s*$', '', tailored_md)
+            tailored_md = tailored_md.strip()
 
             # 保存优化后的简历
             self.agent.tracker.save_job_resume_markdown(job_id, tailored_md)
