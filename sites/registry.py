@@ -91,6 +91,9 @@ def _ensure_registered():
     register('careers.deloitte.ca', 'sites.deloitte', priority=10)
     register('careers.deloitte.com', 'sites.deloitte', priority=10)
 
+    # Bank of Canada (SuccessFactors)
+    register('careers.bankofcanada.ca', 'sites.bank_of_canada', priority=10)
+
     # Generic company domain matchers (lower priority)
     for domain, name in [
         ('nvidia.com', 'NVIDIA'),
@@ -138,4 +141,5 @@ def known_companies() -> Dict[str, str]:
         'ranovus.com': 'Ranovus',
         'nokia.com': 'Nokia',
         'jobs.nokia.com': 'Nokia',
+        'bankofcanada.ca': 'Bank of Canada',
     }
