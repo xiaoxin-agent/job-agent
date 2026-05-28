@@ -160,8 +160,14 @@ WORKDAY_COMPANIES: Dict[str, Dict] = {
             "About the Role",
             "Qualifications",
             "Requirements",
+            "Key Responsibilities",
             "Responsibilities",
+            "Position Summary",
+            "Preferred",
+            "Education",
+            "What We Offer",
             "About Trend Micro",
+            "About TrendAI",
             "Equal Opportunity",
         ],
     },
@@ -193,10 +199,11 @@ def add_company(key: str, domain: str, site_id: str, company: str,
 
 
 def _format_description(text: str, sections: List[str]) -> str:
-    """Convert Workday plain-text description to structured HTML.
+    """Convert Workday plain-text description with minimal formatting.
 
     Workday JSON-LD descriptions are continuous text with section headers.
-    We split on known headers and wrap each section in <p> tags.
+    We preserve the original text and only bold known section headers.
+    No <p> wrapping — let the frontend display it as-is.
     """
     if not text:
         return ""
@@ -207,10 +214,10 @@ def _format_description(text: str, sections: List[str]) -> str:
     parts = re.split(header_pattern, text, flags=re.IGNORECASE)
 
     if len(parts) < 2:
-        escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        return f"<p>{escaped}</p>"
+        # No recognizable headers — return raw text unchanged
+        return text
 
-    html_parts = []
+    result_parts = []
     i = 0
     while i < len(parts):
         part = parts[i].strip()
@@ -220,20 +227,19 @@ def _format_description(text: str, sections: List[str]) -> str:
         clean = part.rstrip(":? ").strip()
         is_header = any(clean.lower() == h.lower() for h in sections)
         if is_header:
+            result_parts.append(f"\n<strong>{clean}</strong>\n")
             if i + 1 < len(parts):
                 body = parts[i + 1].strip()
                 body = re.sub(r'^[:?]\s*', '', body)
-                html_parts.append(f"<p><strong>{clean}</strong></p>")
-                html_parts.append(f"<p>{body}</p>")
+                result_parts.append(body)
                 i += 2
             else:
-                html_parts.append(f"<p><strong>{clean}</strong></p>")
                 i += 1
         else:
-            html_parts.append(f"<p>{part}</p>")
+            result_parts.append(part)
             i += 1
 
-    return "\n".join(html_parts)
+    return "\n".join(result_parts).strip()
 
 
 def extract(html: str, url: str = "") -> Dict[str, str]:
@@ -269,7 +275,8 @@ def extract(html: str, url: str = "") -> Dict[str, str]:
                     if sections:
                         result["description"] = _format_description(desc.strip(), sections)
                     else:
-                        result["description"] = f"<p>{desc.strip()}</p>"
+                        # 保留原始 JSON-LD 纯文本，不包装 <p> 标签
+                        result["description"] = desc.strip()
                 loc = data.get("jobLocation", {})
                 if isinstance(loc, dict):
                     addr = loc.get("address", {})

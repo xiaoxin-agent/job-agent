@@ -74,6 +74,9 @@ def _ensure_registered():
     # Mitel Workday jobs
     register('mitel.wd3.myworkdayjobs.com', 'sites.mitel', priority=10)
 
+    # Trend Micro Workday jobs
+    register('trendmicro.wd3.myworkdayjobs.com', 'sites.trendmicro', priority=10)
+
     # Fortinet (generic) jobs
     register('fortinet.com/corporate/careers', 'sites.fortinet', priority=10)
     register('edel.fa.us2.oraclecloud.com', 'sites.fortinet', priority=10)
