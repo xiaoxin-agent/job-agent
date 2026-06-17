@@ -151,6 +151,27 @@ WORKDAY_COMPANIES: Dict[str, Dict] = {
             "Equal Opportunity",
         ],
     },
+    "Intel": {
+        "domain": "intel.wd1.myworkdayjobs.com",
+        "site_id": "External",
+        "company": "Intel",
+        "locale": "en-US",
+        "sections": [
+            "Job Description",
+            "Qualifications",
+            "Minimum Qualifications",
+            "Preferred Qualifications",
+            "Responsibilities",
+            "Inside this Business Group",
+            "Posting Statement",
+            "Benefits",
+            "Job Type",
+            "Shift",
+            "Primary Location",
+            "Additional Locations",
+            "Work Model",
+        ],
+    },
     "TrendMicro": {
         "domain": "trendmicro.wd3.myworkdayjobs.com",
         "site_id": "External",
@@ -242,6 +263,105 @@ def _format_description(text: str, sections: List[str]) -> str:
     return "\n".join(result_parts).strip()
 
 
+def _auto_format_description(text: str) -> str:
+    """Auto-format a Workday description that has no recognized section headers.
+
+    Handles two common formats:
+    1. Single-line continuous text (no actual newlines) — split on patterns like
+       "Key Responsibilities:", "Qualifications:", capitalized sentence-starting
+       section headers, common JD section names.
+    2. Text with embedded \\n escapes that need rendering.
+
+    Returns text with proper \n line breaks.
+    """
+    if not text:
+        return ""
+
+    # Handle \\n escape sequences (literal backslash-n)
+    if r"\n" in text and "\n" not in text:
+        text = text.replace(r"\n", "\n")
+
+    # If there are already real newlines, just normalize whitespace
+    if "\n" in text or "\r" in text:
+        lines = re.split(r"\r?\n", text)
+        # Collapse multiple blank lines
+        cleaned = []
+        blank = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                if not blank:
+                    cleaned.append("")
+                    blank = True
+            else:
+                cleaned.append(stripped)
+                blank = False
+        return "\n".join(cleaned).strip()
+
+    # Single-line text: try to split on section-like headers
+    # Common JD section headers that start sentences/paragraphs
+    section_patterns = [
+        r"Job Description:\s*",
+        r"Job Details:\s*",
+        r"Key Responsibilities:",
+        r"Responsibilities:",
+        r"Qualifications:",
+        r"Minimum Qualifications:",
+        r"Preferred Qualifications:",
+        r"Required Qualifications:",
+        r"Requirements:",
+        r"About the Role:",
+        r"About the Team:",
+        r"What You Will Do:",
+        r"What You Will Bring:",
+        r"Professional traits:",
+        r"Inside this Business Group:",
+        r"Posting Statement:",
+        r"Benefits:",
+        r"Salary Range:",
+        r"Work Model:",
+    ]
+
+    combined_pattern = "(" + "|".join(section_patterns) + ")"
+    parts = re.split(combined_pattern, text, flags=re.IGNORECASE | re.DOTALL)
+
+    if len(parts) < 3:
+        # No recognizable headers — wrap long text at sentence boundaries
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
+        if len(sentences) > 1:
+            return "\n\n".join(s.strip() for s in sentences if s.strip())
+        return text
+
+    # Found section headers: format with bold headers
+    result_parts = []
+    i = 0
+    while i < len(parts):
+        part = parts[i].strip()
+        if not part:
+            i += 1
+            continue
+        # Check if this part is a section header match
+        clean = part.rstrip(":? ").strip()
+        is_header = any(
+            clean.lower() == h.replace("\\s*", "").rstrip(":? ").lower().replace("\\s*", "")
+            for h in section_patterns
+        ) or re.match(r"^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*:\s*$", clean + ":", re.DOTALL)
+        if is_header:
+            result_parts.append(f"\n<strong>{clean}</strong>\n")
+            if i + 1 < len(parts):
+                body = parts[i + 1].strip()
+                body = re.sub(r'^[:?]\s*', '', body)
+                result_parts.append(body)
+                i += 2
+            else:
+                i += 1
+        else:
+            result_parts.append(part)
+            i += 1
+
+    return "\n".join(result_parts).strip()
+
+
 def extract(html: str, url: str = "") -> Dict[str, str]:
     """Extract job details from a generic Workday job page.
 
@@ -275,8 +395,9 @@ def extract(html: str, url: str = "") -> Dict[str, str]:
                     if sections:
                         result["description"] = _format_description(desc.strip(), sections)
                     else:
-                        # 保留原始 JSON-LD 纯文本，不包装 <p> 标签
-                        result["description"] = desc.strip()
+                        # 没有 sections 配置时，尝试自动格式化
+                        fmt = _auto_format_description(desc.strip())
+                        result["description"] = fmt
                 loc = data.get("jobLocation", {})
                 if isinstance(loc, dict):
                     addr = loc.get("address", {})
@@ -482,6 +603,11 @@ def search_alphawave(keywords: List[str] = None, location: str = "",
 def search_mitel(keywords: List[str] = None, location: str = "",
                   max_results: int = 10) -> List[Dict]:
     return search("Mitel", keywords, location, max_results)
+
+
+def search_intel(keywords: List[str] = None, location: str = "",
+                 max_results: int = 10) -> List[Dict]:
+    return search("Intel", keywords, location, max_results)
 
 
 def search_trendmicro(keywords: List[str] = None, location: str = "",

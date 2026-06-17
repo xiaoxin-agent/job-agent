@@ -74,6 +74,9 @@ def _ensure_registered():
     # Mitel Workday jobs
     register('mitel.wd3.myworkdayjobs.com', 'sites.mitel', priority=10)
 
+    # Intel Workday jobs
+    register('intel.wd1.myworkdayjobs.com', 'sites.intel', priority=10)
+
     # Trend Micro Workday jobs
     register('trendmicro.wd3.myworkdayjobs.com', 'sites.trendmicro', priority=10)
 
