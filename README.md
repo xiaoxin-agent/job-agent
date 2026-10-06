@@ -84,15 +84,25 @@ bash agent_ctl.sh watchdog   # 检查/重启（适用于 cron）
 
 AI 对话功能使用 **DeepSeek API**。
 
-### 方式一：环境变量（推荐）
+API Key 的解析顺序（按优先级，找到即用）：
+
+1. **环境变量** `DEEPSEEK_API_KEY`
+2. **配置文件** `~/.openclaw/agents/main/agent/models.json` 中的
+   `providers.deepseek.apiKey`
+
+> ⚠️ **注意**：`agent_data/settings.json` **不被代码读取**（历史文档遗留，已废弃）。
+
+### 方式一：环境变量
 
 ```bash
 export DEEPSEEK_API_KEY="sk-your-api-key-here"
 ```
 
-### 方式二：配置文件
+适合手动在终端启动服务。**注意**：通过 cron / watchdog 自动重启的进程**不会继承**终端里 `export` 的变量，因此该方式对无人值守重启不可靠。
 
-在 `agent_data/settings.json` 中配置：
+### 方式二：配置文件（推荐，耐重启）
+
+在 `~/.openclaw/agents/main/agent/models.json` 中加入：
 
 ```json
 {
@@ -103,6 +113,9 @@ export DEEPSEEK_API_KEY="sk-your-api-key-here"
   }
 }
 ```
+
+> 🔒 该文件位于工作区仓库**之外**，不会被提交到 Git。
+> 请勿把 Key 写入 `job-agent/` 目录内的任何文件。
 
 ### 使用场景
 
@@ -152,13 +165,15 @@ job-agent/
 ├── job_agent_core.py     # 核心逻辑：搜索、匹配、画像（~1840 行）
 ├── job_agent_apply.py    # 申请分析与管理（~243 行）
 ├── tests.py              # 测试套件（~1400 行）
-├── agent_data/           # 运行时数据
+├── agent_data/           # 运行时数据（已在 .gitignore 中）
 │   ├── user_profile.json # 用户画像
 │   ├── tracked_jobs.json # 跟踪的职位
-│   └── settings.json     # 设置（含 API Key）
+│   └── resumes/          # 简历文件与关联
 ├── static/               # 静态资源（logo SVG 等）
 └── sites/                # 职位网站解析器
 ```
+
+> API Key 不在仓库内，见上文「配置 AI」。
 
 ---
 

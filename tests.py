@@ -920,8 +920,10 @@ setTimeout(() => { if (done < total) { done = total; console.log(JSON.stringify(
         # === 7. 模拟浏览器：刷新跟踪页，验证已关联显示 ===
         tracked_html2 = urlopen(f"http://localhost:{self.port}/tracked").read().decode("utf-8")
         # 不再显示 "关联简历" 按钮
-        self.assertNotIn('linkResume(\'' + job_id + '\')', tracked_html2,
-            "关联后不应再显示关联简历按钮")
+        # 注意：必须匹配 onclick="linkResume('id')"（带前缀），否则会误匹配
+        # unlinkResume('id')（解除关联按钮），导致假失败。
+        self.assertNotIn('onclick="linkResume(\'' + job_id + '\')"', tracked_html2,
+            "关联后不应再显示关联简历按钮（未被 unlinkResume 干扰）")
         # 显示简历名 + 预览/编辑链接
         self.assertIn(resume_name, tracked_html2,
             f"关联后跟踪页应显示简历名 '{resume_name}'")

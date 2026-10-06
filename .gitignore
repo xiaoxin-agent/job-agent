@@ -4,8 +4,15 @@ __pycache__/
 
 # Runtime logs & PIDs
 *.log
+*.log.*
 *.pid
 
 # Runtime data — not part of source code
 agent_data/
 !agent_data/user_profile.json
+
+# Secrets — NEVER commit (API keys)
+**/settings.json
+agent_data/settings.json
+.env
+*.secret

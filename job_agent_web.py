@@ -280,6 +280,8 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "Week {}",
         "tasks_completed": "{} tasks completed",
         "gap_modal_title": "🎯 Skill Gap Analysis",
+        "skill_gap_failed": "Skill gap analysis failed (hover for details)",
+        "skill_gap_nokey": "AI not configured: DeepSeek API key missing",
         "btn_generate_plan": "📚 Generate Study Plan",
         "btn_view_plan": "📚 View Study Plan",
         "learn_plan_empty": "No study plans yet. Generate one from the <a href='/tracked'>tracked page</a>.",
@@ -567,6 +569,8 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "第{}周",
         "tasks_completed": "{}/{} 任务完成",
         "gap_modal_title": "🎯 技能差距分析",
+        "skill_gap_failed": "技能差距分析失败（悬停查看详情）",
+        "skill_gap_nokey": "AI 未配置：缺少 DeepSeek API Key",
         "btn_generate_plan": "📚 生成学习计划",
         "btn_view_plan": "📚 查看学习计划",
         "learn_plan_empty": "暂无学习计划，请先在 <a href='/tracked'>跟踪页面</a> 为职位生成学习计划。",
@@ -882,6 +886,8 @@ LANGUAGES: Dict[str, Dict[str, str]] = {
         "week_focus": "Semaine {}",
         "tasks_completed": "{} tâches terminées",
         "gap_modal_title": "🎯 Analyse des écarts de compétences",
+        "skill_gap_failed": "Échec de l'analyse des écarts (survolez pour détails)",
+        "skill_gap_nokey": "IA non configurée : clé API DeepSeek manquante",
         "btn_generate_plan": "📚 Générer un plan d'étude",
         "btn_view_plan": "📚 Voir le plan d'étude",
         "learn_plan_empty": "Aucun plan d'étude pour le moment. Générez-en un depuis la <a href='/tracked'>page de suivi</a>.",
@@ -1816,6 +1822,8 @@ class JobAgentHandler(BaseHTTPRequestHandler):
         var _applied_btn = {json.dumps(t(lang, "applied_btn"), ensure_ascii=False)};
         var _next_steps = {json.dumps(t(lang, "next_steps"), ensure_ascii=False)};
         var _analysis_failed = {json.dumps(t(lang, "analysis_failed"), ensure_ascii=False)};
+        var _skill_gap_failed = {json.dumps(t(lang, "skill_gap_failed"), ensure_ascii=False)};
+        var _skill_gap_nokey = {json.dumps(t(lang, "skill_gap_nokey"), ensure_ascii=False)};
         var _analysis_error = {json.dumps(t(lang, "analysis_error"), ensure_ascii=False)};
         var _visit_company_site = {json.dumps(t(lang, "visit_company_site"), ensure_ascii=False)};
         var _auto_submit_prefix = {json.dumps(t(lang, "auto_submit_prefix"), ensure_ascii=False)};
@@ -2127,7 +2135,21 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         var jobId = el.id.replace('skill-gap-', '');
                         fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, lang: _lang}})}})
                         .then(function(r){{return r.json()}})
-                        .then(function(d){{ if (d.success && d.html) {{ el.innerHTML = d.html; }}}});
+                        .then(function(d){{
+                            if (d.success && d.html) {{
+                                el.innerHTML = d.html;
+                            }} else if (!d.success) {{
+                                var _m = (d.error || '') + '';
+                                if (_m.indexOf('_NOKEY') === -1 && _m.indexOf('API Key') === -1 && _m.indexOf('API key') === -1) {{
+                                    el.innerHTML = '<span style="color:#d32f2f;font-size:12px" title="' + _m.replace(/"/g,'&quot;') + '">\u26a0 ' + _skill_gap_failed + '</span>';
+                                }} else {{
+                                    el.innerHTML = '<span style="color:#d32f2f;font-size:12px">\u26a0 ' + _skill_gap_nokey + '</span>';
+                                }}
+                            }}
+                        }})
+                        .catch(function(e){{
+                            el.innerHTML = '<span style="color:#d32f2f;font-size:12px">\u26a0 ' + _skill_gap_failed + '</span>';
+                        }});
                     }}
                 }})(els[i]);
             }}
@@ -2566,15 +2588,28 @@ class JobAgentHandler(BaseHTTPRequestHandler):
             }});
         }}
         function analyzeSkillGap(jobId) {{
+            var _el0 = document.getElementById('skill-gap-' + jobId);
+            if (_el0) {{ _el0.innerHTML = '<span style="font-size:12px;color:#666">\u23f3 ' + _btn_generate_plan + '</span>'; }}
             fetch('/api/analyze_skill_gap', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{job_id: jobId, lang: _lang}})}})
             .then(function(r){{return r.json()}})
             .then(function(d){{
-                if (d.success) {{
-                    var el = document.getElementById('skill-gap-' + jobId);
-                    if (el) {{ el.outerHTML = d.html; }}
+                var el = document.getElementById('skill-gap-' + jobId);
+                if (!el) return;
+                if (d.success && d.html) {{
+                    el.outerHTML = d.html;
+                }} else {{
+                    var _m = (d.error || '') + '';
+                    if (_m.indexOf('_NOKEY') !== -1 || _m.indexOf('API Key') !== -1 || _m.indexOf('API key') !== -1) {{
+                        el.innerHTML = '<span style="color:#d32f2f;font-size:12px">\u26a0 ' + _skill_gap_nokey + '</span>';
+                    }} else {{
+                        el.innerHTML = '<span style="color:#d32f2f;font-size:12px" title="' + _m.replace(/"/g,'&quot;') + '">\u26a0 ' + _skill_gap_failed + '</span>';
+                    }}
                 }}
             }})
-            .catch(function(e){{}});
+            .catch(function(e){{
+                var el = document.getElementById('skill-gap-' + jobId);
+                if (el) {{ el.innerHTML = '<span style="color:#d32f2f;font-size:12px">\u26a0 ' + _skill_gap_failed + '</span>'; }}
+            }});
         }}
         function closeResumeModal() {{
             var el = document.getElementById('resume-modal-overlay');
@@ -4368,7 +4403,7 @@ class JobAgentHandler(BaseHTTPRequestHandler):
                         cfg = j.load(f)
                     api_key = cfg.get("providers", {}).get("deepseek", {}).get("apiKey", "")
             if not api_key:
-                self.send_json({"success": False, "error": "未找到 DeepSeek API Key"}, 500)
+                self.send_json({"success": False, "error": "_NOKEY 未找到 DeepSeek API Key"}, 500)
                 return
 
             req_body = j.dumps({
@@ -5073,7 +5108,7 @@ Requirements: Choice answers use 0-based index. Essay questions provide referenc
             h += '<h3 style="margin:0;font-size:16px">\U0001F4C4 \u7B80\u5386\u9884\u89C8</h3>';
             h += '<div>';
             h += '<a href="/api/get_resume?resume_id=' + resumeId + '" target="_blank" class="btn" style="margin-right:4px;font-size:13px;padding:5px 12px">\U0001F4E5 \u4E0B\u8F7D</a>';
-            h += '<button class="btn" onclick="deleteResumeById(\'' + resumeId + '\')" style="margin-right:4px;font-size:13px;padding:5px 12px;color:#d32f2f;border-color:#d32f2f">\U0001F5D1 \u5220\u9664</button>';
+            h += '<button class="btn" onclick="deleteResumeById(\\'' + resumeId + '\\')" style="margin-right:4px;font-size:13px;padding:5px 12px;color:#d32f2f;border-color:#d32f2f">\U0001F5D1 \u5220\u9664</button>';
             h += '<button class="resume-lib-modal-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:4px;line-height:1">\u00d7</button>';
             h += '</div></div>';
             h += '<div id="resume-lib-preview-content" style="overflow-y:auto;padding:20px;line-height:1.7;font-size:14px;flex:1">';
