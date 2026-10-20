@@ -100,6 +100,9 @@ def _ensure_registered():
     # Bank of Canada (SuccessFactors)
     register('careers.bankofcanada.ca', 'sites.bank_of_canada', priority=10)
 
+    # Telesat careers (WordPress/Elementor detail pages behind an nginx WAF)
+    register('telesat.com/careers/jobs', 'sites.telesat', priority=10)
+
     # Generic company domain matchers (lower priority)
     for domain, name in [
         ('nvidia.com', 'NVIDIA'),

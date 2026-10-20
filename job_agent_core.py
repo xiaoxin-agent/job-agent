@@ -1709,26 +1709,13 @@ class JobAgent:
                 return result
         else:
             logger.info(f"fetch_job_from_url: fetching {url[:80]}...")
-            html = None
-            try:
-                from curl_cffi import requests as cffi_req
-                resp = cffi_req.get(url, impersonate='chrome120', timeout=8)
-                if resp.status_code == 200:
-                    html = resp.text
-            except Exception as e:
-                logger.warning(f"curl_cffi failed ({e}), trying std requests")
-            
+            html = self._fetch_html_with_fallbacks(url)
+
             if html is None:
-                try:
-                    import requests as std_req
-                    resp = std_req.get(url, timeout=8)
-                    if resp.status_code == 200:
-                        html = resp.text
-                    else:
-                        logger.warning(f"fetch_job_from_url: HTTP {resp.status_code} for {url}")
-                except Exception as e:
-                    logger.warning(f"fetch_job_from_url: all HTTP methods failed for {url}: {e}")
-            
+                # Last resort: some WAFs (e.g. Telesat's nginx) block browsers but
+                # not their own listing pages. Site adapters can recover title/place.
+                html = self._fetch_via_site_listing(url)
+
             if html is None:
                 return result
 
@@ -1762,6 +1749,109 @@ class JobAgent:
             except:
                 pass
         return result
+
+    # Browser fingerprints to try, in order. Some WAFs block Chrome-like TLS
+    # fingerprints but allow Safari's, so breadth matters more than recency.
+    _IMPERSONATE_PROFILES = ('chrome120', 'safari17_0', 'safari17_2_ios', 'chrome131')
+    _UA_HEADERS = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Upgrade-Insecure-Requests': '1',
+    }
+
+    def _fetch_html_with_fallbacks(self, url: str, timeout: int = 12):
+        """Fetch a job page, retrying across HTTP clients, UA fingerprints, and
+        trailing-slash variants. Returns HTML text or None.
+
+        Order: curl_cffi (multiple impersonation profiles) -> plain requests ->
+        curl_cffi again on the trailing-slash variant. Each step logs the status
+        so a 403/WAF block is diagnosable from the web log.
+        """
+        candidates = [url]
+        if '?' in url:
+            candidates.append(re.sub(r'\?.*', '', url))
+        if not candidates[0].endswith('/'):
+            candidates.append(candidates[0].rstrip('/') + '/')
+
+        for attempt_url in candidates:
+            try:
+                from curl_cffi import requests as cffi_req
+            except ImportError:
+                cffi_req = None
+
+            if cffi_req is not None:
+                for profile in self._IMPERSONATE_PROFILES:
+                    try:
+                        resp = cffi_req.get(
+                            attempt_url, impersonate=profile, timeout=timeout,
+                            headers=self._UA_HEADERS, allow_redirects=True,
+                        )
+                        if resp.status_code == 200 and len(resp.text) > 500:
+                            logger.info(
+                                f"fetch_job_from_url: {profile} OK for {attempt_url[:80]}"
+                            )
+                            return resp.text
+                        logger.info(
+                            f"fetch_job_from_url: {profile} HTTP {resp.status_code} "
+                            f"for {attempt_url[:80]}"
+                        )
+                    except Exception as e:
+                        logger.info(
+                            f"fetch_job_from_url: {profile} failed for {attempt_url[:80]}: {e}"
+                        )
+
+            try:
+                import requests as std_req
+                resp = std_req.get(attempt_url, timeout=timeout, headers=self._UA_HEADERS)
+                if resp.status_code == 200 and len(resp.text) > 500:
+                    return resp.text
+                logger.info(
+                    f"fetch_job_from_url: requests HTTP {resp.status_code} for {attempt_url[:80]}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"fetch_job_from_url: requests failed for {attempt_url[:80]}: {e}"
+                )
+
+        logger.warning(f"fetch_job_from_url: all fetch methods failed for {url[:80]}")
+        return None
+
+    def _fetch_via_site_listing(self, url: str):
+        """Fallback for sites whose detail pages are WAF-blocked but listing pages
+        are reachable. The site adapter supplies the listing URL and matching logic.
+        """
+        from sites.registry import get_adapter
+        if get_adapter(url) is None:
+            return None
+        module_name = self._adapter_module_name(url)
+        if not module_name:
+            return None
+        try:
+            mod = __import__(module_name, fromlist=['LIST_URL'])
+        except ImportError:
+            return None
+        list_url = getattr(mod, 'LIST_URL', '')
+        if not list_url:
+            return None
+        logger.info(f"fetch_job_from_url: falling back to listing {list_url}")
+        try:
+            return self._fetch_html_with_fallbacks(list_url)
+        except Exception as e:
+            logger.warning(f"fetch_job_from_url: listing fetch failed: {e}")
+            return None
+
+    @staticmethod
+    def _adapter_module_name(url: str):
+        """Return the site adapter module name registered for this URL."""
+        try:
+            from sites.registry import _ADAPTERS, _ensure_registered
+            _ensure_registered()
+            for match_fn, module_name, _priority in sorted(_ADAPTERS, key=lambda x: -x[2]):
+                if match_fn(url):
+                    return module_name
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def _fetch_linkedin_with_playwright(url: str) -> str:
