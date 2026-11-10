@@ -1,78 +1,80 @@
-# 🤖 Job Agent — AI 求职助手
+# 🤖 Job Agent — AI Job Search Assistant
 
-AI 驱动的求职全流程管理工具：职位搜索、匹配分析、简历优化、求职信生成、申请跟踪。
+**English** | [中文](README.zh-CN.md)
 
-## 功能一览
+An AI-powered, end-to-end job search management tool: job discovery, match analysis, resume optimization, cover letter generation, and application tracking.
 
-### 🔍 职位搜索与采集
-- 从 Google Careers / LinkedIn / Indeed 等 URL 抓取职位详情
-- 基于关键词和地点批量搜索
-- 自动分析职位要求与技能匹配度
+## Features
 
-### 📊 匹配度分析
-- 根据用户技能画像自动计算匹配百分比
-- 技能差距分析（Skill Gap），提示待提升方向
-- 学习计划生成，含推荐课程和资料链接
-- 学习日历导出（iCal 格式），可导入 Google Calendar
+### 🔍 Job Search & Import
+- Extract job details from URLs such as Google Careers / LinkedIn / Indeed
+- Batch search by keywords and location
+- Automatic analysis of job requirements and skill match
 
-### 📝 简历管理
-- 上传 / 预览 / 下载 / 删除简历
-- 简历与职位关联
-- 针对特定职位优化简历（Tailor Resume）
-- 简历 PDF 导出
-- 多语言支持：中文 / English / Français
+### 📊 Match Analysis
+- Automatically calculates a match percentage against your skill profile
+- Skill gap analysis highlighting areas to improve
+- Learning plan generation with recommended courses and resource links
+- Learning calendar export (iCal), importable into Google Calendar
 
-### ✉️ 求职信
-- 一键生成针对性求职信（Cover Letter）
-- 保存、查看、下载
+### 📝 Resume Management
+- Upload / preview / download / delete resumes
+- Link resumes to specific jobs
+- Tailor a resume to a specific job posting (Tailor Resume)
+- Resume PDF export
+- Multi-language support: 中文 / English / Français
 
-### 🎯 申请跟踪
-- 查看历史申请记录
-- 分析申请方式（邮箱 / 官网 / LinkedIn Easy Apply）
-- 状态看板：Saved → Applied → Interviewing → Offer
+### ✉️ Cover Letters
+- One-click generation of a targeted cover letter
+- Save, view, and download
 
-### 🧠 知识测验
-- 根据学习计划自动生成测验题目（Quiz）
-- 选择题 + 问答题，检验学习成果
+### 🎯 Application Tracking
+- Review your application history
+- Analyze application channels (email / company site / LinkedIn Easy Apply)
+- Status board: Saved → Applied → Interviewing → Offer
 
-### 🌐 多语言界面
-- 支持 **中文 / English / Français**
-- URL 参数 `?lang=zh-CN` 或右上角下拉切换
-- 浏览器语言自动检测（Accept-Language header）
-- 所有页面导航链接携带语言参数，切换页面不丢失
-- 拓展语言只需在 `LANGUAGES` 字典和 `lang_labels` 字典增添条目
+### 🧠 Knowledge Quizzes
+- Automatically generates quiz questions from your learning plan
+- Multiple-choice plus free-response questions to verify learning
+
+### 🌐 Multilingual UI
+- Supports **中文 / English / Français**
+- Switch via the URL parameter `?lang=zh-CN` or the dropdown in the top-right corner
+- Automatic browser language detection (`Accept-Language` header)
+- Every navigation link carries the language parameter, so switching pages does not lose your selection
+- Adding a language only requires new entries in the `LANGUAGES` and `lang_labels` dictionaries
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 依赖
+### Requirements
 - Python 3.8+
-- 无需额外包（纯标准库）
+- No extra packages (standard library only)
 
-### 启动
+### Run
 
 ```bash
 cd /path/to/job-agent
 python3 job_agent_web.py
 ```
 
-服务默认运行在 **http://localhost:9999**
+The service listens on **http://localhost:9999** by default.
 
-### 管理脚本
+### Management Script
 
 ```bash
-bash agent_ctl.sh start      # 启动
-bash agent_ctl.sh stop       # 停止
-bash agent_ctl.sh restart    # 重启
-bash agent_ctl.sh status     # 查看状态
-bash agent_ctl.sh test       # 运行测试
-bash agent_ctl.sh watchdog   # 检查/重启（适用于 cron）
+bash agent_ctl.sh start      # start
+bash agent_ctl.sh stop       # stop
+bash agent_ctl.sh restart    # restart
+bash agent_ctl.sh status     # check status
+bash agent_ctl.sh test       # run tests
+bash agent_ctl.sh watchdog   # check / restart (suitable for cron)
 ```
 
-### 看门狗（可选）
+### Watchdog (optional)
 
-把 `watchdog.sh` 加入 crontab 每分钟检查一次，崩溃自动重启：
+Add `watchdog.sh` to crontab to check every minute and restart on failure:
 
 ```cron
 * * * * * /path/to/job-agent/watchdog.sh
@@ -80,63 +82,62 @@ bash agent_ctl.sh watchdog   # 检查/重启（适用于 cron）
 
 ---
 
-## 配置 AI
+## Configuring AI
 
-AI 对话功能使用 **DeepSeek API**。
+AI chat features use the **DeepSeek API**.
 
-API Key 的解析顺序（按优先级，找到即用）：
+API key resolution order (first match wins):
 
-1. **环境变量** `DEEPSEEK_API_KEY`
-2. **配置文件** `~/.openclaw/agents/main/agent/models.json` 中的
-   `providers.deepseek.apiKey`
+1. **Environment variable** `DEEPSEEK_API_KEY`
+2. **Config file** `providers.deepseek.apiKey` in `~/.openclaw/agents/main/agent/models.json`
 
-> ⚠️ **注意**：`agent_data/settings.json` **不被代码读取**（历史文档遗留，已废弃）。
+> ⚠️ **Note**: `agent_data/settings.json` is **not read by the code** (legacy from older docs, deprecated).
 
-### 方式一：环境变量
+### Option 1: Environment variable
 
 ```bash
-export DEEPSEEK_API_KEY="sk-your-api-key-here"
+export DEEPSEEK_API_KEY="sk-you…here"
 ```
 
-适合手动在终端启动服务。**注意**：通过 cron / watchdog 自动重启的进程**不会继承**终端里 `export` 的变量，因此该方式对无人值守重启不可靠。
+Suitable when starting the service manually from a terminal. **Note**: processes restarted automatically by cron / watchdog **do not inherit** variables `export`ed in your shell, so this approach is unreliable for unattended restarts.
 
-### 方式二：配置文件（推荐，耐重启）
+### Option 2: Config file (recommended, restart-safe)
 
-在 `~/.openclaw/agents/main/agent/models.json` 中加入：
+Add the following to `~/.openclaw/agents/main/agent/models.json`:
 
 ```json
 {
   "providers": {
     "deepseek": {
-      "apiKey": "sk-your-api-key-here"
+      "apiKey": "sk-you…here"
     }
   }
 }
 ```
 
-> 🔒 该文件位于工作区仓库**之外**，不会被提交到 Git。
-> 请勿把 Key 写入 `job-agent/` 目录内的任何文件。
+> 🔒 This file lives **outside** the workspace repository and is never committed to Git.
+> Never write the key into any file under `job-agent/`.
 
-### 使用场景
+### Where AI Is Used
 
-AI 参与以下功能的生成与分析：
+AI participates in generating and analyzing the following:
 
-| 功能 | 说明 |
-|------|------|
-| 简历优化（Tailor） | 针对职位要求调整简历内容 |
-| 求职信生成 | 自动撰写 Cover Letter |
-| 技能差距分析 | 检测缺失技能并评分 |
-| 学习计划 | 生成课程推荐和学习路线 |
-| 知识测验 | 根据学习计划生成 Quiz |
-| 职位分析 | 从 URL 抓取并解析职位详情 |
+| Feature | Description |
+|---------|-------------|
+| Resume tailoring | Adjusts resume content to the job requirements |
+| Cover letter generation | Writes a cover letter automatically |
+| Skill gap analysis | Detects missing skills and scores them |
+| Learning plan | Generates course recommendations and a learning path |
+| Knowledge quiz | Builds a quiz from the learning plan |
+| Job analysis | Fetches and parses job details from a URL |
 
 ---
 
-## 用户画像
+## User Profile
 
-默认画像（`agent_data/user_profile.json`）包含技能、经验年限、偏好地点等，可在页面 `/profile` 编辑，或直接修改 JSON 文件。
+The default profile (`agent_data/user_profile.json`) holds skills, years of experience, preferred locations, and more. Edit it on the `/profile` page or modify the JSON file directly.
 
-画像字段：
+Profile fields:
 
 ```json
 {
@@ -155,35 +156,35 @@ AI 参与以下功能的生成与分析：
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 job-agent/
-├── agent_ctl.sh          # 管理脚本（start/stop/restart/status）
-├── watchdog.sh           # 看门狗脚本（cron 用）
-├── job_agent_web.py      # Web 服务器 + 前端页面（~4790 行）
-├── job_agent_core.py     # 核心逻辑：搜索、匹配、画像（~1840 行）
-├── job_agent_apply.py    # 申请分析与管理（~243 行）
-├── tests.py              # 测试套件（~1400 行）
-├── agent_data/           # 运行时数据（已在 .gitignore 中）
-│   ├── user_profile.json # 用户画像
-│   ├── tracked_jobs.json # 跟踪的职位
-│   └── resumes/          # 简历文件与关联
-├── static/               # 静态资源（logo SVG 等）
-└── sites/                # 职位网站解析器
+├── agent_ctl.sh          # management script (start/stop/restart/status)
+├── watchdog.sh           # watchdog script (for cron)
+├── job_agent_web.py      # web server + frontend pages (~4790 lines)
+├── job_agent_core.py     # core logic: search, matching, profile (~1840 lines)
+├── job_agent_apply.py    # application analysis and management (~243 lines)
+├── tests.py              # test suite (~1400 lines)
+├── agent_data/           # runtime data (already in .gitignore)
+│   ├── user_profile.json # user profile
+│   ├── tracked_jobs.json # tracked jobs
+│   └── resumes/          # resume files and associations
+├── static/               # static assets (logo SVG, etc.)
+└── sites/                # job site parsers
 ```
 
-> API Key 不在仓库内，见上文「配置 AI」。
+> The API key is not in the repository — see "Configuring AI" above.
 
 ---
 
-## 国际化
+## Internationalization
 
-添加新语言步骤：
+Steps to add a new language:
 
-1. 在 `job_agent_web.py` 的 `LANGUAGES` 字典新增语言条目
-2. 在相同文件的 `lang_labels` 字典添加语言选项
-3. 重启服务，右上角下拉框自动出现新语言选项
+1. Add a language entry to the `LANGUAGES` dictionary in `job_agent_web.py`
+2. Add the language option to the `lang_labels` dictionary in the same file
+3. Restart the service; the dropdown in the top-right corner picks up the new language automatically
 
 ---
 
